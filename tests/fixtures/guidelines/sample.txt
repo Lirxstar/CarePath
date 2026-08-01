@@ -1,0 +1,5 @@
+Cookie preferences
+
+A plain-text recommendation keeps numbers, units, and conditions unchanged.
+
+Do not remove negation from a recommendation.

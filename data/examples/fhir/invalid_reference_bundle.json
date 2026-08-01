@@ -1,0 +1,16 @@
+{
+  "resourceType": "Bundle",
+  "type": "collection",
+  "entry": [
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "observation-invalid-reference",
+        "subject": {"reference": "Patient/not-present"},
+        "code": {"coding": [{"code": "steps"}]},
+        "valueQuantity": {"value": 1000, "unit": "steps"},
+        "effectiveDateTime": "2026-07-28T08:00:00+09:00"
+      }
+    }
+  ]
+}

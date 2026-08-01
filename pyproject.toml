@@ -1,0 +1,85 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "carepath-repository"
+version = "0.6.0"
+description = "CarePath research prototype"
+requires-python = ">=3.11"
+dependencies = [
+  "alembic>=1.18,<2",
+  "fastapi>=0.115,<1",
+  "langgraph==1.2.9",
+  "psycopg[binary]>=3.3,<4",
+  "pydantic-settings>=2.5,<3",
+  "qdrant-client[fastembed]==1.18.0",
+  "SQLAlchemy>=2.0.51,<3",
+  "uvicorn>=0.30,<1",
+]
+
+[project.optional-dependencies]
+dev = [
+  "httpx>=0.27,<1",
+  "httpx2>=2.9,<3",
+  "mypy>=2.0,<3",
+  "pre-commit>=4.0,<5",
+  "pytest>=8.0,<9",
+  "pytest-cov>=6.0,<8",
+  "ruff>=0.9,<1",
+]
+
+[project.scripts]
+carepath-db = "backend.storage.cli:main"
+carepath-index = "backend.retrieval.vector_cli:main"
+
+[tool.setuptools.packages.find]
+include = ["backend*"]
+
+[tool.pytest.ini_options]
+addopts = [
+  "-q",
+  "--strict-config",
+  "--strict-markers",
+  "--cov=backend",
+  "--cov-branch",
+  "--cov-report=term-missing:skip-covered",
+  "--cov-report=xml",
+  "--cov-fail-under=85",
+]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["B", "C4", "E", "F", "I", "PIE", "RUF", "SIM", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+"backend/api/app/llm/provider.py" = ["B027"]
+"backend/safety/triage.py" = ["E501"]
+
+[tool.mypy]
+files = ["backend"]
+python_version = "3.11"
+show_error_codes = true
+strict = true
+warn_unreachable = true
+
+[[tool.mypy.overrides]]
+module = "backend.safety.triage"
+disable_error_code = ["no-redef"]
+
+[tool.coverage.run]
+branch = true
+relative_files = true
+source = ["backend"]
+
+[tool.coverage.report]
+fail_under = 85
+show_missing = true
+skip_covered = true
+
+[tool.coverage.xml]
+output = "coverage.xml"

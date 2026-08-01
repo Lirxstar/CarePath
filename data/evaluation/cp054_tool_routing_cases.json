@@ -1,0 +1,12 @@
+[
+  {"question": "Hello, thanks for your help", "expected_tools": []},
+  {"question": "How has my sleep changed recently?", "expected_tools": ["trend", "window_comparison", "change_detection"]},
+  {"question": "Show my steps trend over the last week", "expected_tools": ["trend"]},
+  {"question": "Build a plan to make my sleep routine more regular", "expected_tools": ["trend", "adherence_summary", "user_history", "guideline_retrieval"]},
+  {"question": "What do guidelines recommend about sleep?", "expected_tools": ["guideline_retrieval"]},
+  {"question": "I feel stressed; recommend a low-effort routine", "expected_tools": ["trend", "adherence_summary", "user_history", "guideline_retrieval"]},
+  {"question": "Has my walking gotten better or worse?", "expected_tools": ["trend", "window_comparison", "change_detection"]},
+  {"question": "Summarize my mood trend", "expected_tools": ["trend"]},
+  {"question": "最近睡眠有什么变化？", "expected_tools": ["trend", "window_comparison", "change_detection"]},
+  {"question": "请给我一个活动计划", "expected_tools": ["trend", "adherence_summary", "user_history", "guideline_retrieval"]}
+]

@@ -1,0 +1,55 @@
+flowchart TB
+    subgraph Device["TB-1 · User device / public client"]
+        USER["Question · profile · observations\njournal · feedback · consent choices"]
+    end
+
+    subgraph Application["Trusted application and policy boundary"]
+        APP["FastAPI + deterministic safety + bounded workflow"]
+        INGEST["Evidence ingestion gate\nvalidate source · licence · hash · hostile content"]
+        PROVIDER["ModelProvider\nexplicit payload allowlist + secret filter"]
+        AUDIT["Audit/log writers\nschema-controlled fields"]
+    end
+
+    subgraph UserData["TB-2 · User data / persistence"]
+        STORE[("User/persona-scoped records")]
+        PERSONAL[("Isolated personal retrieval namespace")]
+    end
+
+    subgraph External["TB-3 · Untrusted external guidance"]
+        EXT["Public guideline/document\ncontent has no instruction authority"]
+        EVIDENCE[("Curated evidence namespace\nprovenance retained")]
+    end
+
+    subgraph Endpoint["TB-4 · Model endpoint"]
+        MODEL["Cloud or Radeon endpoint\nno database credentials or direct access"]
+    end
+
+    subgraph Logging["TB-5 · Audit and operational logs"]
+        AUDITSTORE[("Audit: refs + decisions + bounded summaries")]
+        OPS[("Operations: IDs + route + status + latency")]
+    end
+
+    USER -->|"HTTPS · authenticated/consented · schema validated"| APP
+    APP -->|"response JSON · no hidden policy/secrets"| USER
+
+    APP -->|"authorized user-scoped reads/writes"| STORE
+    STORE -->|"minimum task-specific records"| APP
+    APP -->|"user/persona-scoped query only"| PERSONAL
+    PERSONAL -->|"minimal snippets + record refs"| APP
+
+    EXT -->|"untrusted content + source metadata"| INGEST
+    INGEST -->|"validated/sanitized chunks + provenance"| EVIDENCE
+    EVIDENCE -->|"eligible evidence only · never instructions"| APP
+
+    APP -->|"sanitized minimal ModelRequest"| PROVIDER
+    PROVIDER -->|"allow-listed payload · no secrets/DB access"| MODEL
+    MODEL -->|"untrusted completion"| PROVIDER
+    PROVIDER -->|"normalized draft for verification"| APP
+
+    APP -->|"workflow refs + decisions only"| AUDIT
+    AUDIT -->|"schema-controlled audit event"| AUDITSTORE
+    AUDIT -->|"metadata allowlist only"| OPS
+
+    NO_EXTERNAL_POLICY["FORBIDDEN\nexternal text → policy/tool authority"]
+    NO_MODEL_DATA["FORBIDDEN\nmodel endpoint ↔ persistence"]
+    NO_RAW_LOGS["FORBIDDEN\nraw journal/prompt/secret → logs"]

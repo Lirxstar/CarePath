@@ -1,0 +1,101 @@
+{
+  "personal_documents": [
+    {
+      "evidence_id": "personal:journal:j-sleep-001",
+      "user_id": "user-a",
+      "content": "Journal: I went to bed very late and my sleep schedule felt irregular this week."
+    },
+    {
+      "evidence_id": "personal:observation:o-activity-001",
+      "user_id": "user-a",
+      "content": "Observation summary: 3200 steps and 12 active minutes, with low daytime activity."
+    },
+    {
+      "evidence_id": "personal:goal:g-walk-001",
+      "user_id": "user-a",
+      "content": "Goal: build toward 6000 daily steps with a short walk after lunch."
+    },
+    {
+      "evidence_id": "personal:journal:j-sleep-other-user",
+      "user_id": "user-b",
+      "content": "Journal: sleep schedule was irregular and bedtime was late."
+    }
+  ],
+  "external_documents": [
+    {
+      "evidence_id": "external:chunk-sleep",
+      "source_id": "src-sleep",
+      "content": "A consistent sleep schedule and regular wake time can support healthy sleep habits."
+    },
+    {
+      "evidence_id": "external:chunk-activity",
+      "source_id": "src-activity",
+      "content": "Physical activity can include walking and accumulated active minutes across the day."
+    },
+    {
+      "evidence_id": "external:chunk-falls",
+      "source_id": "src-falls",
+      "content": "Fall prevention guidance includes balance, strength, and reducing environmental hazards."
+    },
+    {
+      "evidence_id": "external:chunk-stress",
+      "source_id": "src-stress",
+      "content": "Stress management may include relaxation routines, paced breathing, and regular breaks."
+    },
+    {
+      "evidence_id": "external:chunk-behaviour",
+      "source_id": "src-behaviour",
+      "content": "Behaviour change is supported by specific goals, self monitoring, and gradual progress."
+    },
+    {
+      "evidence_id": "external:chunk-help",
+      "source_id": "src-help",
+      "content": "Professional help should be sought when concerning symptoms are severe, persistent, or worsening."
+    }
+  ],
+  "cases": [
+    {
+      "query": "irregular sleep schedule late bedtime",
+      "namespace": "personal",
+      "user_id": "user-a",
+      "relevant_evidence_ids": ["personal:journal:j-sleep-001"]
+    },
+    {
+      "query": "low steps active minutes",
+      "namespace": "personal",
+      "user_id": "user-a",
+      "relevant_evidence_ids": ["personal:observation:o-activity-001"]
+    },
+    {
+      "query": "daily steps short walk goal",
+      "namespace": "personal",
+      "user_id": "user-a",
+      "relevant_evidence_ids": ["personal:goal:g-walk-001"]
+    },
+    {
+      "query": "consistent sleep schedule regular wake time",
+      "namespace": "external",
+      "relevant_evidence_ids": ["external:chunk-sleep"]
+    },
+    {
+      "query": "physical activity walking active minutes",
+      "namespace": "external",
+      "relevant_evidence_ids": ["external:chunk-activity"]
+    },
+    {
+      "query": "fall prevention balance strength",
+      "namespace": "external",
+      "relevant_evidence_ids": ["external:chunk-falls"]
+    },
+    {
+      "query": "stress relaxation breathing breaks",
+      "namespace": "external",
+      "relevant_evidence_ids": ["external:chunk-stress"]
+    },
+    {
+      "query": "seek professional help severe persistent symptoms",
+      "namespace": "external",
+      "relevant_evidence_ids": ["external:chunk-help"]
+    }
+  ]
+}

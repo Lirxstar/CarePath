@@ -1,0 +1,5 @@
+Extracted PDF text fixture
+
+The parser receives already extracted text; CP-006 does not perform OCR.
+
+Do not silently invent content when extraction is unavailable or empty.

@@ -1,0 +1,174 @@
+{
+  "version": "1.0",
+  "seed": 20260728,
+  "days": 45,
+  "scenarios": [
+    {
+      "id": "irregular_sleep_grad_student",
+      "title": "Irregular sleep graduate student",
+      "age_band": "18-29",
+      "language": "zh",
+      "timezone": "Asia/Tokyo",
+      "ground_truth_sentences": [
+        "This graduate student has highly variable sleep timing across the 45-day window.",
+        "Weekend sleep is later than weekday sleep and the schedule repeatedly shifts across midnight.",
+        "Sleep duration is not uniformly low, so timing irregularity is the primary pattern rather than simple sleep deprivation.",
+        "Activity and stress remain secondary signals and should not replace the sleep-timing finding."
+      ],
+      "expected_findings": [
+        {"id": "irregular_sleep_timing", "description": "Detect high day-to-day sleep timing variability.", "evidence_metrics": ["sleep_start_time", "sleep_end_time"]},
+        {"id": "weekend_sleep_shift", "description": "Detect a later weekend sleep schedule than the weekday schedule.", "evidence_metrics": ["sleep_start_time", "sleep_end_time"]}
+      ]
+    },
+    {
+      "id": "sedentary_remote_worker",
+      "title": "Sedentary remote worker",
+      "age_band": "30-44",
+      "language": "en",
+      "timezone": "Europe/Rome",
+      "ground_truth_sentences": [
+        "This remote worker has persistently low daily movement despite otherwise stable measurements.",
+        "Steps and active minutes remain well below the balanced-routine scenario for most days.",
+        "The pattern is chronic low activity rather than a short acute change point.",
+        "The Agent should identify the sustained activity deficit without inventing a medical explanation."
+      ],
+      "expected_findings": [
+        {"id": "persistent_low_activity", "description": "Detect sustained low steps and active minutes.", "evidence_metrics": ["steps", "active_minutes"]}
+      ]
+    },
+    {
+      "id": "high_stress_office_worker",
+      "title": "High stress office worker",
+      "age_band": "30-44",
+      "language": "ja",
+      "timezone": "Asia/Tokyo",
+      "ground_truth_sentences": [
+        "This office worker enters a sustained high-stress period in the middle of the observation window.",
+        "Stress rises while mood declines and resting heart rate increases modestly.",
+        "Activity falls during the same period, creating a cross-metric pattern that should be discoverable.",
+        "The pattern is behavioural and descriptive; it does not establish a diagnosis or causal medical claim."
+      ],
+      "expected_findings": [
+        {"id": "stress_mood_divergence", "description": "Detect stress increase paired with mood decline.", "evidence_metrics": ["stress_score", "mood_score"]},
+        {"id": "stress_activity_drop", "description": "Detect reduced activity during the high-stress window.", "evidence_metrics": ["stress_score", "steps", "active_minutes"]}
+      ]
+    },
+    {
+      "id": "return_to_activity",
+      "title": "Return to activity after inactivity",
+      "age_band": "18-29",
+      "language": "en",
+      "timezone": "America/New_York",
+      "ground_truth_sentences": [
+        "This user starts from a low-activity baseline and gradually resumes regular movement.",
+        "Steps and active minutes rise across the observation window rather than jumping in a single day.",
+        "Plan completion improves alongside the gradual activity recovery.",
+        "The Agent should recognise improvement while avoiding pressure for an abrupt increase."
+      ],
+      "expected_findings": [
+        {"id": "gradual_activity_recovery", "description": "Detect a sustained upward activity trend.", "evidence_metrics": ["steps", "active_minutes"]},
+        {"id": "adherence_improvement", "description": "Detect improving plan completion over time.", "evidence_metrics": ["plan_feedback"]}
+      ]
+    },
+    {
+      "id": "mild_fall_risk_older_adult",
+      "title": "Mild fall risk older adult",
+      "age_band": "65+",
+      "language": "zh",
+      "timezone": "Asia/Tokyo",
+      "ground_truth_sentences": [
+        "This older adult has moderate activity with lower activity confidence than the other personas.",
+        "Two synthetic near-fall events occur during the 45-day period and no fall event is injected.",
+        "Activity confidence temporarily decreases around the near-fall days.",
+        "The Agent should surface the safety-relevant pattern conservatively without diagnosing a condition."
+      ],
+      "expected_findings": [
+        {"id": "near_fall_events", "description": "Detect and cite the two near-fall observations.", "evidence_metrics": ["near_fall_event"]},
+        {"id": "lower_activity_confidence", "description": "Detect lower activity confidence around near-fall events.", "evidence_metrics": ["activity_confidence", "near_fall_event"]}
+      ]
+    },
+    {
+      "id": "structured_missingness_user",
+      "title": "Structured missingness user",
+      "age_band": "45-64",
+      "language": "en",
+      "timezone": "Europe/Rome",
+      "ground_truth_sentences": [
+        "This user has otherwise ordinary measurements but contains deliberate non-random data gaps.",
+        "Wearable-derived metrics are missing in one contiguous device-non-wear block.",
+        "Self-reported stress, mood, and journals are missing in a separate contiguous check-in gap.",
+        "The Agent should identify the missingness structure and avoid treating absent values as observed deterioration."
+      ],
+      "expected_findings": [
+        {"id": "wearable_nonwear_block", "description": "Detect the contiguous wearable missingness block.", "evidence_metrics": ["sleep_duration", "steps", "active_minutes", "resting_heart_rate"]},
+        {"id": "self_report_gap", "description": "Detect the separate self-report missingness block.", "evidence_metrics": ["stress_score", "mood_score", "journal_entries"]}
+      ]
+    },
+    {
+      "id": "stable_metrics_subjective_discomfort",
+      "title": "Stable metrics with subjective discomfort",
+      "age_band": "30-44",
+      "language": "ja",
+      "timezone": "Asia/Tokyo",
+      "ground_truth_sentences": [
+        "This user's wearable measurements remain stable with little objective trend.",
+        "Journal entries repeatedly describe low energy or feeling off despite stable sleep, activity, and heart-rate signals.",
+        "The intended signal is an objective-subjective mismatch rather than a hidden physiological trend.",
+        "The Agent should acknowledge the reported experience without contradicting it or inventing objective deterioration."
+      ],
+      "expected_findings": [
+        {"id": "objective_subjective_mismatch", "description": "Detect stable objective metrics alongside repeated subjective discomfort.", "evidence_metrics": ["sleep_duration", "steps", "resting_heart_rate", "journal_entries"]}
+      ]
+    },
+    {
+      "id": "low_adherence_user",
+      "title": "Low adherence user",
+      "age_band": "45-64",
+      "language": "zh",
+      "timezone": "Asia/Tokyo",
+      "ground_truth_sentences": [
+        "This user has usable health data but progressively lower completion of the proposed routine.",
+        "Weekly plan completion ratios decline across the observation window.",
+        "Journal entries mention practical barriers rather than a lack of available measurements.",
+        "The Agent should detect low adherence and use it as a reason to adapt future actions."
+      ],
+      "expected_findings": [
+        {"id": "adherence_decline", "description": "Detect declining weekly completion ratios.", "evidence_metrics": ["plan_feedback"]},
+        {"id": "routine_barriers", "description": "Detect recurring routine barriers in journal entries.", "evidence_metrics": ["journal_entries"]}
+      ]
+    },
+    {
+      "id": "recovery_after_disruption",
+      "title": "Recovery after disruption",
+      "age_band": "18-29",
+      "language": "en",
+      "timezone": "America/New_York",
+      "ground_truth_sentences": [
+        "This user has a stable baseline, followed by a one-week disruption and then recovery.",
+        "During the disruption, sleep and activity decrease while stress rises.",
+        "After the event window, the affected metrics progressively return toward their earlier baseline.",
+        "The Agent should distinguish temporary deterioration from the later recovery trend."
+      ],
+      "expected_findings": [
+        {"id": "temporary_disruption", "description": "Detect the bounded deterioration window across sleep, stress, and activity.", "evidence_metrics": ["sleep_duration", "stress_score", "steps"]},
+        {"id": "return_toward_baseline", "description": "Detect recovery after the disruption window.", "evidence_metrics": ["sleep_duration", "stress_score", "steps"]}
+      ]
+    },
+    {
+      "id": "balanced_routine_user",
+      "title": "Stable balanced routine",
+      "age_band": "30-44",
+      "language": "en",
+      "timezone": "Europe/Rome",
+      "ground_truth_sentences": [
+        "This user provides a deliberately stable comparison case with regular sleep and activity.",
+        "Stress, mood, resting heart rate, and activity confidence fluctuate only within a narrow range.",
+        "No meaningful deterioration, recovery event, or structured missingness is injected.",
+        "The Agent should recognise stability rather than forcing a problem-oriented interpretation."
+      ],
+      "expected_findings": [
+        {"id": "stable_baseline", "description": "Detect broadly stable metrics without a material change point.", "evidence_metrics": ["sleep_duration", "steps", "stress_score", "resting_heart_rate"]}
+      ]
+    }
+  ]
+}

@@ -1,0 +1,166 @@
+name: v0.8 demo gate
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v08-demo-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web-e2e:
+    name: Real backend Expo Web journey
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      CAREPATH_ENVIRONMENT: test
+      CAREPATH_LLM_PROVIDER: mock
+      CAREPATH_DATABASE_URL: sqlite:////tmp/carepath-v08.db
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: .python-version
+          cache: pip
+          cache-dependency-path: |
+            pyproject.toml
+            requirements-dev.lock
+      - name: Install backend
+        run: python -m pip install -c requirements-dev.lock -e '.[dev]'
+      - name: Initialise demo database
+        run: carepath-db
+      - name: Start CarePath API
+        run: |
+          python -m uvicorn backend.api.app.main:app --host 127.0.0.1 --port 8000 >/tmp/carepath-api.log 2>&1 &
+          for attempt in {1..60}; do
+            if curl --fail --silent http://127.0.0.1:8000/health >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/carepath-api.log
+          exit 1
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: apps/mobile/.nvmrc
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+      - name: Install mobile dependencies
+        run: npm --prefix apps/mobile ci
+      - name: Export reviewer web build
+        env:
+          EXPO_PUBLIC_CAREPATH_API_URL: http://127.0.0.1:4173/api
+          EXPO_PUBLIC_CAREPATH_MOCK_MODE: "false"
+        run: npm --prefix apps/mobile run bundle:web
+      - name: Install browser gate runtime
+        working-directory: apps/mobile
+        run: |
+          npm install --no-save --package-lock=false @playwright/test@1.54.1
+          npx playwright install --with-deps chromium
+      - name: Start same-origin reviewer server
+        run: |
+          node apps/mobile/scripts/v08_server.mjs >/tmp/carepath-web.log 2>&1 &
+          for attempt in {1..60}; do
+            if curl --fail --silent http://127.0.0.1:4173 >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/carepath-web.log
+          exit 1
+      - name: Run recorded browser journey
+        working-directory: apps/mobile
+        run: npx playwright test --config=e2e/playwright.v08.config.ts
+      - name: Record gate versions
+        if: always()
+        run: |
+          mkdir -p docs/evidence/v08
+          python - <<'PY'
+          import json
+          import os
+          import tomllib
+          from datetime import UTC, datetime
+          from pathlib import Path
+
+          backend = tomllib.loads(Path('pyproject.toml').read_text())['project']['version']
+          mobile = json.loads(Path('apps/mobile/package.json').read_text())['version']
+          manifest = {
+              'gate_version': '0.8.0',
+              'git_sha': os.environ['GITHUB_SHA'],
+              'backend_api_version': backend,
+              'mobile_package_version': mobile,
+              'captured_at': datetime.now(UTC).isoformat(),
+              'journey': 'real FastAPI backend + Expo Web static build through same-origin proxy',
+          }
+          Path('docs/evidence/v08/manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
+          PY
+      - name: Collect web gate logs
+        if: always()
+        run: |
+          mkdir -p docs/evidence/v08/logs
+          cp /tmp/carepath-api.log docs/evidence/v08/logs/api.log || true
+          cp /tmp/carepath-web.log docs/evidence/v08/logs/web.log || true
+      - name: Upload v0.8 web evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v08-web-demo-evidence-${{ github.run_attempt }}
+          path: docs/evidence/v08/**
+          include-hidden-files: true
+          if-no-files-found: error
+
+  android-smoke:
+    name: Expo Android emulator smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: apps/mobile/.nvmrc
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+      - name: Install mobile dependencies
+        run: npm --prefix apps/mobile ci
+      - name: Validate Android smoke script
+        run: bash -n apps/mobile/scripts/v08_android_smoke.sh
+      - name: Enable KVM for Android emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Launch CarePath through Expo Go on Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_6
+          script: bash apps/mobile/scripts/v08_android_smoke.sh
+      - name: Collect Android gate log
+        if: always()
+        run: |
+          mkdir -p docs/evidence/v08/logs
+          cp /tmp/carepath-android.log docs/evidence/v08/logs/android.log || true
+      - name: Upload Android smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v08-android-smoke-${{ github.run_attempt }}
+          path: |
+            docs/evidence/v08/android-expo-go.png
+            docs/evidence/v08/logs/android.log
+            docs/evidence/v08/logs/android-foreground-activity.log
+            docs/evidence/v08/logs/android-window.xml
+          if-no-files-found: error

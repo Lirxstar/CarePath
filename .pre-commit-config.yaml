@@ -1,0 +1,81 @@
+minimum_pre_commit_version: "4.0.0"
+default_install_hook_types:
+  - pre-commit
+  - pre-push
+
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-format
+        name: Ruff format
+        entry: python -m ruff format
+        language: system
+        types_or:
+          - python
+          - pyi
+        stages:
+          - pre-commit
+
+      - id: ruff-check
+        name: Ruff check
+        entry: python -m ruff check
+        language: system
+        types_or:
+          - python
+          - pyi
+        stages:
+          - pre-commit
+
+      - id: mypy
+        name: mypy
+        entry: python -m mypy
+        language: system
+        pass_filenames: false
+        files: ^backend/.*\.py$|^pyproject\.toml$
+        stages:
+          - pre-commit
+
+      - id: prettier
+        name: Prettier check
+        entry: npm --prefix apps/mobile run format:check
+        language: system
+        pass_filenames: false
+        files: ^apps/mobile/
+        stages:
+          - pre-commit
+
+      - id: eslint
+        name: ESLint
+        entry: npm --prefix apps/mobile run lint
+        language: system
+        pass_filenames: false
+        files: ^apps/mobile/.*\.[cm]?[jt]sx?$
+        stages:
+          - pre-commit
+
+      - id: frontend-typecheck
+        name: TypeScript typecheck
+        entry: npm --prefix apps/mobile run typecheck
+        language: system
+        pass_filenames: false
+        files: ^apps/mobile/.*(\.[cm]?[jt]sx?|tsconfig.*\.json)$
+        stages:
+          - pre-commit
+
+      - id: pytest
+        name: pytest
+        entry: python -m pytest
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages:
+          - pre-push
+
+      - id: jest
+        name: Jest
+        entry: npm --prefix apps/mobile run test:ci
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages:
+          - pre-push

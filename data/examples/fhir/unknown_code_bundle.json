@@ -1,0 +1,23 @@
+{
+  "resourceType": "Bundle",
+  "type": "collection",
+  "entry": [
+    {
+      "resource": {
+        "resourceType": "Patient",
+        "id": "patient-unknown-code",
+        "birthDate": "1990-01-01"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "observation-unknown-code",
+        "subject": {"reference": "Patient/patient-unknown-code"},
+        "code": {"coding": [{"system": "https://vendor.example/codes", "code": "vendor_metric_x"}]},
+        "valueQuantity": {"value": 12, "unit": "custom"},
+        "effectiveDateTime": "2026-07-28T08:00:00+09:00"
+      }
+    }
+  ]
+}

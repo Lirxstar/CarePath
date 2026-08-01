@@ -1,0 +1,52 @@
+{
+  "cases": [
+    {
+      "query": "regular sleep schedule wake time",
+      "relevant_chunk_ids": ["chunk-sleep-routine"]
+    },
+    {
+      "query": "bedtime routine consistent sleep habits",
+      "relevant_chunk_ids": ["chunk-sleep-bedtime"]
+    },
+    {
+      "query": "walking active minutes physical activity",
+      "relevant_chunk_ids": ["chunk-activity-walking"]
+    },
+    {
+      "query": "moderate activity movement across the week",
+      "relevant_chunk_ids": ["chunk-activity-weekly"]
+    },
+    {
+      "query": "paced breathing relaxation stress breaks",
+      "relevant_chunk_ids": ["chunk-stress-breathing"]
+    },
+    {
+      "query": "stress management routine recovery time",
+      "relevant_chunk_ids": ["chunk-stress-recovery"]
+    },
+    {
+      "query": "fall prevention balance strength hazards",
+      "relevant_chunk_ids": ["chunk-falls-balance"]
+    },
+    {
+      "query": "reduce trip hazards safer home falls",
+      "relevant_chunk_ids": ["chunk-falls-home"]
+    },
+    {
+      "query": "specific goals self monitoring gradual progress",
+      "relevant_chunk_ids": ["chunk-behaviour-goals"]
+    },
+    {
+      "query": "small achievable action habit behaviour change",
+      "relevant_chunk_ids": ["chunk-behaviour-habit"]
+    },
+    {
+      "query": "seek professional help severe persistent worsening symptoms",
+      "relevant_chunk_ids": ["chunk-help-persistent"]
+    },
+    {
+      "query": "urgent warning signs immediate professional assessment",
+      "relevant_chunk_ids": ["chunk-help-urgent"]
+    }
+  ]
+}

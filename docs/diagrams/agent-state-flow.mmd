@@ -1,0 +1,54 @@
+stateDiagram-v2
+    [*] --> Safety_Triage
+    Safety_Triage --> Context_Builder: routine/caution
+    Safety_Triage --> Composer: urgent or blocked
+
+    Context_Builder --> Tool_Router
+    state tool_fork <<fork>>
+    state tool_join <<join>>
+    Tool_Router --> tool_fork: allow-listed calls
+    tool_fork --> Personal_Context_Retriever
+    tool_fork --> External_Evidence_Retriever
+    tool_fork --> Analytics_Tools
+
+    Analytics_Tools --> tool_join: deterministic summaries + observation refs
+    Personal_Context_Retriever --> tool_join: minimal user-scoped context + refs
+    External_Evidence_Retriever --> tool_join: eligible evidence + provenance
+    tool_join --> Planner: assembled bounded context
+
+    Planner --> Verifier
+    Verifier --> Composer: pass
+    Verifier --> Planner: one bounded regeneration
+    Verifier --> Composer: fail-safe fallback
+
+    Composer --> Feedback_Update
+    Feedback_Update --> [*]
+
+    note right of Safety_Triage
+      Input: request text + minimum safety context
+      Output: risk, policy flags, allowed path
+      Deterministic rules remain outside the LLM
+    end note
+
+    note right of Tool_Router
+      Input: intent + context + allowed capabilities
+      Output: typed, bounded tool/retrieval calls
+      Personal and external namespaces never merge
+    end note
+
+    note right of Planner
+      Input: bounded context + tool/evidence refs
+      Output: structured seven-day draft
+    end note
+
+    note right of Verifier
+      Input: draft + safety rules + evidence refs
+      Output: pass, regenerate_once, or fallback
+      Risk may escalate but never downgrade
+    end note
+
+    note right of Composer
+      Input: verified result + disposition + refs
+      Output: user-facing response
+      Urgent input produces no ordinary weekly plan
+    end note

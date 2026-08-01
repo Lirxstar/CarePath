@@ -1,0 +1,84 @@
+# Environment variables, secrets, and credentials
+.env
+.env.*
+!.env.example
+**/secrets/
+**/credentials/
+*.key
+*.pem
+*.p12
+*.pfx
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# Node.js, React Native, Expo, and TypeScript
+node_modules/
+.expo/
+.expo-shared/
+dist/
+build/
+web-build/
+coverage/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Logs and temporary artifacts
+*.log
+*.tmp
+*.temp
+*.swp
+*.swo
+.cache/
+tmp/
+temp/
+
+# Local databases
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# Private or generated health data (keep schemas, generators, and scenarios)
+data/private/
+data/generated/
+data/exports/
+data/raw/private/
+artifacts/private-health-data/
+
+# CP-006 local source snapshots and generated corpus builds.
+# The registry, code, deterministic fixtures, and documentation remain version controlled.
+data/guidelines/inputs/
+data/guidelines/generated/
+
+# Model checkpoints, weights, and large generated model artifacts
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+checkpoints/
+model-weights/
+
+# macOS
+.DS_Store
+._*
+
+# IDE and editor-local files
+.idea/
+.vscode/
+*.code-workspace

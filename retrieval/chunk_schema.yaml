@@ -1,0 +1,18 @@
+chunk:
+  required:
+    - chunk_id
+    - source_id
+    - title
+    - section
+    - url
+    - updated_date
+    - retrieved_date
+    - text
+  provenance:
+    immutable:
+      - source_id
+      - url
+      - retrieved_date
+      - updated_date
+  licence:
+    rule: "Do not store full text when ingestion permission is not confirmed"

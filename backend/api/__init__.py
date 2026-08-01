@@ -1,0 +1,1 @@
+"""CarePath FastAPI service package."""

@@ -1,0 +1,72 @@
+flowchart LR
+  subgraph Client["TB-1 · User device / public client boundary"]
+    RN["React Native / Expo\nToday · Coach · Health Data · Plan & History"]
+  end
+
+  subgraph App["Trusted application and policy boundary"]
+    API["FastAPI\nschema validation · consent · request/interaction ID"]
+    WF["Bounded Agent Workflow\nSafety → Context → Tools/RAG → Plan → Verify → Compose"]
+    TOOLS["Deterministic time-series tools\ntrend · period comparison · missingness · adherence"]
+    PRAG["Personal Context Retriever\nuser-scoped access only"]
+    ERAG["External Evidence Retriever\ncurated namespace only"]
+    INGEST["Evidence ingestion gate\nprovenance · licence · hash · hostile-content handling"]
+    MP["ModelProvider\nvendor-neutral allow-listed payload"]
+    AUDIT["Audit writer\nschema-controlled refs + summaries"]
+  end
+
+  subgraph Data["TB-2 · User data and persistence boundary"]
+    DB[("User-scoped application records\nPostgreSQL · SQLite for local development")]
+    PNS[("Personal retrieval namespace\nisolated by user/persona")]
+  end
+
+  subgraph Evidence["TB-3 · External evidence lifecycle boundary"]
+    EXT["Public health / behavioural guidance\nUNTRUSTED before ingestion"]
+    ENS[("Curated evidence namespace\npublic guidance + provenance")]
+  end
+
+  subgraph Model["TB-4 · Model endpoint boundary"]
+    CLOUD["Cloud model endpoint\nthird-party processor"]
+    RADEON["Radeon/ROCm endpoint\nlocal or hosted AMD extension"]
+  end
+
+  subgraph Logs["TB-5 · Audit and operational logging boundary"]
+    AUDITDB[("Audit events\nordered refs + bounded summaries")]
+    OPSLOG[("Operational logs\nIDs · route · status · latency · error class")]
+  end
+
+  RN -->|"HTTPS · authenticated + consented request / feedback · no server secrets"| API
+  API -->|"validated InteractionRequest · request/interaction ID"| WF
+  WF -->|"verified structured result"| API
+  API -->|"response JSON · risk/evidence/plan/audit reference"| RN
+
+  WF -->|"bounded parameters + user-scoped observation refs"| TOOLS
+  TOOLS -->|"trends + missingness + source observation refs"| WF
+  TOOLS -->|"authorized user-scoped read request"| DB
+  DB -->|"selected observations only"| TOOLS
+
+  WF -->|"user/persona-scoped retrieval query + allowed record types"| PRAG
+  PRAG -->|"minimal personal context + record refs"| WF
+  PRAG -->|"authorized namespace query"| PNS
+  PNS -->|"matching user-scoped snippets only"| PRAG
+  API -->|"validated state write"| DB
+  DB -->|"authorized task-specific state read"| API
+
+  WF -->|"curated evidence query · no policy instructions"| ERAG
+  ERAG -->|"evidence chunks + source/chunk IDs + provenance"| WF
+  ERAG -->|"curated namespace query"| ENS
+  ENS -->|"eligible chunks + provenance"| ERAG
+  EXT -->|"untrusted document + source metadata"| INGEST
+  INGEST -->|"validated/sanitized chunks + provenance + content hash"| ENS
+
+  WF -->|"sanitized minimal ModelRequest · explicit field allowlist"| MP
+  MP -->|"minimized request · no DB credentials/access"| CLOUD
+  CLOUD -->|"untrusted completion / structured output"| MP
+  MP -. "same minimized contract · AMD extension" .-> RADEON
+  RADEON -. "untrusted completion / structured output" .-> MP
+  MP -->|"normalized ModelResponse"| WF
+
+  WF -->|"component decisions + refs + disposition only"| AUDIT
+  API -->|"request/interaction refs + response status only"| AUDIT
+  AUDIT -->|"schema-controlled audit event"| AUDITDB
+  API -->|"request ID · route · status · latency only"| OPSLOG
+  WF -->|"component · status · latency · error class only"| OPSLOG

@@ -1,0 +1,53 @@
+flowchart LR
+  CLIENT["React Native / Expo reviewer client"]
+
+  subgraph Local["Local Docker Compose · developer/operator boundary"]
+    LAPI["FastAPI + Agent Workflow container"]
+    LMP["ModelProvider"]
+    LDB[("Local PostgreSQL/SQLite")]
+    LLOG[("Local metadata-only logs")]
+    LMODEL["Optional local model endpoint"]
+    LRADEON["Optional local Radeon/ROCm runtime"]
+  end
+
+  subgraph AWS["AWS deployment boundary · concrete cloud backend"]
+    AAPI["FastAPI + Agent Workflow service"]
+    AMP["ModelProvider"]
+    ADB[("Managed PostgreSQL/storage")]
+    ASECRETS["AWS-managed secret/config injection"]
+    ALOG[("AWS metadata-only logs/audit")]
+  end
+
+  subgraph CloudProvider["Third-party cloud model provider boundary"]
+    CM["Hosted LLM endpoint\nminimized payload only"]
+  end
+
+  subgraph RadeonHosted["Hosted Radeon provider boundary · optional AMD extension"]
+    ROCM["Hosted Radeon/ROCm model runtime\nminimized payload only"]
+  end
+
+  CLIENT -->|"HTTPS API"| LAPI
+  CLIENT -->|"HTTPS API"| AAPI
+
+  LAPI <-->|"local application data"| LDB
+  LAPI -->|"IDs/status/latency only"| LLOG
+  LAPI --> LMP
+  LMP -->|"local-only ModelRequest"| LMODEL
+  LMODEL -->|"completion"| LMP
+  LMP -. "local-only AMD path" .-> LRADEON
+  LRADEON -. "completion" .-> LMP
+  LMP -. "optional third-party egress\nsanitized minimal request" .-> CM
+  CM -. "untrusted completion" .-> LMP
+
+  AAPI <-->|"AWS-boundary application data"| ADB
+  ASECRETS -->|"runtime injection · never client/model payload"| AAPI
+  AAPI -->|"IDs/status/latency only"| ALOG
+  AAPI --> AMP
+  AMP -->|"third-party egress\nsanitized minimal request"| CM
+  CM -->|"untrusted completion"| AMP
+  AMP -. "optional AMD extension\nsanitized minimal request" .-> ROCM
+  ROCM -. "untrusted completion" .-> AMP
+
+  CORE["B core\nExpo + Local Docker + AWS backend\nCloud/Radeon endpoints remain replaceable behind ModelProvider"]
+  PRIVACY["local_strict\nlocal endpoint only · no silent cloud fallback"]
+  PRIVACY -. "constrains" .-> LMP

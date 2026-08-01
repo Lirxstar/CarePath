@@ -1,0 +1,16 @@
+{
+  "observation_id": "00000000-0000-0000-0000-000000000001",
+  "user_id": "00000000-0000-0000-0000-000000000002",
+  "metric_type": "sleep_duration",
+  "value_numeric": 7.5,
+  "value_boolean": null,
+  "unit": "hours",
+  "observed_at": "2026-07-27T00:00:00Z",
+  "source_type": "synthetic_wearable",
+  "quality_flag": "valid",
+  "confidence": 0.95,
+  "metadata": {
+    "generator": "carepath_synthetic",
+    "provenance": "synthetic"
+  }
+}

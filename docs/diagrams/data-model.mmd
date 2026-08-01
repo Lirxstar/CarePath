@@ -1,0 +1,64 @@
+erDiagram
+    USER_PROFILE ||--o{ OBSERVATION : has
+    USER_PROFILE ||--o{ JOURNAL_ENTRY : writes
+    USER_PROFILE ||--o{ GOAL : owns
+    USER_PROFILE ||--o{ INTERACTION : starts
+    INTERACTION ||--o{ AUDIT_EVENT : emits
+    GOAL ||--o{ INTERVENTION_PLAN : drives
+    INTERVENTION_PLAN ||--o{ PLAN_ACTION : contains
+    PLAN_ACTION ||--o{ PLAN_FEEDBACK : receives
+    KNOWLEDGE_SOURCE ||--o{ KNOWLEDGE_CHUNK : contains
+
+    USER_PROFILE {
+      uuid user_id PK
+      string timezone
+      string preferred_language
+    }
+    OBSERVATION {
+      uuid observation_id PK
+      uuid user_id FK
+      string metric_type
+      datetime observed_at
+      string source_type
+    }
+    JOURNAL_ENTRY {
+      uuid entry_id PK
+      uuid user_id FK
+      datetime created_at
+    }
+    GOAL {
+      uuid goal_id PK
+      uuid user_id FK
+      string domain
+      string status
+    }
+    INTERVENTION_PLAN {
+      uuid plan_id PK
+      uuid goal_id FK
+      int version
+    }
+    PLAN_ACTION {
+      uuid action_id PK
+      uuid plan_id FK
+    }
+    PLAN_FEEDBACK {
+      uuid feedback_id PK
+      uuid action_id FK
+    }
+    INTERACTION {
+      uuid interaction_id PK
+      uuid user_id FK
+    }
+    AUDIT_EVENT {
+      uuid audit_event_id PK
+      uuid interaction_id FK
+    }
+    KNOWLEDGE_SOURCE {
+      string source_id PK
+      string trust_tier
+    }
+    KNOWLEDGE_CHUNK {
+      string chunk_id PK
+      string source_id FK
+      string content_hash
+    }
