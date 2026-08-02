@@ -1,6 +1,6 @@
 # CarePath Issue Board
 
-This board tracks only the current public backlog. Completed pre-public work remains documented in the implementation, tests, and project documentation rather than as open public issues.
+This board tracks only the current public backlog. Completed work remains documented in the implementation, tests, project documentation, closed issues, and merged pull requests rather than as open board entries.
 
 ## Board policy
 
@@ -16,15 +16,15 @@ None.
 
 ## Ready
 
-### [#1 — CP-016: Build fixed 48-scenario evaluation set](../../issues/1)
+### [#2 — CP-017: Implement B0–B3 baselines and metrics](../../issues/2)
 
-**Labels:** `B-core`, `evaluation`, `safety`, `P0-application-blocking`  
-**Dependencies:** CP-003, CP-006, and CP-008 are complete.  
+**Labels:** `B-core`, `evaluation`, `P0-application-blocking`  
+**Dependencies:** CP-007, CP-009, and CP-016 are complete.  
 **Acceptance criteria:**
 
-- all required categories and counts exist;
-- expected tools, evidence, safety outcome, and prohibited claims are annotated;
-- scenarios are version controlled.
+- all four systems run through one evaluation interface;
+- required retrieval, grounding, tool, safety, and latency metrics are produced;
+- raw and summarised outputs are saved reproducibly.
 
 ### [#4 — CP-019: Containerise and deploy backend](../../issues/4)
 
@@ -37,15 +37,6 @@ None.
 - environment variables and health checks are documented.
 
 ## Blocked
-
-### [#2 — CP-017: Implement B0–B3 baselines and metrics](../../issues/2)
-
-**Blocked by:** CP-016.  
-**Acceptance criteria:**
-
-- all four systems run through one evaluation interface;
-- required retrieval, grounding, tool, safety, and latency metrics are produced;
-- raw and summarised outputs are saved reproducibly.
 
 ### [#3 — CP-018: Pass B acceptance thresholds](../../issues/3)
 
