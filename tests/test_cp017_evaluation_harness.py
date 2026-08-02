@@ -10,10 +10,12 @@ from backend.evaluation.cli import main as evaluation_main
 from backend.evaluation.harness import (
     BaselineId,
     BaselineOutput,
+    BaselineSummary,
     CallableBaselineRunner,
     CitationRecord,
     EvaluationClaim,
     EvaluationHarness,
+    EvaluationRun,
     ExecutionStatus,
     LatencySource,
     ToolExecution,
@@ -24,9 +26,8 @@ from backend.evaluation.reference import reference_runners
 from backend.evaluation.scenarios import SafetyOutcome, load_scenario_set
 
 
-def _summary_by_id(run: object) -> dict[BaselineId, object]:
-    baselines = run.summary.baselines  # type: ignore[attr-defined]
-    return {summary.baseline_id: summary for summary in baselines}
+def _summary_by_id(run: EvaluationRun) -> dict[BaselineId, BaselineSummary]:
+    return {summary.baseline_id: summary for summary in run.summary.baselines}
 
 
 def _sha256(path: Path) -> str:
@@ -53,8 +54,7 @@ def test_reference_fixture_runs_all_four_baselines_and_writes_outputs(
     assert run.summary.benchmark_valid is False
     assert len(run.results) == 192
     assert all(
-        item.output.latency_source is LatencySource.SYNTHETIC_FIXTURE
-        for item in run.results
+        item.output.latency_source is LatencySource.SYNTHETIC_FIXTURE for item in run.results
     )
     assert len((output_dir / "raw_results.jsonl").read_text().splitlines()) == 192
     assert run.manifest.raw_results_sha256 == _sha256(output_dir / "raw_results.jsonl")
@@ -134,8 +134,7 @@ def test_score_scenario_calculates_required_metrics() -> None:
     metrics = score_scenario(scenario, output)
 
     expected_total = len(
-        set(scenario.expected_evidence.personal)
-        | set(scenario.expected_evidence.external)
+        set(scenario.expected_evidence.personal) | set(scenario.expected_evidence.external)
     )
     assert metrics.evidence_retrieval_coverage == pytest.approx(2 / expected_total)
     assert metrics.citation_precision == 0.5
@@ -177,11 +176,7 @@ def test_runner_failures_are_recorded_without_aborting_the_run(tmp_path: Path) -
         benchmark_valid=False,
     )
 
-    failed = [
-        item
-        for item in run.results
-        if item.output.baseline_id is BaselineId.B0_LLM_ONLY
-    ]
+    failed = [item for item in run.results if item.output.baseline_id is BaselineId.B0_LLM_ONLY]
     assert len(failed) == 48
     assert all(item.output.status is ExecutionStatus.FAILED for item in failed)
     assert all(item.output.error_codes == ("runner_exception",) for item in failed)
