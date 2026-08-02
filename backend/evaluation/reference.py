@@ -73,8 +73,7 @@ class ReferenceBaselineRunner:
             response_text=claim.text,
             selected_tools=selected_tools,
             tool_executions=tuple(
-                ToolExecution(tool_name=tool_name, success=True)
-                for tool_name in selected_tools
+                ToolExecution(tool_name=tool_name, success=True) for tool_name in selected_tools
             ),
             personal_evidence=personal_evidence,
             external_evidence=external_evidence,
@@ -86,9 +85,7 @@ class ReferenceBaselineRunner:
         )
 
     def _latency_ms(self, scenario_id: str) -> float:
-        digest = hashlib.sha256(
-            f"{self.baseline_id.value}:{scenario_id}".encode()
-        ).digest()
+        digest = hashlib.sha256(f"{self.baseline_id.value}:{scenario_id}".encode()).digest()
         return _BASE_LATENCY_MS[self.baseline_id] + float(digest[0] % 17)
 
 
