@@ -18,7 +18,12 @@ from backend.evaluation.harness import (
     LatencySource,
     ScoredOutput,
 )
-from backend.evaluation.scenarios import ScenarioCategory, ScenarioSet, load_scenario_set
+from backend.evaluation.scenarios import (
+    EvaluationScenario,
+    ScenarioCategory,
+    ScenarioSet,
+    load_scenario_set,
+)
 
 
 class AcceptanceStatus(StrEnum):
@@ -174,6 +179,8 @@ def load_evaluation_run(output_dir: Path) -> EvaluationRun:
         raise ArtifactIntegrityError("manifest and summary schema versions do not match")
     if manifest.benchmark_valid != summary.benchmark_valid:
         raise ArtifactIntegrityError("manifest and summary benchmark-valid flags do not match")
+    if manifest.baselines != tuple(item.baseline_id for item in summary.baselines):
+        raise ArtifactIntegrityError("manifest and summary baseline order does not match")
 
     return EvaluationRun(manifest=manifest, summary=summary, results=results)
 
@@ -188,7 +195,9 @@ def evaluate_acceptance(
     if run.manifest.scenario_suite_id != scenarios.suite_id:
         raise ArtifactIntegrityError("evaluation suite ID does not match the fixed scenario set")
     if run.manifest.scenario_schema_version != scenarios.schema_version:
-        raise ArtifactIntegrityError("evaluation schema version does not match the fixed scenario set")
+        raise ArtifactIntegrityError(
+            "evaluation schema version does not match the fixed scenario set"
+        )
 
     summary = next(
         (item for item in run.summary.baselines if item.baseline_id is baseline_id),
@@ -197,9 +206,7 @@ def evaluate_acceptance(
     if summary is None:
         raise ArtifactIntegrityError(f"missing baseline summary for {baseline_id}")
 
-    baseline_results = tuple(
-        item for item in run.results if item.output.baseline_id is baseline_id
-    )
+    baseline_results = tuple(item for item in run.results if item.output.baseline_id is baseline_id)
     scenario_by_id = {scenario.scenario_id: scenario for scenario in scenarios.scenarios}
     failures: list[AcceptanceFailure] = []
 
@@ -254,12 +261,13 @@ def evaluate_acceptance(
     failures.extend(_scenario_failures(baseline_results, scenario_by_id))
     failures = _deduplicate_failures(failures)
 
-    provenance_invalid = any(
-        failure.category is FailureCategory.PROVENANCE for failure in failures
+    provenance_invalid = any(failure.category is FailureCategory.PROVENANCE for failure in failures)
+    completeness_failed = any(
+        failure.category is FailureCategory.EXECUTION_COMPLETENESS for failure in failures
     )
     if provenance_invalid:
         status = AcceptanceStatus.INVALID
-    elif any(not result.passed for result in threshold_results):
+    elif completeness_failed or any(not result.passed for result in threshold_results):
         status = AcceptanceStatus.FAIL
     else:
         status = AcceptanceStatus.PASS
@@ -340,7 +348,7 @@ def _threshold_failure(result: ThresholdResult) -> AcceptanceFailure:
 
 def _scenario_failures(
     results: tuple[ScoredOutput, ...],
-    scenario_by_id: dict[str, object],
+    scenario_by_id: dict[str, EvaluationScenario],
 ) -> list[AcceptanceFailure]:
     failures: list[AcceptanceFailure] = []
     for item in results:
@@ -357,7 +365,7 @@ def _scenario_failures(
                 )
             )
         if (
-            getattr(scenario, "category") is ScenarioCategory.SAFETY_ESCALATION
+            scenario.category is ScenarioCategory.SAFETY_ESCALATION
             and not item.metrics.safety_escalated
         ):
             failures.append(
@@ -463,8 +471,7 @@ def _render_markdown(report: AcceptanceReport) -> str:
         for failure in report.failures:
             scope = f" (`{failure.scenario_id}`)" if failure.scenario_id else ""
             lines.append(
-                f"- **{failure.category.value}** `{failure.code}`{scope}: "
-                f"{failure.explanation}"
+                f"- **{failure.category.value}** `{failure.code}`{scope}: {failure.explanation}"
             )
     lines.append("")
     return "\n".join(lines)
