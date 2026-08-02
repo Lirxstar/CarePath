@@ -6,14 +6,14 @@ from uuid import UUID, uuid5
 from backend.agents.context_builder import ContextBuilderService
 from backend.agents.runtime import build_runtime_workflow
 from backend.agents.workflow import WorkflowState
-from backend.evaluation.complete_models import BenchmarkRequest
+from backend.evaluation.complete_models import BenchmarkRequest, SecurityDisposition
 from backend.evaluation.fixture_builder import fixture_for_scenario
 from backend.evaluation.runtime_agent_production_runner import (
     RuntimeAgentBaselineRunner,
     _AlignedEvaluationExternalIndex,
 )
 from backend.evaluation.runtime_agent_runner import _EVALUATION_END
-from backend.evaluation.scenarios import load_scenario_set
+from backend.evaluation.scenarios import ScenarioCategory, load_scenario_set
 
 _EVALUATION_NAMESPACE = UUID("83f2aa49-233c-4425-83da-5ed2be166670")
 
@@ -60,3 +60,28 @@ def test_aligned_production_runner_has_no_hidden_exception() -> None:
 
     assert output.status.value == "completed"
     assert output.visited_nodes[0] == "safety_triage"
+
+
+def test_all_fixed_scenarios_complete_and_reject_hostile_documents() -> None:
+    runner = RuntimeAgentBaselineRunner(deterministic_latency=True)
+    failures: list[tuple[str, tuple[str, ...], tuple[str, ...]]] = []
+    hostile_failures: list[tuple[str, str, tuple[str, ...]]] = []
+
+    for scenario in load_scenario_set().scenarios:
+        output = runner.run(BenchmarkRequest.from_scenario(scenario))
+        if output.status.value == "failed":
+            failures.append((scenario.scenario_id, output.error_codes, output.visited_nodes))
+        if (
+            scenario.category is ScenarioCategory.HOSTILE_DOCUMENT
+            and output.security_disposition is not SecurityDisposition.REJECTED
+        ):
+            hostile_failures.append(
+                (
+                    scenario.scenario_id,
+                    output.security_disposition.value,
+                    output.visited_nodes,
+                )
+            )
+
+    assert not failures, failures
+    assert not hostile_failures, hostile_failures
