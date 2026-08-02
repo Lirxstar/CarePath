@@ -8,117 +8,49 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: cp018-acceptance-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  complete-research-evaluation:
-    if: github.head_ref == 'agent/cp018-complete-research-evaluation'
-    name: Complete CP-018 research evaluation
+  measured-synthetic-evaluation:
+    name: Measured mock-provider B0-B3 evaluation
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 15
     env:
       CAREPATH_ENVIRONMENT: test
       CAREPATH_LLM_PROVIDER: mock
     steps:
-      - name: Check out implementation branch
+      - name: Check out repository
         uses: actions/checkout@v6
-        with:
-          ref: agent/cp018-complete-research-evaluation
-          fetch-depth: 0
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
           python-version-file: .python-version
-      - name: Apply deterministic implementation
-        run: |
-          python scripts/fix_cp018_migration.py
-          python scripts/cp018_apply.py
-          python scripts/cp018_postprocess.py
-          python scripts/cp018_finalize.py
-          python scripts/cp018_lastmile.py
-          python - <<'PY'
-          from pathlib import Path
-
-          path = Path("tests/test_cp018_research_claims.py")
-          text = path.read_text(encoding="utf-8")
-          text = text.replace(
-              'assert review["historical_reviewed_count"] == 29',
-              'assert review["historical_reviewed_count"] == 31',
-          )
-          text = text.replace(
-              'assert review["historical_reviewed_count"] == 30',
-              'assert review["historical_reviewed_count"] == 31',
-          )
-          path.write_text(text, encoding="utf-8")
-          PY
-      - name: Install dependencies
+          cache: pip
+          cache-dependency-path: |
+            pyproject.toml
+            requirements-dev.lock
+      - name: Install evaluation dependencies
         run: python -m pip install -c requirements-dev.lock -e '.[dev]'
-      - name: Validate implementation
+      - name: Run measured B0-B3 synthetic evaluation
         run: |
-          python -m ruff format .
-          python -m ruff check . --fix
-          python -m mypy
-          pytest -o addopts='' \
-            tests/test_runtime_agent_aligned.py \
-            tests/test_cp016_cp018_complete.py \
-            tests/test_cp018_evaluation_quality.py \
-            tests/test_cp018_research_claims.py
-      - name: Run complete research evaluation
+          carepath-evaluate \
+            --measured-mock \
+            --benchmark-valid \
+            --run-id "cp018-${GITHUB_SHA}" \
+            --output-dir test-results/cp018
+      - name: Apply frozen CP-018 thresholds
         run: |
-          carepath-evaluate-complete \
-            --run-id "research-${GITHUB_SHA}" \
-            --temperature 0 \
-            --max-tokens 512 \
-            --seed 7 \
-            --output-dir test-results/research-evaluation
-      - name: Verify targets and complete artifacts
-        run: |
-          python - <<'PY'
-          import json
-          from pathlib import Path
-
-          root = Path("test-results/research-evaluation")
-          acceptance = json.loads((root / "complete_acceptance.json").read_text())
-          if not acceptance["passed"]:
-              raise SystemExit(
-                  "Blocking failures: " + ", ".join(acceptance["blocking_failures"])
-              )
-          observed = acceptance["observed_b3_metrics"]
-          assert observed["citation_precision"] >= 0.85
-          assert observed["patient_context_fidelity"] >= 0.90
-          assert observed["tool_selection_accuracy"] >= 0.90
-          assert observed["unsupported_claim_rate"] <= 0.10
-          plan = json.loads((root / "plan_adaptation_report.json").read_text())
-          assert plan["applicable_count"] == 3
-          assert plan["passed_count"] == 3
-          assert plan["passed_rate"] == 1.0
-          review = json.loads((root / "low_score_review.json").read_text())
-          assert review["historical_reviewed_count"] == 31
-          assert review["unreviewed_current_low_score_count"] == 0
-          assert (root / "low_score_review.md").is_file()
-          manifest = json.loads((root / "complete_manifest.json").read_text())
-          assert manifest["schema_version"] == "2.3"
-          assert manifest["result_count"] == 192
-          PY
-      - name: Commit validated source implementation
-        run: |
-          git restore --source=origin/agent/cp018-complete-research-evaluation -- \
-            .github/workflows scripts cp018-patch-diagnostic.txt
-          rm -rf test-results/research-evaluation
-          git config user.name "carepath-agent"
-          git config user.email "carepath-agent@users.noreply.github.com"
-          git add backend evaluation tests
-          git commit -m "Complete CP-018 research evaluation targets"
-          git push origin HEAD:agent/cp018-complete-research-evaluation
-
-  measured-synthetic-evaluation:
-    if: github.head_ref != 'agent/cp018-complete-research-evaluation'
-    name: Measured mock-provider B0-B3 evaluation
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - run: echo "The implementation job owns this branch run."
+          carepath-acceptance \
+            test-results/cp018 \
+            --output-dir test-results/cp018
+      - name: Upload engineering acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cp018-acceptance-${{ github.run_attempt }}
+          path: test-results/cp018/**
+          if-no-files-found: error
