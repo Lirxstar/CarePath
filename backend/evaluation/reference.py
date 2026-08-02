@@ -6,7 +6,6 @@ import backend.evaluation.harness as evaluation_harness
 import backend.evaluation.scenarios as evaluation_scenarios
 import backend.safety as safety
 
-
 _BASE_LATENCY_MS = {
     evaluation_harness.BaselineId.B0_LLM_ONLY: 40.0,
     evaluation_harness.BaselineId.B1_EXTERNAL_RAG: 70.0,
