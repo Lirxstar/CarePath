@@ -39,6 +39,7 @@ jobs:
           python scripts/cp018_apply.py
           python scripts/cp018_postprocess.py
           python scripts/cp018_finalize.py
+          python scripts/cp018_lastmile.py
       - name: Install dependencies
         run: python -m pip install -c requirements-dev.lock -e '.[dev]'
       - name: Format and type-check
