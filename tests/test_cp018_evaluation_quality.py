@@ -92,6 +92,16 @@ def test_router_covers_missingness_adherence_and_multilingual_trends() -> None:
         "guideline_retrieval",
     ]
 
+    sleep_timing = router.route(
+        user_id=user_id,
+        question="When do I sleep most regularly?",
+        end_date=end_date,
+    )
+    assert [call.arguments["metric_type"] for call in sleep_timing.calls] == [
+        "sleep_start_time",
+        "sleep_end_time",
+    ]
+
     japanese = router.route(
         user_id=user_id,
         question="最近の睡眠傾向を教えてください",
