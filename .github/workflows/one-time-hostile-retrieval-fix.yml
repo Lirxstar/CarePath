@@ -25,23 +25,23 @@ jobs:
 
           path = Path("backend/evaluation/runtime_agent_valid_fixture_runner.py")
           content = path.read_text(encoding="utf-8")
-          source = '''        documents: list[tuple[str, str]] = []
-              for reference in self.fixture.external_evidence_refs:
-          '''
-          target = '''        documents: list[tuple[str, str]] = []
-              has_untrusted_reference = any(
-                  reference.startswith("untrusted_document:")
-                  for reference in self.fixture.external_evidence_refs
-              )
-              if self.request.hostile_document is not None and not has_untrusted_reference:
-                  documents.append(
-                      ("untrusted_document:runtime_attack", self.request.hostile_document)
-                  )
-              for reference in self.fixture.external_evidence_refs:
-          '''
-          if source not in content and target not in content:
-              raise SystemExit("Exact external index anchor not found")
-          path.write_text(content.replace(source, target), encoding="utf-8")
+          start = content.index("        documents: list[tuple[str, str]] = []")
+          loop = content.index(
+              "        for reference in self.fixture.external_evidence_refs:",
+              start,
+          )
+          prefix = (
+              "        documents: list[tuple[str, str]] = []\n"
+              "        has_untrusted_reference = any(\n"
+              "            reference.startswith(\"untrusted_document:\")\n"
+              "            for reference in self.fixture.external_evidence_refs\n"
+              "        )\n"
+              "        if self.request.hostile_document is not None and not has_untrusted_reference:\n"
+              "            documents.append(\n"
+              "                (\"untrusted_document:runtime_attack\", self.request.hostile_document)\n"
+              "            )\n"
+          )
+          path.write_text(content[:start] + prefix + content[loop:], encoding="utf-8")
           PY
       - name: Commit fix
         run: |
