@@ -8,9 +8,9 @@ from backend.agents.runtime import build_runtime_workflow
 from backend.agents.workflow import WorkflowState
 from backend.evaluation.complete_models import BenchmarkRequest, SecurityDisposition
 from backend.evaluation.fixture_builder import fixture_for_scenario
-from backend.evaluation.runtime_agent_production_runner import (
+from backend.evaluation.runtime_agent_valid_fixture_runner import (
     RuntimeAgentBaselineRunner,
-    _AlignedEvaluationExternalIndex,
+    _ExactEvaluationExternalIndex,
 )
 from backend.evaluation.runtime_agent_runner import _EVALUATION_END
 from backend.evaluation.scenarios import ScenarioCategory, load_scenario_set
@@ -37,7 +37,7 @@ def test_aligned_production_runner_has_no_hidden_exception() -> None:
         session=runner.session,
         user_id=user_id,
         request_text=runtime_text,
-        external_index=_AlignedEvaluationExternalIndex(request, fixture),
+        external_index=_ExactEvaluationExternalIndex(request, fixture),
         language=request.language.value,
     )
     started = perf_counter_ns()

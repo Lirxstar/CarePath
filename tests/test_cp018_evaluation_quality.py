@@ -8,7 +8,7 @@ from backend.evaluation.complete_metrics import score_output
 from backend.evaluation.complete_models import BenchmarkRequest, CompleteBaselineOutput
 from backend.evaluation.fixture_builder import build_evaluation_fixture
 from backend.evaluation.harness import BaselineId
-from backend.evaluation.runtime_agent_production_runner import RuntimeAgentBaselineRunner
+from backend.evaluation.runtime_agent_valid_fixture_runner import RuntimeAgentBaselineRunner
 from backend.evaluation.scenarios import SafetyOutcome, load_scenario_set
 
 

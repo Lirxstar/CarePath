@@ -32,7 +32,7 @@ from .complete_models import (
 from .complete_redteam import run_redteam
 from .complete_runner import CompleteBaselineRunner
 from .complete_scenarios import load_complete_scenarios
-from .runtime_agent_production_runner import RuntimeAgentBaselineRunner
+from .runtime_agent_valid_fixture_runner import RuntimeAgentBaselineRunner
 
 __all__ = [
     "BenchmarkRequest",

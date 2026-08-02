@@ -432,8 +432,12 @@ class CarePathToolRouter:
             term in text for term in ("sleep", "slept", "睡眠", "睡", "眠")
         ):
             metrics.insert(0, MetricType.SLEEP_DURATION)
+        if "when do i sleep" in text:
+            if MetricType.SLEEP_START_TIME not in metrics:
+                metrics.insert(0, MetricType.SLEEP_START_TIME)
+            if MetricType.SLEEP_END_TIME not in metrics:
+                metrics.append(MetricType.SLEEP_END_TIME)
         return metrics
-
 
     @staticmethod
     def _metric_call(tool: ToolName, user_id: UUID, metric: MetricType, end_date: date) -> ToolCall:
