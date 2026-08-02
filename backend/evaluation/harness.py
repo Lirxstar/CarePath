@@ -239,9 +239,7 @@ class EvaluationHarness:
                         f"runner {baseline_id} returned scenario {output.scenario_id}; "
                         f"expected {scenario.scenario_id}"
                     )
-                scored.append(
-                    ScoredOutput(output=output, metrics=score_scenario(scenario, output))
-                )
+                scored.append(ScoredOutput(output=output, metrics=score_scenario(scenario, output)))
 
         summary = EvaluationSummary(
             run_id=run_id,
@@ -265,13 +263,12 @@ class EvaluationHarness:
         manifest_path = output_dir / "manifest.json"
 
         raw_content = "".join(
-            json.dumps(item.model_dump(mode="json"), sort_keys=True, separators=(",", ":"))
-            + "\n"
+            json.dumps(item.model_dump(mode="json"), sort_keys=True, separators=(",", ":")) + "\n"
             for item in scored
         )
-        summary_content = json.dumps(
-            summary.model_dump(mode="json"), indent=2, sort_keys=True
-        ) + "\n"
+        summary_content = (
+            json.dumps(summary.model_dump(mode="json"), indent=2, sort_keys=True) + "\n"
+        )
         raw_path.write_text(raw_content, encoding="utf-8")
         summary_path.write_text(summary_content, encoding="utf-8")
 
@@ -411,15 +408,9 @@ def _aggregate_baseline(
         patient_context_fidelity=fmean(
             result.metrics.patient_context_fidelity for result in results
         ),
-        unsupported_claim_rate=_ratio(
-            total_unsupported_medical, total_medical_claims, empty=0.0
-        ),
-        tool_selection_accuracy=fmean(
-            result.metrics.tool_selection_accuracy for result in results
-        ),
-        tool_execution_success=_ratio(
-            total_successful_tools, total_tool_executions, empty=1.0
-        ),
+        unsupported_claim_rate=_ratio(total_unsupported_medical, total_medical_claims, empty=0.0),
+        tool_selection_accuracy=fmean(result.metrics.tool_selection_accuracy for result in results),
+        tool_execution_success=_ratio(total_successful_tools, total_tool_executions, empty=1.0),
         safety_escalation_recall=_ratio(safety_escalations, safety_cases, empty=1.0),
         contradiction_rate=_ratio(
             sum(result.metrics.contradiction for result in results), len(results), empty=0.0
