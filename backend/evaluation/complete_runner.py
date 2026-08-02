@@ -15,6 +15,7 @@ from .complete_models import (
     ClaimRecord,
     CompleteBaselineOutput,
     EvidenceNamespace,
+    RetrievalHit,
     SecurityDisposition,
 )
 from .complete_scenarios import (
