@@ -12,17 +12,19 @@ This board tracks only the current public backlog. Completed work remains docume
 
 ## In progress
 
-### [#2 — CP-017: Implement B0–B3 baselines and metrics](../../issues/2)
-
-**Labels:** `B-core`, `evaluation`, `P0-application-blocking`  
-**Dependencies:** CP-007, CP-009, and CP-016 are complete.  
-**Acceptance criteria:**
-
-- all four systems run through one evaluation interface;
-- required retrieval, grounding, tool, safety, and latency metrics are produced;
-- raw and summarised outputs are saved reproducibly.
+None.
 
 ## Ready
+
+### [#3 — CP-018: Pass B acceptance thresholds](../../issues/3)
+
+**Labels:** `B-core`, `evaluation`, `safety`, `P0-application-blocking`  
+**Dependencies:** CP-011 and CP-017 are complete.  
+**Acceptance criteria:**
+
+- all frozen internal thresholds pass;
+- failures are categorised and analysed;
+- no metric is represented as clinical validation.
 
 ### [#4 — CP-019: Containerise and deploy backend](../../issues/4)
 
@@ -35,15 +37,6 @@ This board tracks only the current public backlog. Completed work remains docume
 - environment variables and health checks are documented.
 
 ## Blocked
-
-### [#3 — CP-018: Pass B acceptance thresholds](../../issues/3)
-
-**Blocked by:** CP-017.  
-**Acceptance criteria:**
-
-- all frozen internal thresholds pass;
-- failures are categorised and analysed;
-- no metric is represented as clinical validation.
 
 ### [#5 — CP-020: Deploy reviewer-facing client](../../issues/5)
 
