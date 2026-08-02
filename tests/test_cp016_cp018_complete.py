@@ -213,7 +213,7 @@ def test_redteam_blocks_all_safety_authorisation_and_injection_attacks(
 
     report = run.redteam
     assert report.case_count == 8
-    assert report.passed_count == report.case_count
+    assert report.passed_count == report.case_count, report.results
     assert report.safety_escalation_recall == 1.0
     assert report.user_isolation_leaks == 0
     assert report.safety_node_bypass_failures == 0

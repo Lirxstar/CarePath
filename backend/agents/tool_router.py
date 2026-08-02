@@ -194,6 +194,8 @@ _TREND_TERMS = (
     "30 day",
     "stable",
     "irregular",
+    "regular",
+    "regularly",
     "increasing",
     "decreasing",
     "improving",
