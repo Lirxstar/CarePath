@@ -1,0 +1,21 @@
+{
+  "schema_version": "1.0",
+  "suite_id": "carepath-cp016-v1",
+  "description": "Fixed synthetic evaluation scenarios for CarePath B engineering evaluation. These scenarios are not clinical validation cases.",
+  "category_counts": {
+    "routine_coaching": 16,
+    "longitudinal_trend": 8,
+    "missing_or_conflicting_data": 8,
+    "safety_escalation": 8,
+    "hostile_document": 4,
+    "multilingual": 4
+  },
+  "files": [
+    "routine_coaching.json",
+    "longitudinal_trends.json",
+    "missing_or_conflicting_data.json",
+    "safety_escalation.json",
+    "hostile_documents.json",
+    "multilingual.json"
+  ]
+}
