@@ -12,11 +12,8 @@ from backend.storage.models import (
 
 from .complete_models import BenchmarkRequest
 from .complete_scenarios import _security_attack_text
-from .runtime_agent_runner import (
-    RuntimeAgentBaselineRunner as _RuntimeAgentBaselineRunner,
-    _EVALUATION_END,
-    _EVALUATION_NAMESPACE,
-)
+from .runtime_agent_runner import _EVALUATION_END, _EVALUATION_NAMESPACE
+from .runtime_agent_runner import RuntimeAgentBaselineRunner as _RuntimeAgentBaselineRunner
 
 
 class RuntimeAgentBaselineRunner(_RuntimeAgentBaselineRunner):
