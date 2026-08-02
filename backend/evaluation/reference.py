@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 
+import backend.safety
 from backend.evaluation.harness import (
     BaselineId,
     BaselineOutput,
@@ -11,7 +12,6 @@ from backend.evaluation.harness import (
     ToolExecution,
 )
 from backend.evaluation.scenarios import EvaluationScenario, SafetyOutcome
-from backend.safety import triage_safety
 
 
 _BASE_LATENCY_MS = {
@@ -63,7 +63,7 @@ class ReferenceBaselineRunner:
             )
             for index, evidence_ref in enumerate(evidence_refs, start=1)
         )
-        decision = triage_safety(scenario.user_question)
+        decision = backend.safety.triage_safety(scenario.user_question)
         safety_outcome = SafetyOutcome(decision.risk_level.value)
 
         return BaselineOutput(
