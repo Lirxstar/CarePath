@@ -125,6 +125,21 @@ _METRIC_TERMS: dict[MetricType, tuple[str, ...]] = {
         "ふらつ",
     ),
 }
+_DIRECTIONAL_CHANGE_TERMS = (
+    "change",
+    "changed",
+    "worse",
+    "better",
+    "increase",
+    "decrease",
+    "gotten better",
+    "gotten worse",
+    "变化",
+    "变差",
+    "改善",
+    "変化",
+    "悪化",
+)
 _COMPARE_TERMS = (
     "compared",
     "compare",
@@ -145,7 +160,7 @@ _COMPARE_TERMS = (
     "平日",
     "週末",
 )
-_CHANGE_TERMS = (
+_ABRUPT_CHANGE_TERMS = (
     "sudden",
     "abrupt",
     "outlier",
@@ -273,9 +288,15 @@ class CarePathToolRouter:
             )
 
         metrics = self._metrics(text)
+        wants_directional_change = any(term in text for term in _DIRECTIONAL_CHANGE_TERMS)
         wants_compare = any(term in text for term in _COMPARE_TERMS)
-        wants_change = any(term in text for term in _CHANGE_TERMS)
-        wants_trend = wants_compare or wants_change or any(term in text for term in _TREND_TERMS)
+        wants_abrupt_change = any(term in text for term in _ABRUPT_CHANGE_TERMS)
+        wants_trend = (
+            wants_directional_change
+            or wants_compare
+            or wants_abrupt_change
+            or any(term in text for term in _TREND_TERMS)
+        )
         wants_missingness = any(term in text for term in _MISSINGNESS_TERMS)
         wants_adherence = any(term in text for term in _ADHERENCE_TERMS)
         wants_plan = wants_adherence or any(term in text for term in _PLAN_TERMS)
@@ -284,11 +305,23 @@ class CarePathToolRouter:
         calls: list[ToolCall] = []
 
         for metric in metrics[:2]:
-            if wants_compare:
+            if wants_directional_change:
+                calls.extend(
+                    [
+                        self._metric_call(ToolName.TREND, user_id, metric, end_date),
+                        self._metric_call(
+                            ToolName.WINDOW_COMPARISON, user_id, metric, end_date
+                        ),
+                        self._metric_call(
+                            ToolName.CHANGE_DETECTION, user_id, metric, end_date
+                        ),
+                    ]
+                )
+            elif wants_compare:
                 calls.append(
                     self._metric_call(ToolName.WINDOW_COMPARISON, user_id, metric, end_date)
                 )
-            elif wants_change:
+            elif wants_abrupt_change:
                 calls.append(
                     self._metric_call(ToolName.CHANGE_DETECTION, user_id, metric, end_date)
                 )
