@@ -1,0 +1,48 @@
+name: One-time final evaluation diagnostics
+
+on:
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.head_ref }}
+      - uses: actions/setup-python@v6
+        with:
+          python-version-file: .python-version
+      - name: Add regularity routing and detailed red-team assertion
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          router = Path("backend/agents/tool_router.py")
+          content = router.read_text(encoding="utf-8")
+          source = '    "irregular",\n    "increasing",'
+          target = '    "irregular",\n    "regular",\n    "regularly",\n    "increasing",'
+          if source not in content and target not in content:
+              raise SystemExit("Trend terms anchor not found")
+          router.write_text(content.replace(source, target), encoding="utf-8")
+
+          tests = Path("tests/test_cp016_cp018_complete.py")
+          content = tests.read_text(encoding="utf-8")
+          source = "    assert report.passed_count == report.case_count\n"
+          target = "    assert report.passed_count == report.case_count, report.results\n"
+          if source not in content and target not in content:
+              raise SystemExit("Red-team assertion anchor not found")
+          tests.write_text(content.replace(source, target), encoding="utf-8")
+          PY
+      - name: Commit diagnostics
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add backend/agents/tool_router.py tests/test_cp016_cp018_complete.py
+          git commit -m "Route regular sleep timing and expose red-team failures"
+          git push origin "HEAD:${GITHUB_HEAD_REF}"
