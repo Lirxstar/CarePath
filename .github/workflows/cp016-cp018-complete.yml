@@ -117,6 +117,18 @@ jobs:
           path.write_text(text, encoding="utf-8")
           PY
           python scripts/cp018_finalize.py
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("backend/evaluation/runtime_agent_production_runner.py")
+          text = path.read_text(encoding="utf-8")
+          block = '''        if WorkflowNode.EXTERNAL_EVIDENCE_RETRIEVER in state.visited_nodes:
+            success_by_tool[ToolName.RETRIEVE_EXTERNAL_EVIDENCE] = True
+'''
+          if block not in text:
+              raise SystemExit("external tool accounting block not found")
+          path.write_text(text.replace(block, "", 1), encoding="utf-8")
+          PY
       - name: Install dependencies
         run: python -m pip install -c requirements-dev.lock -e '.[dev]'
       - name: Format and type-check implementation
@@ -159,6 +171,8 @@ jobs:
                       [item.value for item in scenario.expected_tools],
                       [item.value for item in result.output.selected_tools],
                       result.metrics.tool_selection_accuracy,
+                      scenario.user_question,
+                      list(scenario.context_overrides),
                   )
           print("PLAN_REPORT", json.dumps(run.plan_adaptation, sort_keys=True))
           print("LOW_SCORE_REVIEW", json.dumps(run.low_score_review, sort_keys=True))
