@@ -33,6 +33,14 @@ class _ExactEvaluationExternalIndex(_AlignedEvaluationExternalIndex):
     def search(self, query: str, *, top_k: int = 5) -> tuple[ExternalEvidenceHit, ...]:
         del query
         documents: list[tuple[str, str]] = []
+        has_untrusted_reference = any(
+            reference.startswith("untrusted_document:")
+            for reference in self.fixture.external_evidence_refs
+        )
+        if self.request.hostile_document is not None and not has_untrusted_reference:
+            documents.append(
+                ("untrusted_document:runtime_attack", self.request.hostile_document)
+            )
         for reference in self.fixture.external_evidence_refs:
             content = (
                 self.request.hostile_document
