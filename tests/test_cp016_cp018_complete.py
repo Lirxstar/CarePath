@@ -68,7 +68,7 @@ def test_complete_run_uses_strict_baselines_and_real_b3_agent(tmp_path: Path) ->
     )
 
     assert run.manifest.result_count == 192
-    assert run.manifest.schema_version == "2.1"
+    assert run.manifest.schema_version == "2.2"
     assert run.manifest.run_config.provider == "mock+deterministic_production_runtime"
     assert run.manifest.run_config.temperature == 0.0
     assert run.manifest.run_config.max_tokens == 512
