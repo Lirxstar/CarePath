@@ -51,6 +51,5 @@ def load_recorded_runners(
     if missing:
         raise ValueError(f"recorded outputs are missing baselines: {missing}")
     return tuple(
-        RecordedBaselineRunner(baseline_id, grouped[baseline_id])
-        for baseline_id in BaselineId
+        RecordedBaselineRunner(baseline_id, grouped[baseline_id]) for baseline_id in BaselineId
     )
