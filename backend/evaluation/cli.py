@@ -47,11 +47,7 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-    if (
-        args.benchmark_valid
-        and args.recorded_input is None
-        and not args.measured_mock
-    ):
+    if args.benchmark_valid and args.recorded_input is None and not args.measured_mock:
         parser.error("--benchmark-valid requires --recorded-input or --measured-mock")
 
     runners: Sequence[BaselineRunner]
