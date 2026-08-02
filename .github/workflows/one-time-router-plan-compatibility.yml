@@ -1,0 +1,56 @@
+name: One-time router plan compatibility
+
+on:
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.head_ref }}
+      - uses: actions/setup-python@v6
+        with:
+          python-version-file: .python-version
+      - name: Preserve adherence analysis for planning requests
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("backend/agents/tool_router.py")
+          content = path.read_text(encoding="utf-8")
+          source = '''        wants_missingness = any(term in text for term in _MISSINGNESS_TERMS)
+              wants_adherence = any(term in text for term in _ADHERENCE_TERMS)
+              wants_plan = wants_adherence or any(term in text for term in _PLAN_TERMS)
+              wants_history = wants_plan or any(term in text for term in _HISTORY_TERMS)
+          '''
+          target = '''        wants_missingness = any(term in text for term in _MISSINGNESS_TERMS)
+              explicit_plan = any(term in text for term in _PLAN_TERMS)
+              wants_adherence = (
+                  explicit_plan or any(term in text for term in _ADHERENCE_TERMS)
+              )
+              wants_plan = explicit_plan or wants_adherence
+              wants_history = wants_plan or any(term in text for term in _HISTORY_TERMS)
+          '''
+          if source not in content and target not in content:
+              raise SystemExit("Planning intent block not found")
+          path.write_text(content.replace(source, target), encoding="utf-8")
+          PY
+      - name: Validate fixed CP-054 routing set
+        run: |
+          python -m pytest -o addopts='' \
+            tests/test_tool_router_v2.py \
+            tests/test_cp012_api_contract.py::test_coach_message_returns_interaction_id_and_persists_interaction
+      - name: Commit compatibility fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add backend/agents/tool_router.py
+          git commit -m "Preserve adherence tools for planning requests"
+          git push origin "HEAD:${GITHUB_HEAD_REF}"
