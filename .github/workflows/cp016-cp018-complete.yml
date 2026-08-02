@@ -1,0 +1,69 @@
+name: Complete evaluation and red-team gate
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: complete-evaluation-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  complete-evaluation:
+    name: CP-016 to CP-018 complete gate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CAREPATH_ENVIRONMENT: test
+      CAREPATH_LLM_PROVIDER: mock
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: .python-version
+          cache: pip
+          cache-dependency-path: |
+            pyproject.toml
+            requirements-dev.lock
+      - name: Install evaluation dependencies
+        run: python -m pip install -c requirements-dev.lock -e '.[dev]'
+      - name: Run focused regression tests
+        run: pytest -o addopts='' tests/test_cp016_cp018_complete.py
+      - name: Run complete 48x4 evaluation and red-team gate
+        run: |
+          carepath-evaluate-complete \
+            --run-id "complete-${GITHUB_SHA}" \
+            --temperature 0 \
+            --max-tokens 512 \
+            --seed 7 \
+            --output-dir test-results/complete-evaluation
+      - name: Verify blocking acceptance result
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(
+              Path("test-results/complete-evaluation/complete_acceptance.json").read_text()
+          )
+          if not report["passed"]:
+              raise SystemExit(
+                  "Blocking complete-evaluation failures: "
+                  + ", ".join(report["blocking_failures"])
+              )
+          PY
+      - name: Upload complete evaluation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: complete-evaluation-${{ github.run_attempt }}
+          path: test-results/complete-evaluation/**
+          if-no-files-found: error
