@@ -31,7 +31,9 @@ jobs:
         with:
           python-version-file: .python-version
       - name: Apply deterministic migration
-        run: python scripts/cp018_apply.py
+        run: |
+          python scripts/fix_cp018_migration.py
+          python scripts/cp018_apply.py
       - name: Install dependencies
         run: python -m pip install -c requirements-dev.lock -e '.[dev]'
       - name: Format and validate implementation
