@@ -43,6 +43,8 @@ def test_aligned_production_runner_has_no_hidden_exception() -> None:
             request_text=runtime_text,
         )
     )
+    assert state.status.value == "completed", state.failures
+
     output = runner._aligned_output(
         request,
         fixture,
