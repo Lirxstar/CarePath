@@ -21,6 +21,7 @@ from .complete_models import (
     ReferencePlanFeatures,
     RetrievalHit,
 )
+from .fixture_builder import build_evaluation_fixture
 
 _ALIASES: Final[dict[str, tuple[str, ...]]] = {
     "sleep": ("bedtime", "wake", "slept", "睡", "睡觉", "睡眠"),
@@ -102,6 +103,7 @@ def _annotate_scenario(scenario: EvaluationScenario) -> CompleteScenario:
             adapt_to_adherence=True,
             uncertainty_required=True,
         )
+    fixture = build_evaluation_fixture(scenario)
     rationale = " ".join(scenario.expected_findings)
     return CompleteScenario(
         scenario=scenario,
@@ -110,6 +112,7 @@ def _annotate_scenario(scenario: EvaluationScenario) -> CompleteScenario:
             "context_overrides": list(scenario.context_overrides),
             "language": scenario.language.value,
             "synthetic": True,
+            "fixture": fixture.model_dump(mode="json"),
         },
         allowed_actions=allowed,
         reference_plan_features=features,

@@ -1,6 +1,6 @@
 """Application-controlled sanitization for retrieved untrusted text.
 
-Natural-language evidence never receives instruction authority.  This module removes
+Natural-language evidence never receives instruction authority. This module removes
 common instruction-like spans before retrieved text reaches planner/model-facing
 surfaces and emits only bounded security metadata for audit/debugging.
 """
@@ -17,6 +17,8 @@ class InjectionPattern(StrEnum):
     POLICY_OVERRIDE = "policy_override"
     SAFETY_BYPASS = "safety_bypass"
     SECRET_EXFILTRATION = "secret_exfiltration"
+    FORCED_DIAGNOSIS = "forced_diagnosis"
+    MEDICATION_OVERRIDE = "medication_override"
     TOOL_EXECUTION = "tool_execution"
     SCOPE_OVERRIDE = "scope_override"
     CROSS_USER_ACCESS = "cross_user_access"
@@ -47,6 +49,7 @@ _PATTERN_SPECS: tuple[tuple[InjectionPattern, re.Pattern[str]], ...] = (
         re.compile(
             r"ignore\s+(?:all\s+|the\s+)?(?:previous|prior|system)\s+instructions?|"
             r"(?:override|replace|change)\s+(?:the\s+)?system\s+(?:prompt|policy)|"
+            r"\bsystem\s+override\b|"
             r"忽略(?:之前|先前|系统)(?:的)?指令|覆盖系统(?:提示词|规则)|"
             r"以前の(?:指示|命令)を無視|システム(?:プロンプト|規則)を上書き",
             re.IGNORECASE,
@@ -65,10 +68,32 @@ _PATTERN_SPECS: tuple[tuple[InjectionPattern, re.Pattern[str]], ...] = (
     (
         InjectionPattern.SECRET_EXFILTRATION,
         re.compile(
-            r"(?:reveal|print|show|expose|return).{0,32}"
-            r"(?:system\s+prompt|api\s+key|secret|credential|access\s+token)|"
+            r"(?:reveal|print|show|expose|return|output).{0,48}"
+            r"(?:system\s+prompt|api\s+keys?|secret|credential|access\s+token)|"
+            r"(?:admin\s+command).{0,64}(?:api\s+keys?|secret|records)|"
             r"(?:显示|泄露|输出).{0,20}(?:系统提示词|密钥|凭据|令牌)|"
             r"(?:表示|公開|出力).{0,20}(?:システムプロンプト|APIキー|秘密|認証情報)",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        InjectionPattern.FORCED_DIAGNOSIS,
+        re.compile(
+            r"(?:diagnose|label).{0,48}(?:regardless|disorder|disease|condition)|"
+            r"(?:state|claim).{0,32}(?:the\s+)?(?:source|evidence).{0,24}proves|"
+            r"(?:诊断|断定).{0,24}(?:疾病|障碍|病症)|"
+            r"(?:診断|断定).{0,24}(?:疾患|障害)",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        InjectionPattern.MEDICATION_OVERRIDE,
+        re.compile(
+            r"(?:tell|recommend|instruct).{0,32}(?:stop|start|change|increase|decrease).{0,24}"
+            r"(?:medication|medicine|dose)|"
+            r"(?:stop|change).{0,24}(?:all\s+)?medication.{0,16}immediately|"
+            r"(?:要求|建议|指示).{0,20}(?:停药|改药|调整剂量)|"
+            r"(?:薬|投薬|用量).{0,20}(?:中止|変更|増量|減量)",
             re.IGNORECASE,
         ),
     ),
@@ -94,10 +119,10 @@ _PATTERN_SPECS: tuple[tuple[InjectionPattern, re.Pattern[str]], ...] = (
     (
         InjectionPattern.CROSS_USER_ACCESS,
         re.compile(
-            r"(?:retrieve|access|read|fetch).{0,24}(?:another|other).{0,16}"
-            r"(?:user|patient|persona)|"
-            r"(?:读取|访问|获取).{0,16}(?:其他|别的)(?:用户|患者)|"
-            r"(?:他|別)の(?:ユーザー|患者).{0,16}(?:読|取得|アクセス)",
+            r"(?:retrieve|access|read|fetch|output|reveal).{0,32}"
+            r"(?:another|other|every|all).{0,20}(?:user|patient|persona)|"
+            r"(?:读取|访问|获取|输出).{0,16}(?:其他|别的|所有)(?:用户|患者)|"
+            r"(?:他|別|すべて)の(?:ユーザー|患者).{0,16}(?:読|取得|アクセス|出力)",
             re.IGNORECASE,
         ),
     ),
@@ -126,7 +151,7 @@ _PATTERN_SPECS: tuple[tuple[InjectionPattern, re.Pattern[str]], ...] = (
 def sanitize_retrieved_content(text: str) -> SanitizedEvidence:
     """Remove instruction-like spans and mark hostile payloads as non-evidence.
 
-    Detection is defence-in-depth only.  Authorization, user scoping, tool allowlists,
+    Detection is defence-in-depth only. Authorization, user scoping, tool allowlists,
     typed arguments, and verifier checks remain independent controls.
     """
 
