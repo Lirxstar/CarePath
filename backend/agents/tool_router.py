@@ -288,7 +288,14 @@ class CarePathToolRouter:
             )
 
         metrics = self._metrics(text)
-        wants_directional_change = any(term in text for term in _DIRECTIONAL_CHANGE_TERMS)
+        wants_missingness = any(term in text for term in _MISSINGNESS_TERMS)
+        wants_adherence = any(term in text for term in _ADHERENCE_TERMS)
+        wants_plan = wants_adherence or any(term in text for term in _PLAN_TERMS)
+        wants_history = wants_plan or any(term in text for term in _HISTORY_TERMS)
+        wants_guidance = wants_plan or any(term in text for term in _GUIDANCE_TERMS)
+        wants_directional_change = (
+            any(term in text for term in _DIRECTIONAL_CHANGE_TERMS) and not wants_plan
+        )
         wants_compare = any(term in text for term in _COMPARE_TERMS)
         wants_abrupt_change = any(term in text for term in _ABRUPT_CHANGE_TERMS)
         wants_trend = (
@@ -297,11 +304,6 @@ class CarePathToolRouter:
             or wants_abrupt_change
             or any(term in text for term in _TREND_TERMS)
         )
-        wants_missingness = any(term in text for term in _MISSINGNESS_TERMS)
-        wants_adherence = any(term in text for term in _ADHERENCE_TERMS)
-        wants_plan = wants_adherence or any(term in text for term in _PLAN_TERMS)
-        wants_history = wants_plan or any(term in text for term in _HISTORY_TERMS)
-        wants_guidance = wants_plan or any(term in text for term in _GUIDANCE_TERMS)
         calls: list[ToolCall] = []
 
         for metric in metrics[:2]:
