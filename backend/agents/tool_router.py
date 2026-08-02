@@ -100,16 +100,29 @@ ToolFunction = Callable[[Mapping[str, Any]], Any]
 
 _METRIC_TERMS: dict[MetricType, tuple[str, ...]] = {
     MetricType.SLEEP_DURATION: (
-        "sleep",
-        "slept",
-        "bedtime",
-        "wake time",
-        "睡眠",
-        "睡",
-        "眠",
-        "就寝",
-        "起床",
-    ),
+    "sleep duration",
+    "hours slept",
+    "how long did i sleep",
+    "睡眠时长",
+    "睡了多久",
+    "睡眠時間",
+),
+MetricType.SLEEP_START_TIME: (
+    "bedtime",
+    "fall asleep",
+    "go to bed",
+    "sleep start",
+    "when do i sleep",
+    "入睡",
+    "就寝",
+),
+MetricType.SLEEP_END_TIME: (
+    "wake time",
+    "wake up",
+    "sleep end",
+    "起床",
+    "醒来",
+),
     MetricType.STEPS: ("step", "steps", "walk", "walking", "步数", "走", "歩"),
     MetricType.ACTIVE_MINUTES: ("active minute", "activity", "exercise", "运动", "活動", "運動"),
     MetricType.RESTING_HEART_RATE: ("resting heart", "heart rate", "心率", "心拍"),
@@ -404,10 +417,23 @@ class CarePathToolRouter:
         return tuple(validated)
 
     @staticmethod
-    def _metrics(text: str) -> list[MetricType]:
-        return [
-            metric for metric, terms in _METRIC_TERMS.items() if any(term in text for term in terms)
-        ]
+def _metrics(text: str) -> list[MetricType]:
+    metrics = [
+        metric
+        for metric, terms in _METRIC_TERMS.items()
+        if any(term in text for term in terms)
+    ]
+    sleep_metrics = {
+        MetricType.SLEEP_DURATION,
+        MetricType.SLEEP_START_TIME,
+        MetricType.SLEEP_END_TIME,
+    }
+    if not any(metric in sleep_metrics for metric in metrics) and any(
+        term in text for term in ("sleep", "slept", "睡眠", "睡", "眠")
+    ):
+        metrics.insert(0, MetricType.SLEEP_DURATION)
+    return metrics
+
 
     @staticmethod
     def _metric_call(tool: ToolName, user_id: UUID, metric: MetricType, end_date: date) -> ToolCall:
