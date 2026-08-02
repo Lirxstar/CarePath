@@ -8,194 +8,68 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: complete-evaluation-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  apply-research-evaluation:
-    if: github.head_ref == 'agent/cp018-complete-research-evaluation'
-    name: Apply CP-018 research evaluation completion
+  complete-evaluation:
+    name: CP-016 to CP-018 complete gate
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 20
+    env:
+      CAREPATH_ENVIRONMENT: test
+      CAREPATH_LLM_PROVIDER: mock
     steps:
-      - name: Check out implementation branch
+      - name: Check out repository
         uses: actions/checkout@v6
-        with:
-          ref: agent/cp018-complete-research-evaluation
-          fetch-depth: 0
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
           python-version-file: .python-version
-      - name: Apply deterministic migration
-        run: |
-          python scripts/fix_cp018_migration.py
-          python scripts/cp018_apply.py
-          python - <<'PY'
-          from pathlib import Path
-
-          path = Path("backend/evaluation/manual_review.py")
-          text = path.read_text(encoding="utf-8")
-          text = text.replace(
-              "from collections.abc import Sequence\n",
-              "from collections.abc import Sequence\nfrom typing import cast\n",
-          )
-          text = text.replace(
-              '            "retrieval": "Context Builder records were available but not all were represented in scored patient evidence.",',
-              '            "retrieval": (\n                "Context Builder records were available but not all were represented "\n                "in scored patient evidence."\n            ),',
-          )
-          text = text.replace(
-              '            "planning": "The router ignored supplied context or treated generic plan and routine wording as adherence intent.",',
-              '            "planning": (\n                "The router ignored supplied context or treated generic plan and routine "\n                "wording as adherence intent."\n            ),',
-          )
-          text = text.replace(
-              '        "This report distinguishes retrieval, planning and tool routing, citation, and annotation causes.",',
-              '        (\n            "This report distinguishes retrieval, planning and tool routing, citation, "\n            "and annotation causes."\n        ),',
-          )
-          text = text.replace(
-              '    for item in report["current_low_scores"]:\n        lines.append(\n            f"| {item[\'scenario_id\']} | {\', \'.join(item[\'categories\'])} | {item[\'review_status\']} |"\n        )',
-              '    current = cast(list[dict[str, object]], report["current_low_scores"])\n    for item in current:\n        categories = cast(list[str], item["categories"])\n        lines.append(\n            f"| {item[\'scenario_id\']} | {\', \'.join(categories)} | "\n            f"{item[\'review_status\']} |"\n        )',
-          )
-          path.write_text(text, encoding="utf-8")
-
-          path = Path("backend/evaluation/complete.py")
-          text = path.read_text(encoding="utf-8")
-          text = text.replace("from typing import Protocol\n", "from typing import Protocol, cast\n")
-          text = text.replace(
-              '    if int(plan_adaptation["applicable_count"]) < 2:',
-              '    if cast(int, plan_adaptation["applicable_count"]) < 2:',
-          )
-          text = text.replace(
-              '    if float(plan_adaptation["passed_rate"]) != 1.0:',
-              '    if cast(float, plan_adaptation["passed_rate"]) != 1.0:',
-          )
-          text = text.replace(
-              '    if int(low_score_review["unreviewed_current_low_score_count"]):',
-              '    if cast(int, low_score_review["unreviewed_current_low_score_count"]):',
-          )
-          path.write_text(text, encoding="utf-8")
-
-          path = Path("backend/agents/tool_router.py")
-          text = path.read_text(encoding="utf-8")
-          text = text.replace(
-              '        calls: list[ToolCall] = []\n',
-              '        wants_trend = wants_trend or (wants_adherence and bool(metrics))\n'
-              '        calls: list[ToolCall] = []\n',
-              1,
-          )
-          path.write_text(text, encoding="utf-8")
-
-          path = Path("backend/evaluation/runtime_agent_valid_fixture_runner.py")
-          text = path.read_text(encoding="utf-8")
-          text = text.replace(
-              "from .complete_models import BenchmarkRequest, CompleteBaselineOutput\n",
-              "from .complete_models import (\n"
-              "    BenchmarkRequest,\n"
-              "    CompleteBaselineOutput,\n"
-              "    SecurityDisposition,\n"
-              ")\n",
-          )
-          text = text.replace(
-              '            self._record_plan_adaptation(request, state)\n            return output\n',
-              '            if (\n'
-              '                request.hostile_document is not None\n'
-              '                and "external_evidence_retriever" not in output.visited_nodes\n'
-              '            ):\n'
-              '                output = output.model_copy(\n'
-              '                    update={"security_disposition": SecurityDisposition.REJECTED}\n'
-              '                )\n'
-              '            self._record_plan_adaptation(request, state)\n'
-              '            return output\n',
-          )
-          text = text.replace(
-              '    match = re.search(r"\\b(\\d{1,2})-minute\\b", text)\n',
-              '    match = re.search(r"\\b(\\d{1,2})(?:-minute| minutes?)\\b", text)\n',
-          )
-          path.write_text(text, encoding="utf-8")
-          PY
-          python scripts/cp018_finalize.py
-          python - <<'PY'
-          from pathlib import Path
-
-          path = Path("backend/evaluation/runtime_agent_production_runner.py")
-          text = path.read_text(encoding="utf-8")
-          block = '''        if WorkflowNode.EXTERNAL_EVIDENCE_RETRIEVER in state.visited_nodes:
-            success_by_tool[ToolName.RETRIEVE_EXTERNAL_EVIDENCE] = True
-'''
-          if block not in text:
-              raise SystemExit("external tool accounting block not found")
-          path.write_text(text.replace(block, "", 1), encoding="utf-8")
-          PY
-      - name: Install dependencies
+          cache: pip
+          cache-dependency-path: |
+            pyproject.toml
+            requirements-dev.lock
+      - name: Install evaluation dependencies
         run: python -m pip install -c requirements-dev.lock -e '.[dev]'
-      - name: Format and type-check implementation
-        run: |
-          python -m ruff format .
-          python -m ruff check . --fix
-          python -m mypy
-      - name: Print final evaluation diagnostics
-        run: |
-          python - <<'PY'
-          import json
-          from datetime import UTC, datetime
-          from pathlib import Path
-
-          from backend.evaluation.complete import run_complete_evaluation
-          from backend.evaluation.harness import BaselineId
-          from backend.evaluation.scenarios import load_scenario_set
-
-          run = run_complete_evaluation(
-              output_dir=Path("/tmp/cp018-final-diagnostic"),
-              run_id="cp018-final-diagnostic",
-              fixed_time=datetime(2026, 8, 2, 12, tzinfo=UTC),
-              git_sha="diagnostic",
-          )
-          scenarios = {item.scenario_id: item for item in load_scenario_set().scenarios}
-          b3 = next(
-              item for item in run.summaries
-              if item.baseline_id is BaselineId.B3_CAREPATH_AGENT and item.category is None
-          )
-          print("B3_METRICS", json.dumps(b3.metrics.model_dump(mode="json"), sort_keys=True))
-          print("BLOCKING", json.dumps(list(run.acceptance.blocking_failures)))
-          for result in run.results:
-              if result.output.baseline_id is not BaselineId.B3_CAREPATH_AGENT:
-                  continue
-              if result.metrics.tool_routing_applicable and result.metrics.tool_selection_accuracy < 1.0:
-                  scenario = scenarios[result.output.scenario_id]
-                  print(
-                      "TOOL_MISMATCH",
-                      result.output.scenario_id,
-                      [item.value for item in scenario.expected_tools],
-                      [item.value for item in result.output.selected_tools],
-                      result.metrics.tool_selection_accuracy,
-                      scenario.user_question,
-                      list(scenario.context_overrides),
-                  )
-          print("PLAN_REPORT", json.dumps(run.plan_adaptation, sort_keys=True))
-          print("LOW_SCORE_REVIEW", json.dumps(run.low_score_review, sort_keys=True))
-          PY
       - name: Run focused regression tests
         run: |
           pytest -o addopts='' \
+            tests/test_runtime_agent_production.py \
             tests/test_runtime_agent_aligned.py \
             tests/test_cp016_cp018_complete.py \
             tests/test_cp018_evaluation_quality.py \
             tests/test_cp018_research_claims.py
-      - name: Commit implementation
+      - name: Run complete 48x4 evaluation and red-team gate
         run: |
-          git config user.name "carepath-agent"
-          git config user.email "carepath-agent@users.noreply.github.com"
-          git add -A
-          git commit -m "Complete CP-018 research evaluation targets"
-          git push origin HEAD:agent/cp018-complete-research-evaluation
+          carepath-evaluate-complete \
+            --run-id "complete-${GITHUB_SHA}" \
+            --temperature 0 \
+            --max-tokens 512 \
+            --seed 7 \
+            --output-dir test-results/complete-evaluation
+      - name: Verify blocking acceptance result
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
 
-  complete-evaluation:
-    if: github.head_ref != 'agent/cp018-complete-research-evaluation'
-    name: CP-016 to CP-018 complete gate
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    steps:
-      - run: echo "Temporary implementation job owns this branch run."
+          report = json.loads(
+              Path("test-results/complete-evaluation/complete_acceptance.json").read_text()
+          )
+          if not report["passed"]:
+              raise SystemExit(
+                  "Blocking complete-evaluation failures: "
+                  + ", ".join(report["blocking_failures"])
+              )
+          PY
+      - name: Upload complete evaluation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: complete-evaluation-${{ github.run_attempt }}
+          path: test-results/complete-evaluation/**
+          if-no-files-found: error
