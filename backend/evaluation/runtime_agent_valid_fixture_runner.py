@@ -15,12 +15,14 @@ from backend.storage.models import ObservationTable
 from .complete_models import BenchmarkRequest, CompleteBaselineOutput
 from .fixture_builder import EvaluationFixture, external_evidence_content, fixture_for_scenario
 from .runtime_agent_production_runner import (
-    RuntimeAgentBaselineRunner as _AlignedRuntimeAgentBaselineRunner,
-    _AlignedEvaluationExternalIndex,
     _EVENT_METRICS,
     _UNIT_BY_METRIC,
+    _AlignedEvaluationExternalIndex,
     _fixture_value,
     _topic_for_reference,
+)
+from .runtime_agent_production_runner import (
+    RuntimeAgentBaselineRunner as _AlignedRuntimeAgentBaselineRunner,
 )
 from .runtime_agent_runner import _EVALUATION_END, _EVALUATION_NAMESPACE
 

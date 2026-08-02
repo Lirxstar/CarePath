@@ -37,10 +37,12 @@ from .fixture_builder import (
     fixture_for_scenario,
 )
 from .runtime_agent_runner import (
-    RuntimeAgentBaselineRunner as _RuntimeAgentBaselineRunner,
     _EVALUATION_END,
     _EVALUATION_NAMESPACE,
     _EvaluationExternalIndex,
+)
+from .runtime_agent_runner import (
+    RuntimeAgentBaselineRunner as _RuntimeAgentBaselineRunner,
 )
 
 _RUNTIME_TOOL_MAP: dict[str, ToolName] = {

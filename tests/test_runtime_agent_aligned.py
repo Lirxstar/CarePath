@@ -8,11 +8,11 @@ from backend.agents.runtime import build_runtime_workflow
 from backend.agents.workflow import WorkflowState
 from backend.evaluation.complete_models import BenchmarkRequest, SecurityDisposition
 from backend.evaluation.fixture_builder import fixture_for_scenario
+from backend.evaluation.runtime_agent_runner import _EVALUATION_END
 from backend.evaluation.runtime_agent_valid_fixture_runner import (
     RuntimeAgentBaselineRunner,
     _ExactEvaluationExternalIndex,
 )
-from backend.evaluation.runtime_agent_runner import _EVALUATION_END
 from backend.evaluation.scenarios import ScenarioCategory, load_scenario_set
 
 _EVALUATION_NAMESPACE = UUID("83f2aa49-233c-4425-83da-5ed2be166670")
