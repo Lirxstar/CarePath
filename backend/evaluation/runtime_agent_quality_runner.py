@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import timedelta
 from uuid import UUID, uuid5
 
 from backend.storage.models import ObservationTable
@@ -43,9 +44,7 @@ class RuntimeAgentBaselineRunner(_AlignedRuntimeAgentBaselineRunner):
         for index in range(30):
             if missing and 10 <= index <= 15:
                 continue
-            observed_at = _EVALUATION_END.replace() - __import__("datetime").timedelta(
-                days=29 - index
-            )
+            observed_at = _EVALUATION_END - timedelta(days=29 - index)
             for metric, reference in sorted(metric_refs.items()):
                 observation_id = str(
                     uuid5(
