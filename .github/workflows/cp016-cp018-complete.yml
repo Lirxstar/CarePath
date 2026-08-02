@@ -116,6 +116,7 @@ jobs:
           )
           path.write_text(text, encoding="utf-8")
           PY
+          python scripts/cp018_finalize.py
       - name: Install dependencies
         run: python -m pip install -c requirements-dev.lock -e '.[dev]'
       - name: Format and type-check implementation
@@ -123,7 +124,7 @@ jobs:
           python -m ruff format .
           python -m ruff check . --fix
           python -m mypy
-      - name: Print remaining evaluation mismatches
+      - name: Print final evaluation diagnostics
         run: |
           python - <<'PY'
           import json
@@ -134,10 +135,9 @@ jobs:
           from backend.evaluation.harness import BaselineId
           from backend.evaluation.scenarios import load_scenario_set
 
-          output_dir = Path("/tmp/cp018-diagnostic")
           run = run_complete_evaluation(
-              output_dir=output_dir,
-              run_id="cp018-diagnostic",
+              output_dir=Path("/tmp/cp018-final-diagnostic"),
+              run_id="cp018-final-diagnostic",
               fixed_time=datetime(2026, 8, 2, 12, tzinfo=UTC),
               git_sha="diagnostic",
           )
