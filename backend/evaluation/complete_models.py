@@ -112,6 +112,8 @@ class CompleteBaselineOutput(BaseModel):
     baseline_id: BaselineId
     scenario_id: str
     response_text: str
+    runtime_mode: str = "baseline_executor"
+    visited_nodes: tuple[str, ...] = ()
     selected_tools: tuple[ToolName, ...] = ()
     tool_successes: tuple[bool, ...] = ()
     retrieval_hits: tuple[RetrievalHit, ...] = ()

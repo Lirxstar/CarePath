@@ -58,7 +58,7 @@ def test_benchmark_request_removes_every_gold_answer() -> None:
     assert "reference_plan_features" not in BenchmarkRequest.model_fields
 
 
-def test_complete_run_uses_strict_baselines_and_writes_all_metrics(tmp_path: Path) -> None:
+def test_complete_run_uses_strict_baselines_and_real_b3_agent(tmp_path: Path) -> None:
     fixed = datetime(2026, 8, 2, 10, tzinfo=UTC)
     run = run_complete_evaluation(
         output_dir=tmp_path,
@@ -68,7 +68,8 @@ def test_complete_run_uses_strict_baselines_and_writes_all_metrics(tmp_path: Pat
     )
 
     assert run.manifest.result_count == 192
-    assert run.manifest.run_config.provider == "mock"
+    assert run.manifest.schema_version == "2.1"
+    assert run.manifest.run_config.provider == "mock+deterministic_production_runtime"
     assert run.manifest.run_config.temperature == 0.0
     assert run.manifest.run_config.max_tokens == 512
     assert run.manifest.run_config.seed == 7
@@ -76,6 +77,15 @@ def test_complete_run_uses_strict_baselines_and_writes_all_metrics(tmp_path: Pat
     assert run.acceptance.passed is True
     assert run.acceptance.blocking_failures == ()
     assert len(run.summaries) == 4 * (1 + len(ScenarioCategory))
+
+    b3_outputs = [
+        result.output
+        for result in run.results
+        if result.output.baseline_id is BaselineId.B3_CAREPATH_AGENT
+    ]
+    assert len(b3_outputs) == 48
+    assert all(output.runtime_mode == "production_agent" for output in b3_outputs)
+    assert all("safety_triage" in output.visited_nodes for output in b3_outputs)
 
     safety_id = next(
         item.scenario.scenario_id
@@ -90,11 +100,27 @@ def test_complete_run_uses_strict_baselines_and_writes_all_metrics(tmp_path: Pat
     assert safety_outputs[BaselineId.B0_LLM_ONLY].safety_outcome is SafetyOutcome.ROUTINE
     assert safety_outputs[BaselineId.B1_EXTERNAL_RAG].safety_outcome is SafetyOutcome.ROUTINE
     assert safety_outputs[BaselineId.B2_DUAL_RAG].safety_outcome is SafetyOutcome.ROUTINE
-    assert safety_outputs[BaselineId.B3_CAREPATH_AGENT].safety_outcome is not SafetyOutcome.ROUTINE
+    b3_safety = safety_outputs[BaselineId.B3_CAREPATH_AGENT]
+    assert b3_safety.safety_outcome is not SafetyOutcome.ROUTINE
+    assert b3_safety.verifier_passed is False
+    assert "planner" not in b3_safety.visited_nodes
+    assert "verifier" not in b3_safety.visited_nodes
+    assert b3_safety.visited_nodes == ("safety_triage", "composer", "feedback_update")
+
+    routine = next(output for output in b3_outputs if output.scenario_id == "CP016-RT-001")
+    assert routine.verifier_passed is True
+    assert "context_builder" in routine.visited_nodes
+    assert "tool_router" in routine.visited_nodes
+    assert "analytics_tools" in routine.visited_nodes
+    assert "personal_context_retriever" in routine.visited_nodes
+    assert "external_evidence_retriever" in routine.visited_nodes
+    assert "planner" in routine.visited_nodes
+    assert "verifier" in routine.visited_nodes
+    assert "composer" in routine.visited_nodes
+
     assert safety_outputs[BaselineId.B0_LLM_ONLY].retrieval_hits == ()
     assert safety_outputs[BaselineId.B1_EXTERNAL_RAG].selected_tools == ()
     assert safety_outputs[BaselineId.B2_DUAL_RAG].selected_tools == ()
-    assert safety_outputs[BaselineId.B3_CAREPATH_AGENT].verifier_passed is True
 
     raw_lines = (tmp_path / "complete_raw_results.jsonl").read_text().splitlines()
     assert len(raw_lines) == 192

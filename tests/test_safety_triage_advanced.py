@@ -1,5 +1,6 @@
 from backend.domain.models import RiskLevel
 from backend.safety import (
+    PolicyFlag,
     ResponseAction,
     SafetySignal,
     SupplementalSafetyAssessment,
@@ -38,6 +39,16 @@ def test_structured_high_risk_signal_cannot_be_negated_by_text() -> None:
 
     assert result.risk_level is RiskLevel.URGENT
     assert "TRI-URG-001" in result.matched_rule_ids
+
+
+def test_imperative_diagnosis_request_is_caution() -> None:
+    result = triage_safety("Diagnose what disease is causing my stress.")
+
+    assert result.risk_level is RiskLevel.CAUTION
+    assert not result.allow_normal_planning
+    assert "TRI-CAU-004" in result.matched_rule_ids
+    assert PolicyFlag.DIAGNOSIS_REQUEST in result.policy_flags
+    assert ResponseAction.NON_DIAGNOSTIC_RESPONSE in result.required_response_actions
 
 
 def test_supplemental_classifier_cannot_downgrade_rule_result() -> None:

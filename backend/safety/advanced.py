@@ -55,6 +55,12 @@ _JA_NEGATION_PREFIX = re.compile(r"(?:ない|ありません|否定).{0,8}$")
 _JA_NEGATION_SUFFIX = re.compile(
     r"^(?:は|が|も|では|じゃ)?(?:ない|ありません|ではありません|じゃない)"
 )
+_IMPERATIVE_DIAGNOSIS_REQUEST = re.compile(
+    r"\bdiagnose\s+(?:me|my|this|the|what|which)\b"
+    r"|\bwhat\s+(?:disease|condition|illness)\s+(?:is|could be|might be)\s+"
+    r"(?:causing|behind)\b",
+    re.IGNORECASE,
+)
 
 
 def triage_safety(text: str, context: TriageContext | None = None) -> TriageDecision:
@@ -83,6 +89,15 @@ def triage_safety(text: str, context: TriageContext | None = None) -> TriageDeci
         flags.append(rule.policy_flag)
         if _RISK_RANK[rule.risk_level] > _RISK_RANK[risk_level]:
             risk_level = rule.risk_level
+
+    for match in _IMPERATIVE_DIAGNOSIS_REQUEST.finditer(normalized):
+        if _is_explicitly_negated(normalized, match.start(), match.end()):
+            continue
+        matched_rule_ids.append("TRI-CAU-004")
+        flags.append(PolicyFlag.DIAGNOSIS_REQUEST)
+        if _RISK_RANK[RiskLevel.CAUTION] > _RISK_RANK[risk_level]:
+            risk_level = RiskLevel.CAUTION
+        break
 
     if context is not None:
         for signal in context.structured_signals:
