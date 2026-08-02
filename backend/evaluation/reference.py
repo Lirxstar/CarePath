@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import hashlib
 
-from backend.safety import triage_safety
-
-from .harness import (
+from backend.evaluation.harness import (
     BaselineId,
     BaselineOutput,
     CitationRecord,
@@ -12,7 +10,8 @@ from .harness import (
     LatencySource,
     ToolExecution,
 )
-from .scenarios import EvaluationScenario, SafetyOutcome
+from backend.evaluation.scenarios import EvaluationScenario, SafetyOutcome
+from backend.safety import triage_safety
 
 
 _BASE_LATENCY_MS = {
