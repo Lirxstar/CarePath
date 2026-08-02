@@ -22,6 +22,7 @@ from .tool_router import (
     AdherenceToolArguments,
     GuidelineRetrievalArguments,
     MetricToolArguments,
+    MissingnessToolArguments,
     ToolName,
     UserHistoryArguments,
 )
@@ -39,6 +40,7 @@ class CarePathToolExecutors:
             ToolName.TREND: self._trend,
             ToolName.WINDOW_COMPARISON: self._comparison,
             ToolName.CHANGE_DETECTION: self._change,
+            ToolName.MISSINGNESS: self._missingness,
             ToolName.ADHERENCE_SUMMARY: self._adherence,
             ToolName.USER_HISTORY: self._history,
             ToolName.GUIDELINE_RETRIEVAL: self._guideline,
@@ -118,6 +120,26 @@ class CarePathToolExecutors:
             source_observation_ids=source_ids,
             expected_count=args.days,
         ).model_dump(mode="json")
+
+    def _missingness(self, arguments: Mapping[str, Any]) -> dict[str, object]:
+        args = TypeAdapter(MissingnessToolArguments).validate_python(arguments)
+        end_at = datetime.combine(args.end_date, datetime.max.time(), UTC)
+        summary = ContextBuilderService(self.session).build(args.user_id, end_at=end_at)
+        windows = summary.metrics_7d if args.days == 7 else summary.metrics_30d
+        return {
+            "window_days": args.days,
+            "metrics": [
+                {
+                    "metric_type": item.metric_type.value,
+                    "missing_rate": item.missing_rate,
+                    "coverage": item.coverage,
+                    "data_sufficient": item.data_sufficient,
+                    "source_record_ids": [str(value) for value in item.source_record_ids],
+                }
+                for item in windows
+            ],
+            "data_insufficient": list(summary.data_insufficient),
+        }
 
     def _adherence(self, arguments: Mapping[str, Any]) -> dict[str, object]:
         args = TypeAdapter(AdherenceToolArguments).validate_python(arguments)
