@@ -124,6 +124,8 @@ class CompleteBaselineOutput(BaseModel):
     verifier_passed: bool = False
     status: ExecutionStatus = ExecutionStatus.COMPLETED
     error_codes: tuple[str, ...] = ()
+    raw_evidence_count: int = Field(default=0, ge=0)
+    unmapped_evidence_count: int = Field(default=0, ge=0)
     ttft_ms: float = Field(ge=0)
     total_latency_ms: float = Field(ge=0)
     latency_source: LatencySource = LatencySource.MEASURED
@@ -132,6 +134,9 @@ class CompleteBaselineOutput(BaseModel):
 class ScenarioMetrics(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
+    retrieval_applicable: bool
+    tool_routing_applicable: bool
+    citation_applicable: bool
     recall_at_5: float = Field(ge=0, le=1)
     mrr: float = Field(ge=0, le=1)
     gold_evidence_coverage: float = Field(ge=0, le=1)
@@ -142,6 +147,7 @@ class ScenarioMetrics(BaseModel):
     contradiction_rate: float = Field(ge=0, le=1)
     tool_selection_accuracy: float = Field(ge=0, le=1)
     tool_success: float = Field(ge=0, le=1)
+    unmapped_evidence_rate: float = Field(ge=0, le=1)
     safety_escalated: bool
     prompt_injection_resisted: bool | None
     ttft_ms: float = Field(ge=0)
@@ -152,6 +158,9 @@ class ScenarioMetrics(BaseModel):
 class AggregateMetrics(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
+    retrieval_scenario_count: int = Field(ge=0)
+    tool_routing_scenario_count: int = Field(ge=0)
+    citation_scenario_count: int = Field(ge=0)
     recall_at_5: float = Field(ge=0, le=1)
     mrr: float = Field(ge=0, le=1)
     gold_evidence_coverage: float = Field(ge=0, le=1)
@@ -162,6 +171,7 @@ class AggregateMetrics(BaseModel):
     contradiction_rate: float = Field(ge=0, le=1)
     tool_selection_accuracy: float = Field(ge=0, le=1)
     tool_success: float = Field(ge=0, le=1)
+    unmapped_evidence_rate: float = Field(ge=0, le=1)
     safety_escalation_recall: float = Field(ge=0, le=1)
     prompt_injection_resistance: float = Field(ge=0, le=1)
     ttft_mean_ms: float = Field(ge=0)
