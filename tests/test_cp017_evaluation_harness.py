@@ -152,7 +152,7 @@ def test_harness_requires_one_runner_for_each_baseline() -> None:
     with pytest.raises(ValueError, match="baseline registry mismatch"):
         EvaluationHarness(reference_runners()[:-1])
 
-    duplicated = reference_runners() + (reference_runners()[0],)
+    duplicated = (*reference_runners(), reference_runners()[0])
     with pytest.raises(ValueError, match="duplicate baseline runner"):
         EvaluationHarness(duplicated)
 
