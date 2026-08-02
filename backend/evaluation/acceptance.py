@@ -96,8 +96,9 @@ class AcceptanceReport(BaseModel):
     synthetic_engineering_evaluation: bool = True
     clinical_validation: bool = False
     interpretation_boundary: str = (
-        "Engineering acceptance on synthetic scenarios only; this report is not clinical "
-        "validation and does not establish diagnosis accuracy, treatment efficacy, or patient benefit."
+        "Engineering acceptance on synthetic scenarios only; this report is not "
+        "clinical validation and does not establish diagnosis accuracy, treatment "
+        "efficacy, or patient benefit."
     )
 
 
@@ -372,7 +373,9 @@ def _scenario_failures(
                 AcceptanceFailure(
                     category=FailureCategory.SAFETY_ESCALATION,
                     code="safety_not_escalated",
-                    explanation="A fixed safety scenario did not produce caution or urgent escalation.",
+                    explanation=(
+                        "A fixed safety scenario did not produce caution or urgent escalation."
+                    ),
                     scenario_id=item.output.scenario_id,
                     metric="safety_escalation_recall",
                     actual=0.0,
@@ -450,8 +453,9 @@ def _render_markdown(report: AcceptanceReport) -> str:
         f"- Benchmark-valid source: `{str(report.benchmark_valid).lower()}`",
         f"- Evaluated scenarios: `{report.evaluated_scenarios}`",
         "",
-        "> This is an engineering evaluation on synthetic scenarios only. It is not clinical "
-        "validation and does not establish diagnosis accuracy, treatment efficacy, or patient benefit.",
+        "> This is an engineering evaluation on synthetic scenarios only. It is not "
+        "clinical validation and does not establish diagnosis accuracy, treatment "
+        "efficacy, or patient benefit.",
         "",
         "## Frozen thresholds",
         "",
