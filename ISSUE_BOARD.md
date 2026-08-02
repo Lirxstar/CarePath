@@ -12,10 +12,6 @@ This board tracks only the current public backlog. Completed work remains docume
 
 ## In progress
 
-None.
-
-## Ready
-
 ### [#3 — CP-018: Pass B acceptance thresholds](../../issues/3)
 
 **Labels:** `B-core`, `evaluation`, `safety`, `P0-application-blocking`  
@@ -25,6 +21,8 @@ None.
 - all frozen internal thresholds pass;
 - failures are categorised and analysed;
 - no metric is represented as clinical validation.
+
+## Ready
 
 ### [#4 — CP-019: Containerise and deploy backend](../../issues/4)
 

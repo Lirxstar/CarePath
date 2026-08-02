@@ -30,6 +30,7 @@ dev = [
 ]
 
 [project.scripts]
+carepath-acceptance = "backend.evaluation.acceptance_cli:main"
 carepath-db = "backend.storage.cli:main"
 carepath-evaluate = "backend.evaluation.cli:main"
 carepath-index = "backend.retrieval.vector_cli:main"
