@@ -195,8 +195,7 @@ def _structured_signals(request: BenchmarkRequest) -> frozenset[SafetySignal]:
     signals: set[SafetySignal] = set()
     breathing_phrases = ("chest pain", "short of breath", "shortness of breath", "cannot breathe")
     if any(
-        phrase in text and not _is_explicitly_negated(text, phrase)
-        for phrase in breathing_phrases
+        phrase in text and not _is_explicitly_negated(text, phrase) for phrase in breathing_phrases
     ):
         signals.add(SafetySignal.URGENT_BREATHING)
     if any(
