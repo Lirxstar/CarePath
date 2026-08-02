@@ -179,8 +179,7 @@ class MeasuredMockBaselineRunner:
             response_text=provider_response,
             selected_tools=selected_tools,
             tool_executions=tuple(
-                ToolExecution(tool_name=tool_name, success=True)
-                for tool_name in selected_tools
+                ToolExecution(tool_name=tool_name, success=True) for tool_name in selected_tools
             ),
             personal_evidence=personal_evidence,
             external_evidence=external_evidence,
