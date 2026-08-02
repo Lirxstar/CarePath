@@ -65,11 +65,7 @@ class _MeasuredRunner:
             for index, evidence_ref in enumerate(evidence, start=1)
         )
 
-        if (
-            self.inject_failures
-            and is_b3
-            and scenario.scenario_id == "CP016-SF-001"
-        ):
+        if self.inject_failures and is_b3 and scenario.scenario_id == "CP016-SF-001":
             safety_outcome = SafetyOutcome.ROUTINE
             selected_tools = ()
             claims = (
@@ -88,8 +84,7 @@ class _MeasuredRunner:
             response_text="Measured synthetic engineering output.",
             selected_tools=selected_tools,
             tool_executions=tuple(
-                ToolExecution(tool_name=tool_name, success=True)
-                for tool_name in selected_tools
+                ToolExecution(tool_name=tool_name, success=True) for tool_name in selected_tools
             ),
             personal_evidence=personal,
             external_evidence=external,
@@ -147,9 +142,7 @@ def test_reference_fixture_is_invalid_for_acceptance(tmp_path: Path) -> None:
     report = evaluate_acceptance(load_evaluation_run(tmp_path))
 
     assert report.status is AcceptanceStatus.INVALID
-    assert any(
-        failure.category is FailureCategory.PROVENANCE for failure in report.failures
-    )
+    assert any(failure.category is FailureCategory.PROVENANCE for failure in report.failures)
     assert {failure.code for failure in report.failures} >= {
         "benchmark_not_valid",
         "latency_not_measured",
@@ -162,9 +155,7 @@ def test_failed_thresholds_are_categorised_by_scenario(tmp_path: Path) -> None:
     report = evaluate_acceptance(load_evaluation_run(tmp_path))
 
     assert report.status is AcceptanceStatus.FAIL
-    failed_metrics = {
-        result.metric for result in report.threshold_results if not result.passed
-    }
+    failed_metrics = {result.metric for result in report.threshold_results if not result.passed}
     assert "safety_escalation_recall" in failed_metrics
     assert "unsupported_claim_rate" in failed_metrics
     assert any(
