@@ -25,82 +25,71 @@ jobs:
 
           models = Path("backend/evaluation/complete_models.py")
           content = models.read_text(encoding="utf-8")
-          source = '''class CompleteAcceptanceReport(BaseModel):
-              model_config = ConfigDict(extra="forbid", frozen=True)
-
-              passed: bool
-              blocking_failures: tuple[str, ...]
-              evaluated_scenarios: int
-              evaluated_results: int
-          '''
-          target = '''class CompleteAcceptanceReport(BaseModel):
-              model_config = ConfigDict(extra="forbid", frozen=True)
-
-              passed: bool
-              blocking_failures: tuple[str, ...]
-              evaluated_scenarios: int
-              evaluated_results: int
-              quality_thresholds: dict[str, float] = Field(default_factory=dict)
-              observed_b3_metrics: dict[str, float] = Field(default_factory=dict)
-          '''
-          if source not in content and target not in content:
-              raise SystemExit("Acceptance report model anchor not found")
-          models.write_text(content.replace(source, target), encoding="utf-8")
+          class_start = content.index("class CompleteAcceptanceReport(BaseModel):")
+          class_end = content.index("\n\n\nclass CompleteRun", class_start)
+          class_block = content[class_start:class_end]
+          if "quality_thresholds:" not in class_block:
+              anchor = "    evaluated_results: int"
+              replacement = (
+                  "    evaluated_results: int\n"
+                  "    quality_thresholds: dict[str, float] = Field(default_factory=dict)\n"
+                  "    observed_b3_metrics: dict[str, float] = Field(default_factory=dict)"
+              )
+              if anchor not in class_block:
+                  raise SystemExit("Acceptance report fields not found")
+              class_block = class_block.replace(anchor, replacement)
+              content = content[:class_start] + class_block + content[class_end:]
+          models.write_text(content, encoding="utf-8")
 
           complete = Path("backend/evaluation/complete.py")
           content = complete.read_text(encoding="utf-8")
           import_anchor = "from .complete_redteam import run_redteam\n"
-          import_line = (
+          quality_import = (
               "from .quality_gate import (\n"
               "    QUALITY_THRESHOLDS,\n"
               "    evaluate_quality_thresholds,\n"
               "    observed_quality_metrics,\n"
               ")\n"
           )
-          if import_line not in content:
-              if import_anchor not in content:
-                  raise SystemExit("Quality gate import anchor not found")
-              content = content.replace(import_anchor, import_anchor + import_line)
+          if quality_import not in content:
+              content = content.replace(import_anchor, import_anchor + quality_import)
 
-          failure_anchor = '''    if b3.metrics.failure_rate != 0.0:
-              failures.append("b3_runner_failure")
-          '''
-          failure_target = '''    if b3.metrics.failure_rate != 0.0:
-              failures.append("b3_runner_failure")
-              failures.extend(evaluate_quality_thresholds(b3.metrics))
-          '''
-          if failure_anchor not in content and failure_target not in content:
-              raise SystemExit("B3 failure-rate anchor not found")
-          content = content.replace(failure_anchor, failure_target)
+          quality_call = "    failures.extend(evaluate_quality_thresholds(b3.metrics))\n"
+          if quality_call not in content:
+              failure_line = '        failures.append("b3_runner_failure")\n'
+              position = content.index(failure_line) + len(failure_line)
+              content = content[:position] + quality_call + content[position:]
 
-          return_anchor = '''        evaluated_scenarios=48,
-              evaluated_results=len(results),
-          )
-          '''
-          return_target = '''        evaluated_scenarios=48,
-              evaluated_results=len(results),
-              quality_thresholds=dict(QUALITY_THRESHOLDS),
-              observed_b3_metrics=observed_quality_metrics(b3.metrics),
-          )
-          '''
-          if return_anchor not in content and return_target not in content:
-              raise SystemExit("Acceptance report return anchor not found")
-          content = content.replace(return_anchor, return_target)
+          report_start = content.index("    return CompleteAcceptanceReport(")
+          report_end = content.index("\n    )", report_start)
+          report_block = content[report_start:report_end]
+          if "quality_thresholds=" not in report_block:
+              anchor = "        evaluated_results=len(results),"
+              replacement = (
+                  "        evaluated_results=len(results),\n"
+                  "        quality_thresholds=dict(QUALITY_THRESHOLDS),\n"
+                  "        observed_b3_metrics=observed_quality_metrics(b3.metrics),"
+              )
+              if anchor not in report_block:
+                  raise SystemExit("Acceptance report result fields not found")
+              report_block = report_block.replace(anchor, replacement)
+              content = content[:report_start] + report_block + content[report_end:]
           content = content.replace('schema_version="2.1"', 'schema_version="2.2"')
           complete.write_text(content, encoding="utf-8")
 
           tests = Path("tests/test_cp016_cp018_complete.py")
           content = tests.read_text(encoding="utf-8")
-          anchor = "    assert run.acceptance.blocking_failures == ()\n"
-          addition = (
-              "    assert run.acceptance.blocking_failures == ()\n"
-              "    assert run.acceptance.quality_thresholds[\"recall_at_5_min\"] == 0.80\n"
-              "    assert run.acceptance.observed_b3_metrics[\"citation_precision\"] >= 0.95\n"
-              "    assert run.acceptance.observed_b3_metrics[\"unmapped_evidence_rate\"] == 0.0\n"
-          )
-          if addition not in content:
+          assertion = '    assert run.acceptance.quality_thresholds["recall_at_5_min"] == 0.80\n'
+          if assertion not in content:
+              anchor = "    assert run.acceptance.blocking_failures == ()\n"
+              addition = (
+                  anchor
+                  + assertion
+                  + '    assert run.acceptance.observed_b3_metrics["citation_precision"] >= 0.95\n'
+                  + '    assert run.acceptance.observed_b3_metrics["unmapped_evidence_rate"] == 0.0\n'
+              )
               if anchor not in content:
-                  raise SystemExit("Complete acceptance test anchor not found")
+                  raise SystemExit("Complete acceptance assertion not found")
               content = content.replace(anchor, addition, 1)
           tests.write_text(content, encoding="utf-8")
           PY
