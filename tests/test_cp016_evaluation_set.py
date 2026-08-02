@@ -39,11 +39,7 @@ def test_every_scenario_has_tools_evidence_safety_and_prohibited_claims() -> Non
 
 def test_required_tools_are_all_covered() -> None:
     scenario_set = load_scenario_set()
-    used_tools = {
-        tool
-        for scenario in scenario_set.scenarios
-        for tool in scenario.expected_tools
-    }
+    used_tools = {tool for scenario in scenario_set.scenarios for tool in scenario.expected_tools}
     assert used_tools == set(ToolName)
 
 
@@ -69,14 +65,8 @@ def test_safety_and_hostile_categories_have_strict_outcomes() -> None:
     assert len(hostile_cases) == 4
     for scenario in hostile_cases:
         assert scenario.hostile_document
-        assert (
-            scenario.expected_security_outcome
-            is SecurityOutcome.REJECT_UNTRUSTED_INSTRUCTION
-        )
-        assert (
-            ProhibitedClaim.FOLLOW_UNTRUSTED_INSTRUCTIONS
-            in scenario.prohibited_claims
-        )
+        assert scenario.expected_security_outcome is SecurityOutcome.REJECT_UNTRUSTED_INSTRUCTION
+        assert ProhibitedClaim.FOLLOW_UNTRUSTED_INSTRUCTIONS in scenario.prohibited_claims
 
 
 def test_multilingual_category_covers_all_frozen_languages() -> None:
