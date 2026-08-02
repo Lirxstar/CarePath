@@ -3,6 +3,7 @@ from __future__ import annotations
 from time import perf_counter_ns
 from uuid import UUID, uuid5
 
+from backend.agents.context_builder import ContextBuilderService
 from backend.agents.runtime import build_runtime_workflow
 from backend.agents.workflow import WorkflowState
 from backend.evaluation.complete_models import BenchmarkRequest
@@ -27,6 +28,9 @@ def test_aligned_production_runner_has_no_hidden_exception() -> None:
     interaction_id = uuid5(_EVALUATION_NAMESPACE, f"interaction:{request.scenario_id}")
 
     runner._seed_user(request, user_id)
+    summary = ContextBuilderService(runner.session).build(user_id)
+    assert summary.user_id == user_id
+
     runtime_text = runner._runtime_request_text(request)
     workflow = build_runtime_workflow(
         session=runner.session,
