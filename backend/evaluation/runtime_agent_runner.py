@@ -12,7 +12,6 @@ from backend.agents.runtime import build_runtime_workflow
 from backend.agents.tool_router import ToolName as RuntimeToolName
 from backend.agents.workflow import (
     VerificationDisposition,
-    WorkflowNode,
     WorkflowState,
     WorkflowStatus,
 )
@@ -87,9 +86,7 @@ class _EvaluationExternalIndex:
             )
         return tuple(
             self._hit(reference, topic, content, title, rank)
-            for rank, (reference, topic, content, title) in enumerate(
-                documents[:top_k], start=1
-            )
+            for rank, (reference, topic, content, title) in enumerate(documents[:top_k], start=1)
         )
 
     def _safe_documents(
@@ -247,9 +244,11 @@ class RuntimeAgentBaselineRunner:
             elapsed = (perf_counter_ns() - started) / 1_000_000
             return self._output(request, state, user_id, elapsed)
         except Exception:
-            elapsed = self._latency(request) if self.deterministic_latency else (
-                perf_counter_ns() - started
-            ) / 1_000_000
+            elapsed = (
+                self._latency(request)
+                if self.deterministic_latency
+                else (perf_counter_ns() - started) / 1_000_000
+            )
             return CompleteBaselineOutput(
                 baseline_id=self.baseline_id,
                 scenario_id=request.scenario_id,
@@ -300,7 +299,9 @@ class RuntimeAgentBaselineRunner:
         ):
             self.session.add(
                 GoalTable(
-                    goal_id=str(uuid5(_EVALUATION_NAMESPACE, f"goal:{request.scenario_id}:{domain}")),
+                    goal_id=str(
+                        uuid5(_EVALUATION_NAMESPACE, f"goal:{request.scenario_id}:{domain}")
+                    ),
                     user_id=str(user_id),
                     domain=domain,
                     description=description,
@@ -343,7 +344,9 @@ class RuntimeAgentBaselineRunner:
         journal_text = " ".join(request.context_overrides)
         self.session.add(
             JournalEntryTable(
-                entry_id=str(uuid5(_EVALUATION_NAMESPACE, f"journal:{request.scenario_id}:context")),
+                entry_id=str(
+                    uuid5(_EVALUATION_NAMESPACE, f"journal:{request.scenario_id}:context")
+                ),
                 user_id=str(user_id),
                 created_at=_EVALUATION_END - timedelta(hours=2),
                 text=journal_text,
@@ -416,9 +419,7 @@ class RuntimeAgentBaselineRunner:
                 else SafetyOutcome.ROUTINE
             ),
             security_disposition=security,
-            verifier_passed=(
-                state.verification_disposition is VerificationDisposition.PASS
-            ),
+            verifier_passed=(state.verification_disposition is VerificationDisposition.PASS),
             status=(
                 ExecutionStatus.FAILED
                 if state.status is WorkflowStatus.FAILED
@@ -474,9 +475,7 @@ class RuntimeAgentBaselineRunner:
         return tuple(hits), mapping
 
     @staticmethod
-    def _canonical_evidence(
-        evidence_id: str, content: str, namespace: EvidenceNamespace
-    ) -> str:
+    def _canonical_evidence(evidence_id: str, content: str, namespace: EvidenceNamespace) -> str:
         if namespace is EvidenceNamespace.EXTERNAL:
             return evidence_id.removeprefix("external:")
         text = content.casefold()
@@ -515,8 +514,12 @@ class RuntimeAgentBaselineRunner:
                 if not isinstance(raw, dict):
                     continue
                 claim_id = str(raw.get("claim_id") or f"runtime-claim-{index}")
-                evidence_ids = tuple(
-                    str(item) for item in raw.get("evidence_ids", []) if isinstance(item, str)
+                raw_evidence_ids = raw.get("evidence_ids", [])
+                evidence_ids = (
+                    tuple(str(item) for item in raw_evidence_ids if isinstance(item, str))
+                    if isinstance(raw_evidence_ids, Sequence)
+                    and not isinstance(raw_evidence_ids, (str, bytes))
+                    else ()
                 )
                 canonical = tuple(
                     evidence_map[item] for item in evidence_ids if item in evidence_map
