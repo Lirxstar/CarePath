@@ -1,0 +1,116 @@
+name: One-time quality gate activation
+
+on:
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.head_ref }}
+      - uses: actions/setup-python@v6
+        with:
+          python-version-file: .python-version
+      - name: Activate measured B3 quality thresholds
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          models = Path("backend/evaluation/complete_models.py")
+          content = models.read_text(encoding="utf-8")
+          source = '''class CompleteAcceptanceReport(BaseModel):
+              model_config = ConfigDict(extra="forbid", frozen=True)
+
+              passed: bool
+              blocking_failures: tuple[str, ...]
+              evaluated_scenarios: int
+              evaluated_results: int
+          '''
+          target = '''class CompleteAcceptanceReport(BaseModel):
+              model_config = ConfigDict(extra="forbid", frozen=True)
+
+              passed: bool
+              blocking_failures: tuple[str, ...]
+              evaluated_scenarios: int
+              evaluated_results: int
+              quality_thresholds: dict[str, float] = Field(default_factory=dict)
+              observed_b3_metrics: dict[str, float] = Field(default_factory=dict)
+          '''
+          if source not in content and target not in content:
+              raise SystemExit("Acceptance report model anchor not found")
+          models.write_text(content.replace(source, target), encoding="utf-8")
+
+          complete = Path("backend/evaluation/complete.py")
+          content = complete.read_text(encoding="utf-8")
+          import_anchor = "from .complete_redteam import run_redteam\n"
+          import_line = (
+              "from .quality_gate import (\n"
+              "    QUALITY_THRESHOLDS,\n"
+              "    evaluate_quality_thresholds,\n"
+              "    observed_quality_metrics,\n"
+              ")\n"
+          )
+          if import_line not in content:
+              if import_anchor not in content:
+                  raise SystemExit("Quality gate import anchor not found")
+              content = content.replace(import_anchor, import_anchor + import_line)
+
+          failure_anchor = '''    if b3.metrics.failure_rate != 0.0:
+              failures.append("b3_runner_failure")
+          '''
+          failure_target = '''    if b3.metrics.failure_rate != 0.0:
+              failures.append("b3_runner_failure")
+              failures.extend(evaluate_quality_thresholds(b3.metrics))
+          '''
+          if failure_anchor not in content and failure_target not in content:
+              raise SystemExit("B3 failure-rate anchor not found")
+          content = content.replace(failure_anchor, failure_target)
+
+          return_anchor = '''        evaluated_scenarios=48,
+              evaluated_results=len(results),
+          )
+          '''
+          return_target = '''        evaluated_scenarios=48,
+              evaluated_results=len(results),
+              quality_thresholds=dict(QUALITY_THRESHOLDS),
+              observed_b3_metrics=observed_quality_metrics(b3.metrics),
+          )
+          '''
+          if return_anchor not in content and return_target not in content:
+              raise SystemExit("Acceptance report return anchor not found")
+          content = content.replace(return_anchor, return_target)
+          content = content.replace('schema_version="2.1"', 'schema_version="2.2"')
+          complete.write_text(content, encoding="utf-8")
+
+          tests = Path("tests/test_cp016_cp018_complete.py")
+          content = tests.read_text(encoding="utf-8")
+          anchor = "    assert run.acceptance.blocking_failures == ()\n"
+          addition = (
+              "    assert run.acceptance.blocking_failures == ()\n"
+              "    assert run.acceptance.quality_thresholds[\"recall_at_5_min\"] == 0.80\n"
+              "    assert run.acceptance.observed_b3_metrics[\"citation_precision\"] >= 0.95\n"
+              "    assert run.acceptance.observed_b3_metrics[\"unmapped_evidence_rate\"] == 0.0\n"
+          )
+          if addition not in content:
+              if anchor not in content:
+                  raise SystemExit("Complete acceptance test anchor not found")
+              content = content.replace(anchor, addition, 1)
+          tests.write_text(content, encoding="utf-8")
+          PY
+      - name: Commit activation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            backend/evaluation/complete.py \
+            backend/evaluation/complete_models.py \
+            tests/test_cp016_cp018_complete.py
+          git commit -m "Enforce measured B3 quality thresholds"
+          git push origin "HEAD:${GITHUB_HEAD_REF}"
