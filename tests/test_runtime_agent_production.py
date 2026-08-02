@@ -6,10 +6,8 @@ from backend.agents.runtime import build_runtime_workflow
 from backend.agents.workflow import WorkflowState
 from backend.evaluation.complete_models import BenchmarkRequest
 from backend.evaluation.complete_scenarios import load_complete_scenarios
-from backend.evaluation.runtime_agent_runner import (
-    RuntimeAgentBaselineRunner,
-    _EvaluationExternalIndex,
-)
+from backend.evaluation.runtime_agent_production_runner import RuntimeAgentBaselineRunner
+from backend.evaluation.runtime_agent_runner import _EvaluationExternalIndex
 
 _EVALUATION_NAMESPACE = UUID("83f2aa49-233c-4425-83da-5ed2be166670")
 
