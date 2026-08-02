@@ -34,6 +34,25 @@ jobs:
         run: |
           python scripts/fix_cp018_migration.py
           python scripts/cp018_apply.py
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("backend/evaluation/manual_review.py")
+          text = path.read_text(encoding="utf-8")
+          text = text.replace(
+              '            "retrieval": "Context Builder records were available but not all were represented in scored patient evidence.",',
+              '            "retrieval": (\n                "Context Builder records were available but not all were represented "\n                "in scored patient evidence."\n            ),',
+          )
+          text = text.replace(
+              '            "planning": "The router ignored supplied context or treated generic plan and routine wording as adherence intent.",',
+              '            "planning": (\n                "The router ignored supplied context or treated generic plan and routine "\n                "wording as adherence intent."\n            ),',
+          )
+          text = text.replace(
+              '        "This report distinguishes retrieval, planning and tool routing, citation, and annotation causes.",',
+              '        (\n            "This report distinguishes retrieval, planning and tool routing, citation, "\n            "and annotation causes."\n        ),',
+          )
+          path.write_text(text, encoding="utf-8")
+          PY
       - name: Install dependencies
         run: python -m pip install -c requirements-dev.lock -e '.[dev]'
       - name: Format and validate implementation
