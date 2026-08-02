@@ -98,8 +98,7 @@ class _MeasuredRunner:
 
 def _measured_runners(*, inject_failures: bool = False) -> tuple[_MeasuredRunner, ...]:
     return tuple(
-        _MeasuredRunner(baseline_id, inject_failures=inject_failures)
-        for baseline_id in BaselineId
+        _MeasuredRunner(baseline_id, inject_failures=inject_failures) for baseline_id in BaselineId
     )
 
 
