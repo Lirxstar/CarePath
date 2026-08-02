@@ -36,7 +36,7 @@ jobs:
       - name: Install evaluation dependencies
         run: python -m pip install -c requirements-dev.lock -e '.[dev]'
       - name: Run focused regression tests
-        run: pytest tests/test_cp016_cp018_complete.py
+        run: pytest -o addopts='' tests/test_cp016_cp018_complete.py
       - name: Run complete 48x4 evaluation and red-team gate
         run: |
           carepath-evaluate-complete \
