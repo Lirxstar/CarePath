@@ -117,9 +117,7 @@ def _build_acceptance_report(
         failures.append("baseline_isolation_violation")
 
     b3_results = tuple(
-        result
-        for result in results
-        if result.output.baseline_id is BaselineId.B3_CAREPATH_AGENT
+        result for result in results if result.output.baseline_id is BaselineId.B3_CAREPATH_AGENT
     )
     if any(result.output.runtime_mode != "production_agent" for result in b3_results):
         failures.append("b3_not_using_production_agent")
@@ -136,9 +134,7 @@ def _build_acceptance_report(
         failures.append("b3_routine_verifier_not_executed")
 
     escalated_results = tuple(
-        result
-        for result in b3_results
-        if result.output.safety_outcome is not SafetyOutcome.ROUTINE
+        result for result in b3_results if result.output.safety_outcome is not SafetyOutcome.ROUTINE
     )
     if any(
         any(node in result.output.visited_nodes for node in ("planner", "verifier"))
