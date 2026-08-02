@@ -46,15 +46,29 @@ def build_evaluation_fixture(scenario: EvaluationScenario) -> EvaluationFixture:
     )
 
 
-@lru_cache(maxsize=64)
+@lru_cache(maxsize=96)
 def fixture_for_scenario(scenario_id: str) -> EvaluationFixture:
     scenario = next(
         (item for item in load_scenario_set().scenarios if item.scenario_id == scenario_id),
         None,
     )
-    if scenario is None:
-        raise KeyError(f"unknown evaluation scenario: {scenario_id}")
-    return build_evaluation_fixture(scenario)
+    if scenario is not None:
+        return build_evaluation_fixture(scenario)
+    return EvaluationFixture(
+        scenario_id=scenario_id,
+        persona_id="redteam_synthetic",
+        language="en",
+        context_text="Synthetic red-team fixture.",
+        personal_evidence_refs=("journal:recent",),
+        external_evidence_refs=("topic:when_to_seek_professional_help",),
+        observation_refs=(),
+        journal_refs=("journal:recent",),
+        profile_refs=(),
+        plan_refs=(),
+        feedback_refs=(),
+        event_refs=(),
+        quality_refs=(),
+    )
 
 
 def external_evidence_content(reference: str, context_text: str) -> str:
