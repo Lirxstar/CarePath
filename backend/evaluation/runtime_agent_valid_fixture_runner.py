@@ -189,6 +189,33 @@ class RuntimeAgentBaselineRunner(_AlignedRuntimeAgentBaselineRunner):
                 self._register(observation_id, *registered)
 
 
+    def _personal_refs(
+        self,
+        evidence_id: str,
+        fixture: EvaluationFixture,
+    ) -> tuple[str, ...]:
+        mapped = super()._personal_refs(evidence_id, fixture)
+        if mapped:
+            return mapped
+        if evidence_id.startswith("patient:profile:"):
+            return ("profile:runtime_context",)
+        if evidence_id.startswith("patient:trend:"):
+            parts = evidence_id.split(":")
+            metric = parts[3] if len(parts) > 3 else "unknown"
+            return (f"observation:{metric}",)
+        if evidence_id.startswith("patient:event:"):
+            parts = evidence_id.split(":")
+            metric = parts[2] if len(parts) > 2 else "unknown"
+            return (f"event:{metric}",)
+        if evidence_id.startswith("patient:journal:"):
+            return ("journal:runtime_context",)
+        if evidence_id.startswith("patient:goal:"):
+            return ("profile:goal_context",)
+        if evidence_id.startswith("patient:plan:"):
+            return ("plan:runtime_context",)
+        return ()
+
+
 def _storage_metric(reference: str) -> str:
     suffix = reference.split(":", 1)[-1]
     if suffix in _VALID_METRICS:

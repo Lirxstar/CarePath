@@ -25,7 +25,9 @@ from .complete_models import (
 def score_output(scenario: EvaluationScenario, output: CompleteBaselineOutput) -> ScenarioMetrics:
     retrieval_applicable = scenario.expected_safety_outcome is SafetyOutcome.ROUTINE
     tool_routing_applicable = retrieval_applicable
-    citation_applicable = retrieval_applicable and bool(output.claims)
+    citation_applicable = retrieval_applicable and any(
+        claim.is_medical for claim in output.claims
+    )
     expected_personal = set(scenario.expected_evidence.personal)
     expected_external = set(scenario.expected_evidence.external)
     expected_all = expected_personal | expected_external
