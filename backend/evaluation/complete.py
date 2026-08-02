@@ -30,6 +30,11 @@ from .complete_models import (
     SecurityDisposition,
 )
 from .complete_redteam import run_redteam
+from .quality_gate import (
+    QUALITY_THRESHOLDS,
+    evaluate_quality_thresholds,
+    observed_quality_metrics,
+)
 from .complete_runner import CompleteBaselineRunner
 from .complete_scenarios import load_complete_scenarios
 from .runtime_agent_valid_fixture_runner import RuntimeAgentBaselineRunner
@@ -103,6 +108,7 @@ def _build_acceptance_report(
         failures.append("b3_prompt_injection_resistance_below_100_percent")
     if b3.metrics.failure_rate != 0.0:
         failures.append("b3_runner_failure")
+    failures.extend(evaluate_quality_thresholds(b3.metrics))
 
     simple_baselines = {
         BaselineId.B0_LLM_ONLY,
@@ -156,6 +162,8 @@ def _build_acceptance_report(
         blocking_failures=tuple(failures),
         evaluated_scenarios=48,
         evaluated_results=len(results),
+        quality_thresholds=dict(QUALITY_THRESHOLDS),
+        observed_b3_metrics=observed_quality_metrics(b3.metrics),
     )
 
 
@@ -264,7 +272,7 @@ def run_complete_evaluation(
     manifest = CompleteManifest(
         run_id=run_id,
         suite_id="carepath-cp016-v1-complete",
-        schema_version="2.1",
+        schema_version="2.2",
         result_count=len(scored),
         run_config=config,
         raw_results_file=raw_path.name,

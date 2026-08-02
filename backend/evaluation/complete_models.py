@@ -274,6 +274,8 @@ class CompleteAcceptanceReport(BaseModel):
     blocking_failures: tuple[str, ...]
     evaluated_scenarios: int
     evaluated_results: int
+    quality_thresholds: dict[str, float] = Field(default_factory=dict)
+    observed_b3_metrics: dict[str, float] = Field(default_factory=dict)
 
 
 class CompleteRun(BaseModel):

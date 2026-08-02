@@ -76,6 +76,9 @@ def test_complete_run_uses_strict_baselines_and_real_b3_agent(tmp_path: Path) ->
     assert run.manifest.run_config.started_at == fixed
     assert run.acceptance.passed is True
     assert run.acceptance.blocking_failures == ()
+    assert run.acceptance.quality_thresholds["recall_at_5_min"] == 0.80
+    assert run.acceptance.observed_b3_metrics["citation_precision"] >= 0.95
+    assert run.acceptance.observed_b3_metrics["unmapped_evidence_rate"] == 0.0
     assert len(run.summaries) == 4 * (1 + len(ScenarioCategory))
 
     b3_outputs = [
