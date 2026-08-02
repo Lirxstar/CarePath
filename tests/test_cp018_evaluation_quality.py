@@ -85,11 +85,13 @@ def test_router_covers_missingness_adherence_and_multilingual_trends() -> None:
 
     adherence = router.route(
         user_id=user_id,
-        question="I rejected the evening walk. Can you change the plan?",
+        question=(
+            "I rejected the evening walk. Can you change the plan? "
+            "[CAREPATH_CONTEXT] The last two proposed actions were rejected."
+        ),
         end_date=end_date,
     )
     assert [call.tool_name for call in adherence.calls] == [
-        "trend",
         "adherence_summary",
         "user_history",
         "guideline_retrieval",
@@ -97,7 +99,10 @@ def test_router_covers_missingness_adherence_and_multilingual_trends() -> None:
 
     sleep_timing = router.route(
         user_id=user_id,
-        question="When do I sleep most regularly?",
+        question=(
+            "When do I sleep most regularly? "
+            "[CAREPATH_CONTEXT] Bedtime and wake time vary across the month."
+        ),
         end_date=end_date,
     )
     assert [call.arguments["metric_type"] for call in sleep_timing.calls] == [

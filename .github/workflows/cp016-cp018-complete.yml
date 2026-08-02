@@ -41,7 +41,8 @@ jobs:
             tests/test_runtime_agent_production.py \
             tests/test_runtime_agent_aligned.py \
             tests/test_cp016_cp018_complete.py \
-            tests/test_cp018_evaluation_quality.py
+            tests/test_cp018_evaluation_quality.py \
+            tests/test_cp018_research_claims.py
       - name: Run complete 48x4 evaluation and red-team gate
         run: |
           carepath-evaluate-complete \

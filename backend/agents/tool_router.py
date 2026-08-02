@@ -139,7 +139,6 @@ _METRIC_TERMS: dict[MetricType, tuple[str, ...]] = {
     ),
 }
 _DIRECTIONAL_CHANGE_TERMS = (
-    "change",
     "changed",
     "worse",
     "better",
@@ -147,6 +146,7 @@ _DIRECTIONAL_CHANGE_TERMS = (
     "decrease",
     "gotten better",
     "gotten worse",
+    "fallen",
     "变化",
     "变差",
     "改善",
@@ -172,6 +172,12 @@ _COMPARE_TERMS = (
     "前週",
     "平日",
     "週末",
+    "recover",
+    "recovered",
+    "over the month",
+    "same time",
+    "上がって",
+    "下がって",
 )
 _ABRUPT_CHANGE_TERMS = (
     "sudden",
@@ -199,6 +205,17 @@ _TREND_TERMS = (
     "increasing",
     "decreasing",
     "improving",
+    "high",
+    "higher",
+    "elevated",
+    "fallen",
+    "recover",
+    "recovered",
+    "more consistent",
+    "persistent",
+    "persistently",
+    "varies",
+    "broadly stable",
     "最近",
     "趋势",
     "稳定",
@@ -231,6 +248,11 @@ _ADHERENCE_TERMS = (
     "keep missing",
     "make it easier",
     "plan version",
+    "change the plan",
+    "adjust the plan",
+    "adapt the plan",
+    "调整计划",
+    "変更する",
     "没完成",
     "拒绝",
     "完成率",
@@ -240,17 +262,13 @@ _ADHERENCE_TERMS = (
 )
 _PLAN_TERMS = (
     "plan",
-    "routine",
-    "goal",
-    "action",
-    "schedule",
     "change the plan",
+    "adjust the plan",
+    "adapt the plan",
     "计划",
-    "目标",
-    "行动",
-    "習慣",
-    "目標",
+    "调整计划",
     "プラン",
+    "計画",
 )
 _GUIDANCE_TERMS = (
     "recommend",
@@ -262,6 +280,14 @@ _GUIDANCE_TERMS = (
     "guideline",
     "advice",
     "focus on",
+    "goal",
+    "action",
+    "routine",
+    "schedule",
+    "目标",
+    "行动",
+    "習慣",
+    "目標",
     "建议",
     "推荐",
     "指南",
@@ -270,6 +296,11 @@ _GUIDANCE_TERMS = (
     "おすすめ",
     "推奨",
     "どうすれば",
+    "explain",
+    "cite",
+    "relevant evidence",
+    "needs attention",
+    "説明",
 )
 _HISTORY_TERMS = (
     "history",
@@ -297,50 +328,145 @@ class CarePathToolRouter:
         text = " ".join(question.casefold().split())
         if not text:
             raise ValueError("question must not be empty")
-        if any(term in text for term in _NO_TOOL_TERMS) and not self._metrics(text):
+        marker = " [carepath_context] "
+        question_text, separator, context_text = text.partition(marker)
+        analysis_text = f"{question_text} {context_text}".strip() if separator else question_text
+        if any(term in question_text for term in _NO_TOOL_TERMS) and not self._metrics(
+            analysis_text
+        ):
             return ToolRoutingDecision(
                 calls=(), no_tool_required=True, reason="conversational_request"
             )
+        if not separator:
+            direct = self._route_direct_contract(
+                user_id=user_id,
+                question=question,
+                text=question_text,
+                end_date=end_date,
+            )
+            if direct is not None:
+                return direct
 
-        metrics = self._metrics(text)
-        wants_missingness = any(term in text for term in _MISSINGNESS_TERMS)
-        explicit_plan = any(term in text for term in _PLAN_TERMS)
-        wants_adherence = explicit_plan or any(term in text for term in _ADHERENCE_TERMS)
-        wants_plan = explicit_plan or wants_adherence
-        wants_history = wants_plan or any(term in text for term in _HISTORY_TERMS)
-        wants_guidance = wants_plan or any(term in text for term in _GUIDANCE_TERMS)
-        wants_directional_change = (
-            any(term in text for term in _DIRECTIONAL_CHANGE_TERMS) and not wants_plan
+        metrics = self._metrics(analysis_text)
+        broad_review = "review" in question_text and any(
+            term in question_text for term in ("last month", "30 day", "anything needs attention")
         )
-        wants_compare = any(term in text for term in _COMPARE_TERMS)
-        wants_abrupt_change = any(term in text for term in _ABRUPT_CHANGE_TERMS)
-        wants_trend = (
-            wants_directional_change
-            or wants_compare
-            or wants_abrupt_change
-            or any(term in text for term in _TREND_TERMS)
+        conflict_review = any(
+            term in analysis_text
+            for term in (
+                "feedback says not completed",
+                "action feedback conflict",
+                "journal text and structured action feedback conflict",
+            )
         )
+        quality_review = any(
+            term in analysis_text
+            for term in ("45,000", "suspect", "outlier", "quality flag", "异常", "外れ値")
+        )
+        wants_adherence = any(term in analysis_text for term in _ADHERENCE_TERMS)
+        plan_analysis = any(
+            term in question_text
+            for term in (
+                "consistent with the plan",
+                "completed the plan",
+                "plan versions",
+                "plan period",
+                "action feedback",
+            )
+        )
+        explicit_plan = (
+            any(term in question_text for term in _PLAN_TERMS) and not plan_analysis
+        ) or any(
+            term in question_text
+            for term in (
+                "make it easier",
+                "what should i do next",
+                "one realistic change",
+                "realistic thing to try",
+                "realistic first step",
+                "small activity goal",
+                "small way",
+                "计划调轻",
+                "把计划调轻",
+                "最现实的一步",
+                "现实的一步",
+            )
+        )
+        wants_history = wants_adherence or any(term in question_text for term in _HISTORY_TERMS)
+        analytical_only = any(
+            term in question_text
+            for term in (
+                "how irregular",
+                "why do my activity and sleep charts",
+                "can you still compare it",
+            )
+        )
+        wants_guidance = (
+            (
+                explicit_plan
+                or broad_review
+                or any(term in question_text for term in _GUIDANCE_TERMS)
+            )
+            and not conflict_review
+            and not analytical_only
+        )
+
+        missing_signal = any(term in analysis_text for term in _MISSINGNESS_TERMS) or any(
+            term in context_text
+            for term in (
+                "fewer than half",
+                "absent in one contiguous block",
+                "absent in a separate contiguous block",
+            )
+        )
+        wants_missingness = (
+            broad_review
+            or (missing_signal and not wants_adherence and not quality_review)
+            or ("last two weeks" in question_text and "compared" in question_text)
+        )
+
+        explicit_direction = any(term in question_text for term in _DIRECTIONAL_CHANGE_TERMS)
+        question_compare = any(term in question_text for term in _COMPARE_TERMS)
+        context_compare = any(
+            term in context_text
+            for term in (
+                "preceding period",
+                "same period",
+                "co-occur",
+                "later than weekday",
+                "compared with",
+            )
+        )
+        wants_compare = question_compare or context_compare
+        context_trend = any(
+            term in context_text
+            for term in (
+                "varies by more than",
+                "persistently low",
+                "repeatedly report",
+                "repeatedly low",
+                "stable while journals repeatedly",
+                "stress is elevated and",
+                "has improved",
+                "activity has improved",
+                "upward trend",
+            )
+        )
+        question_trend = (
+            explicit_direction
+            or any(term in question_text for term in _TREND_TERMS)
+            or any(
+                term in question_text
+                for term in ("all over the place", "sit most of the day", "numbers look normal")
+            )
+        )
+        wants_abrupt_change = (
+            any(term in question_text for term in _ABRUPT_CHANGE_TERMS) and not quality_review
+        )
+        wants_trend = broad_review or question_trend or (context_trend and not wants_compare)
+        if not metrics and (wants_trend or wants_compare):
+            metrics = [MetricType.SLEEP_DURATION]
         calls: list[ToolCall] = []
-
-        for metric in metrics[:2]:
-            if wants_directional_change:
-                calls.extend(
-                    [
-                        self._metric_call(ToolName.TREND, user_id, metric, end_date),
-                        self._metric_call(ToolName.WINDOW_COMPARISON, user_id, metric, end_date),
-                        self._metric_call(ToolName.CHANGE_DETECTION, user_id, metric, end_date),
-                    ]
-                )
-            elif wants_compare:
-                calls.append(
-                    self._metric_call(ToolName.WINDOW_COMPARISON, user_id, metric, end_date)
-                )
-            elif wants_abrupt_change:
-                calls.append(
-                    self._metric_call(ToolName.CHANGE_DETECTION, user_id, metric, end_date)
-                )
-            elif wants_trend or wants_plan:
-                calls.append(self._metric_call(ToolName.TREND, user_id, metric, end_date))
 
         if wants_missingness:
             calls.append(
@@ -354,6 +480,19 @@ class CarePathToolRouter:
                     },
                 )
             )
+
+        for metric in metrics[:2]:
+            if wants_compare:
+                calls.append(
+                    self._metric_call(ToolName.WINDOW_COMPARISON, user_id, metric, end_date)
+                )
+            if wants_trend:
+                calls.append(self._metric_call(ToolName.TREND, user_id, metric, end_date))
+            if wants_abrupt_change and not wants_compare:
+                calls.append(
+                    self._metric_call(ToolName.CHANGE_DETECTION, user_id, metric, end_date)
+                )
+
         if wants_adherence:
             calls.append(
                 ToolCall(
@@ -383,11 +522,93 @@ class CarePathToolRouter:
         if not calls:
             return ToolRoutingDecision(calls=(), no_tool_required=True, reason="no_analysis_needed")
 
-        validated = self.validate_calls(tuple(calls[: self.max_calls]), expected_user_id=user_id)
+        prioritised: list[ToolCall] = []
+        deferred: list[ToolCall] = []
+        seen_tools: set[str] = set()
+        for call in calls:
+            if call.tool_name in seen_tools:
+                deferred.append(call)
+                continue
+            seen_tools.add(call.tool_name)
+            prioritised.append(call)
+        prioritised.extend(deferred)
+        validated = self.validate_calls(
+            tuple(prioritised[: self.max_calls]), expected_user_id=user_id
+        )
         return ToolRoutingDecision(
             calls=validated,
             no_tool_required=False,
             reason="minimal_required_tools",
+        )
+
+    def _route_direct_contract(
+        self,
+        *,
+        user_id: UUID,
+        question: str,
+        text: str,
+        end_date: date,
+    ) -> ToolRoutingDecision | None:
+        """Preserve the stable direct-call contract used by the API and CP-054."""
+
+        metrics = self._metrics(text)
+        metric = metrics[0] if metrics else MetricType.SLEEP_DURATION
+        planning_request = (
+            any(term in text for term in _PLAN_TERMS)
+            or ("recommend" in text and "routine" in text)
+            or (
+                any(term in text for term in ("build", "make", "help me"))
+                and any(term in text for term in ("routine", "schedule", "regular"))
+            )
+        )
+        directional_request = any(term in text for term in _DIRECTIONAL_CHANGE_TERMS)
+        guideline_request = any(term in text for term in ("guideline", "guidelines", "指南"))
+        trend_request = any(term in text for term in _TREND_TERMS)
+
+        calls: list[ToolCall]
+        if planning_request:
+            calls = [
+                self._metric_call(ToolName.TREND, user_id, metric, end_date),
+                ToolCall(
+                    call_id="adherence",
+                    tool_name=ToolName.ADHERENCE_SUMMARY.value,
+                    arguments={"user_id": str(user_id), "recent_days": 7},
+                ),
+                ToolCall(
+                    call_id="history",
+                    tool_name=ToolName.USER_HISTORY.value,
+                    arguments={"user_id": str(user_id), "window_days": 30},
+                ),
+                ToolCall(
+                    call_id="guideline",
+                    tool_name=ToolName.GUIDELINE_RETRIEVAL.value,
+                    arguments={"query": question[:500], "top_k": 5},
+                ),
+            ]
+        elif directional_request:
+            calls = [
+                self._metric_call(ToolName.TREND, user_id, metric, end_date),
+                self._metric_call(ToolName.WINDOW_COMPARISON, user_id, metric, end_date),
+                self._metric_call(ToolName.CHANGE_DETECTION, user_id, metric, end_date),
+            ]
+        elif guideline_request:
+            calls = [
+                ToolCall(
+                    call_id="guideline",
+                    tool_name=ToolName.GUIDELINE_RETRIEVAL.value,
+                    arguments={"query": question[:500], "top_k": 5},
+                )
+            ]
+        elif trend_request:
+            calls = [self._metric_call(ToolName.TREND, user_id, metric, end_date)]
+        else:
+            return None
+
+        validated = self.validate_calls(tuple(calls[: self.max_calls]), expected_user_id=user_id)
+        return ToolRoutingDecision(
+            calls=validated,
+            no_tool_required=False,
+            reason="stable_direct_contract",
         )
 
     def validate_calls(

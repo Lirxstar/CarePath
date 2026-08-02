@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from datetime import timedelta
 from time import perf_counter_ns
 from uuid import UUID, uuid5
@@ -446,8 +447,6 @@ class RuntimeAgentBaselineRunner(_RuntimeAgentBaselineRunner):
             )
         if WorkflowNode.PERSONAL_CONTEXT_RETRIEVER in state.visited_nodes:
             success_by_tool[ToolName.RETRIEVE_PERSONAL_CONTEXT] = True
-        if WorkflowNode.EXTERNAL_EVIDENCE_RETRIEVER in state.visited_nodes:
-            success_by_tool[ToolName.RETRIEVE_EXTERNAL_EVIDENCE] = True
         ordered = tuple(tool for tool in ToolName if tool in success_by_tool)
         return ordered, tuple(success_by_tool[tool] for tool in ordered)
 
@@ -491,6 +490,11 @@ class RuntimeAgentBaselineRunner(_RuntimeAgentBaselineRunner):
                 supported_personal.update(fixture.journal_refs)
                 supported_personal.update(fixture.profile_refs)
                 supported_personal.update(fixture.plan_refs)
+
+        for record_id in _context_record_ids(state.context):
+            references = self.source_refs.get(record_id)
+            if references:
+                supported_personal.update(references)
 
         personal_order = [
             ref for ref in fixture.personal_evidence_refs if ref in supported_personal
@@ -540,6 +544,16 @@ class RuntimeAgentBaselineRunner(_RuntimeAgentBaselineRunner):
         valid = {reference for reference in references if reference}
         if valid:
             self.source_refs.setdefault(record_id, set()).update(valid)
+
+
+def _context_record_ids(value: object) -> tuple[str, ...]:
+    if isinstance(value, str):
+        return (value,)
+    if isinstance(value, Mapping):
+        return tuple(item for nested in value.values() for item in _context_record_ids(nested))
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+        return tuple(item for nested in value for item in _context_record_ids(nested))
+    return ()
 
 
 def _topic_for_reference(reference: str) -> GuidelineTopic:

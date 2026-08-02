@@ -177,3 +177,15 @@ pytest \
 ```
 
 The focused tests cover the scenario schema, gold-answer separation, fixture validity, baseline isolation, predictable metric formulas, production-agent node traversal, multilingual routing, missingness and adherence tools, stable evidence mapping, correct safety bypass semantics, end-to-end red-team cases, deterministic reference artifacts and CLI output.
+
+
+## Research-claim completion gate
+
+The internal research targets are blocking for the deterministic production B3 run:
+
+- citation precision at least 0.85;
+- patient-context fidelity at least 0.90;
+- tool-selection accuracy at least 0.90;
+- unsupported claim rate at most 0.10.
+
+The evaluator writes `plan_adaptation_report.json`, proving that both low-adherence personas receive a low-difficulty action of no more than eight minutes with an explicit reduction rationale. `low_score_review.json` and `low_score_review.md` preserve the manual review of the schema-2.2 low-score scenarios and classify root causes as retrieval, planning and tool routing, citation, or annotation. Any new low-score scenario without a recorded review blocks acceptance.
