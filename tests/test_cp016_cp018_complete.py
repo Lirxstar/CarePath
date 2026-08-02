@@ -107,11 +107,7 @@ def test_complete_run_uses_strict_baselines_and_real_b3_agent(tmp_path: Path) ->
     assert "verifier" not in b3_safety.visited_nodes
     assert b3_safety.visited_nodes == ("safety_triage", "composer", "feedback_update")
 
-    routine = next(
-        output
-        for output in b3_outputs
-        if output.scenario_id == "CP016-RT-001"
-    )
+    routine = next(output for output in b3_outputs if output.scenario_id == "CP016-RT-001")
     assert routine.verifier_passed is True
     assert "context_builder" in routine.visited_nodes
     assert "tool_router" in routine.visited_nodes
