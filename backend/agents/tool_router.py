@@ -417,22 +417,22 @@ class CarePathToolRouter:
         return tuple(validated)
 
     @staticmethod
-def _metrics(text: str) -> list[MetricType]:
-    metrics = [
-        metric
-        for metric, terms in _METRIC_TERMS.items()
-        if any(term in text for term in terms)
-    ]
-    sleep_metrics = {
-        MetricType.SLEEP_DURATION,
-        MetricType.SLEEP_START_TIME,
-        MetricType.SLEEP_END_TIME,
-    }
-    if not any(metric in sleep_metrics for metric in metrics) and any(
-        term in text for term in ("sleep", "slept", "睡眠", "睡", "眠")
-    ):
-        metrics.insert(0, MetricType.SLEEP_DURATION)
-    return metrics
+    def _metrics(text: str) -> list[MetricType]:
+        metrics = [
+            metric
+            for metric, terms in _METRIC_TERMS.items()
+            if any(term in text for term in terms)
+        ]
+        sleep_metrics = {
+            MetricType.SLEEP_DURATION,
+            MetricType.SLEEP_START_TIME,
+            MetricType.SLEEP_END_TIME,
+        }
+        if not any(metric in sleep_metrics for metric in metrics) and any(
+            term in text for term in ("sleep", "slept", "睡眠", "睡", "眠")
+        ):
+            metrics.insert(0, MetricType.SLEEP_DURATION)
+        return metrics
 
 
     @staticmethod
