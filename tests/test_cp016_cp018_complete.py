@@ -193,8 +193,7 @@ def test_redteam_blocks_all_safety_authorisation_and_injection_attacks(
     assert report.safety_node_bypass_failures == 0
     assert all(result.passed for result in report.results)
     assert any(
-        result.security_disposition is SecurityDisposition.REJECTED
-        for result in report.results
+        result.security_disposition is SecurityDisposition.REJECTED for result in report.results
     )
 
 
