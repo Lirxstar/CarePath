@@ -12,6 +12,7 @@ from backend.evaluation.runtime_agent_production_runner import (
     RuntimeAgentBaselineRunner,
     _AlignedEvaluationExternalIndex,
 )
+from backend.evaluation.runtime_agent_runner import _EVALUATION_END
 from backend.evaluation.scenarios import load_scenario_set
 
 _EVALUATION_NAMESPACE = UUID("83f2aa49-233c-4425-83da-5ed2be166670")
@@ -28,7 +29,7 @@ def test_aligned_production_runner_has_no_hidden_exception() -> None:
     interaction_id = uuid5(_EVALUATION_NAMESPACE, f"interaction:{request.scenario_id}")
 
     runner._seed_user(request, user_id)
-    summary = ContextBuilderService(runner.session).build(user_id)
+    summary = ContextBuilderService(runner.session).build(user_id, end_at=_EVALUATION_END)
     assert summary.user_id == user_id
 
     runtime_text = runner._runtime_request_text(request)
