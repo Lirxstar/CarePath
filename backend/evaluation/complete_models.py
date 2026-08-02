@@ -68,7 +68,7 @@ class BenchmarkRequest(BaseModel):
     hostile_document: str | None = None
 
     @classmethod
-    def from_scenario(cls, scenario: EvaluationScenario) -> "BenchmarkRequest":
+    def from_scenario(cls, scenario: EvaluationScenario) -> BenchmarkRequest:
         return cls(
             scenario_id=scenario.scenario_id,
             persona_id=scenario.persona_id,
