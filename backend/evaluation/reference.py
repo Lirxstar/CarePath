@@ -37,9 +37,7 @@ class ReferenceBaselineRunner:
             evaluation_harness.BaselineId.B2_DUAL_RAG,
             evaluation_harness.BaselineId.B3_CAREPATH_AGENT,
         }
-        include_tools = (
-            self.baseline_id is evaluation_harness.BaselineId.B3_CAREPATH_AGENT
-        )
+        include_tools = self.baseline_id is evaluation_harness.BaselineId.B3_CAREPATH_AGENT
 
         personal_evidence = scenario.expected_evidence.personal if include_personal else ()
         external_evidence = scenario.expected_evidence.external if include_external else ()
@@ -88,6 +86,5 @@ class ReferenceBaselineRunner:
 
 def reference_runners() -> tuple[ReferenceBaselineRunner, ...]:
     return tuple(
-        ReferenceBaselineRunner(baseline_id)
-        for baseline_id in evaluation_harness.BaselineId
+        ReferenceBaselineRunner(baseline_id) for baseline_id in evaluation_harness.BaselineId
     )
