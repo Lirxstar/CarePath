@@ -1,6 +1,6 @@
 # CarePath Issue Board
 
-This board tracks only the current public backlog. Completed pre-public work remains documented in the repository history, tests, and implementation files rather than as open public issues.
+This board tracks only the current public backlog. Completed pre-public work remains documented in the implementation, tests, and project documentation rather than as open public issues.
 
 ## Board policy
 
