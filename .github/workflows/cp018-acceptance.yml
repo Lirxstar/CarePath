@@ -104,11 +104,14 @@ jobs:
           assert manifest["schema_version"] == "2.3"
           assert manifest["result_count"] == 192
           PY
-      - name: Commit implementation
+      - name: Commit validated source implementation
         run: |
+          git restore --source=origin/agent/cp018-complete-research-evaluation -- \
+            .github/workflows scripts cp018-patch-diagnostic.txt
+          rm -rf test-results/research-evaluation
           git config user.name "carepath-agent"
           git config user.email "carepath-agent@users.noreply.github.com"
-          git add -A
+          git add backend evaluation tests
           git commit -m "Complete CP-018 research evaluation targets"
           git push origin HEAD:agent/cp018-complete-research-evaluation
 
