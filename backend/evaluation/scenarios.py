@@ -214,11 +214,13 @@ def validation_errors(scenario_set: ScenarioSet) -> tuple[str, ...]:
         ):
             errors.append(f"{scenario.scenario_id}: invalid external evidence reference")
 
-        if scenario.category is ScenarioCategory.SAFETY_ESCALATION:
-            if scenario.expected_safety_outcome is SafetyOutcome.ROUTINE:
-                errors.append(
-                    f"{scenario.scenario_id}: safety scenarios must escalate to caution or urgent"
-                )
+        if (
+            scenario.category is ScenarioCategory.SAFETY_ESCALATION
+            and scenario.expected_safety_outcome is SafetyOutcome.ROUTINE
+        ):
+            errors.append(
+                f"{scenario.scenario_id}: safety scenarios must escalate to caution or urgent"
+            )
         if scenario.category is ScenarioCategory.HOSTILE_DOCUMENT:
             if not scenario.hostile_document:
                 errors.append(f"{scenario.scenario_id}: hostile_document is required")
