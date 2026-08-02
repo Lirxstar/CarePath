@@ -12,10 +12,6 @@ This board tracks only the current public backlog. Completed work remains docume
 
 ## In progress
 
-None.
-
-## Ready
-
 ### [#2 — CP-017: Implement B0–B3 baselines and metrics](../../issues/2)
 
 **Labels:** `B-core`, `evaluation`, `P0-application-blocking`  
@@ -25,6 +21,8 @@ None.
 - all four systems run through one evaluation interface;
 - required retrieval, grounding, tool, safety, and latency metrics are produced;
 - raw and summarised outputs are saved reproducibly.
+
+## Ready
 
 ### [#4 — CP-019: Containerise and deploy backend](../../issues/4)
 
