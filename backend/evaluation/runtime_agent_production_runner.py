@@ -601,4 +601,7 @@ def _fixture_value(metric: str, index: int, text: str) -> tuple[float | None, bo
         delta += float((index % 3) * 75)
     if metric == "sleep_end_time" and any(term in text for term in ("varies", "irregular")):
         delta += float((index % 3) * 60)
-    return float(base + delta), None
+    value = float(base + delta)
+    if metric in {"sleep_start_time", "sleep_end_time"}:
+        value %= 1440.0
+    return value, None
