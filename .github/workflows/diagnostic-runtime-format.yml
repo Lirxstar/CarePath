@@ -1,18 +1,20 @@
-name: Diagnostic runtime formatter diff
+name: One-time runtime formatter fix
 
 on:
   pull_request:
-  workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  formatter-diff:
+  formatter-fix:
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.head_ref }}
       - uses: actions/setup-python@v6
         with:
           python-version-file: .python-version
@@ -21,5 +23,15 @@ jobs:
             pyproject.toml
             requirements-dev.lock
       - run: python -m pip install -c requirements-dev.lock -e '.[dev]'
-      - name: Show exact Ruff formatter diff
-        run: python -m ruff format --diff backend/evaluation/runtime_agent_runner.py
+      - name: Apply exact Ruff formatter result
+        run: python -m ruff format backend/evaluation/runtime_agent_runner.py
+      - name: Commit formatter-only change
+        run: |
+          if git diff --quiet; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add backend/evaluation/runtime_agent_runner.py
+          git commit -m "Format production agent evaluation runner"
+          git push origin "HEAD:${GITHUB_HEAD_REF}"
