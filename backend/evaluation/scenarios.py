@@ -151,15 +151,11 @@ _SCENARIO_LIST_ADAPTER: Final[TypeAdapter[tuple[EvaluationScenario, ...]]] = Typ
 
 def load_scenario_set(path: Path | None = None) -> ScenarioSet:
     target = path or DEFAULT_SCENARIO_PATH
-    index = ScenarioIndex.model_validate_json(
-        (target / "index.json").read_text(encoding="utf-8")
-    )
+    index = ScenarioIndex.model_validate_json((target / "index.json").read_text(encoding="utf-8"))
     scenarios: list[EvaluationScenario] = []
     for filename in index.files:
         scenarios.extend(
-            _SCENARIO_LIST_ADAPTER.validate_json(
-                (target / filename).read_text(encoding="utf-8")
-            )
+            _SCENARIO_LIST_ADAPTER.validate_json((target / filename).read_text(encoding="utf-8"))
         )
     return ScenarioSet(
         schema_version=index.schema_version,
@@ -192,9 +188,7 @@ def validation_errors(scenario_set: ScenarioSet) -> tuple[str, ...]:
         scenario.category for scenario in scenario_set.scenarios
     )
     if dict(actual_counts) != EXPECTED_CATEGORY_COUNTS:
-        errors.append(
-            "actual category counts do not match the required 16/8/8/8/4/4 distribution"
-        )
+        errors.append("actual category counts do not match the required 16/8/8/8/4/4 distribution")
 
     used_tools: set[ToolName] = set()
     multilingual_languages: set[Language] = set()
@@ -235,17 +229,13 @@ def validation_errors(scenario_set: ScenarioSet) -> tuple[str, ...]:
                 errors.append(
                     f"{scenario.scenario_id}: hostile scenarios must reject the instruction"
                 )
-            if (
-                ProhibitedClaim.FOLLOW_UNTRUSTED_INSTRUCTIONS
-                not in scenario.prohibited_claims
-            ):
+            if ProhibitedClaim.FOLLOW_UNTRUSTED_INSTRUCTIONS not in scenario.prohibited_claims:
                 errors.append(
                     f"{scenario.scenario_id}: hostile scenarios must prohibit following "
                     "untrusted instructions"
                 )
             if not any(
-                ref.startswith("untrusted_document:")
-                for ref in scenario.expected_evidence.external
+                ref.startswith("untrusted_document:") for ref in scenario.expected_evidence.external
             ):
                 errors.append(
                     f"{scenario.scenario_id}: hostile scenarios need an untrusted-document ref"
@@ -270,8 +260,7 @@ def validation_errors(scenario_set: ScenarioSet) -> tuple[str, ...]:
     if multilingual_languages != EXPECTED_LANGUAGES:
         present = sorted(language.value for language in multilingual_languages)
         errors.append(
-            "multilingual scenarios must cover English, Chinese, and Japanese; "
-            f"present={present}"
+            f"multilingual scenarios must cover English, Chinese, and Japanese; present={present}"
         )
 
     return tuple(errors)
@@ -292,19 +281,13 @@ def summary(scenario_set: ScenarioSet) -> dict[str, object]:
         "category_counts": {
             category.value: count
             for category, count in sorted(
-                Counter(
-                    scenario.category for scenario in scenario_set.scenarios
-                ).items(),
+                Counter(scenario.category for scenario in scenario_set.scenarios).items(),
                 key=lambda item: item[0].value,
             )
         },
         "languages": sorted({scenario.language.value for scenario in scenario_set.scenarios}),
         "tools": sorted(
-            {
-                tool.value
-                for scenario in scenario_set.scenarios
-                for tool in scenario.expected_tools
-            }
+            {tool.value for scenario in scenario_set.scenarios for tool in scenario.expected_tools}
         ),
     }
 
