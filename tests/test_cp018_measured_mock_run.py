@@ -40,8 +40,7 @@ def test_measured_mock_run_passes_the_frozen_engineering_gate(tmp_path: Path) ->
     assert run.manifest.result_count == 192
     assert run.summary.execution_mode == "measured_mock_provider"
     assert all(
-        item.output.latency_source is LatencySource.MEASURED
-        and item.output.latency_ms > 0
+        item.output.latency_source is LatencySource.MEASURED and item.output.latency_ms > 0
         for item in run.results
     )
     assert report.status is AcceptanceStatus.PASS
