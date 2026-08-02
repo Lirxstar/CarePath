@@ -153,7 +153,7 @@ class _EvaluationExternalIndex:
                 (
                     "topic:falls_prevention",
                     GuidelineTopic.FALL_PREVENTION,
-                    "Reducing trip hazards and using conservative activity can support fall prevention.",
+                    "Reducing trip hazards and using conservative activity can support fall prevention.",  # noqa: E501
                     "Synthetic fall-prevention guidance",
                 )
             )
@@ -162,7 +162,7 @@ class _EvaluationExternalIndex:
                 (
                     "topic:behaviour_change",
                     GuidelineTopic.BEHAVIOUR_CHANGE,
-                    "Small achievable actions and review of completion can support behaviour change.",
+                    "Small achievable actions and review of completion can support behaviour change.",  # noqa: E501
                     "Synthetic behaviour-change guidance",
                 )
             )
