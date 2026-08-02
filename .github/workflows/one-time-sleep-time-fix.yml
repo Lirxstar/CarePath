@@ -1,0 +1,48 @@
+name: One-time evaluation sleep-time fix
+
+on:
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.head_ref }}
+      - uses: actions/setup-python@v6
+        with:
+          python-version-file: .python-version
+      - name: Normalize synthetic sleep clock values
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("backend/evaluation/runtime_agent_production_runner.py")
+          content = path.read_text(encoding="utf-8")
+          source = "    return float(base + delta), None\n"
+          target = (
+              "    value = float(base + delta)\n"
+              "    if metric in {\"sleep_start_time\", \"sleep_end_time\"}:\n"
+              "        value %= 1440.0\n"
+              "    return value, None\n"
+          )
+          if source not in content and target not in content:
+              raise SystemExit("Expected fixture return statement not found")
+          path.write_text(content.replace(source, target), encoding="utf-8")
+          PY
+      - name: Commit fix
+        run: |
+          if git diff --quiet; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add backend/evaluation/runtime_agent_production_runner.py
+          git commit -m "Normalize synthetic sleep clock values"
+          git push origin "HEAD:${GITHUB_HEAD_REF}"
