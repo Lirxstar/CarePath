@@ -305,9 +305,7 @@ class CarePathToolRouter:
         metrics = self._metrics(text)
         wants_missingness = any(term in text for term in _MISSINGNESS_TERMS)
         explicit_plan = any(term in text for term in _PLAN_TERMS)
-        wants_adherence = (
-            explicit_plan or any(term in text for term in _ADHERENCE_TERMS)
-        )
+        wants_adherence = explicit_plan or any(term in text for term in _ADHERENCE_TERMS)
         wants_plan = explicit_plan or wants_adherence
         wants_history = wants_plan or any(term in text for term in _HISTORY_TERMS)
         wants_guidance = wants_plan or any(term in text for term in _GUIDANCE_TERMS)
