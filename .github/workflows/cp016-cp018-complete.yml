@@ -40,6 +40,10 @@ jobs:
           path = Path("backend/evaluation/manual_review.py")
           text = path.read_text(encoding="utf-8")
           text = text.replace(
+              "from collections.abc import Sequence\n",
+              "from collections.abc import Sequence\nfrom typing import cast\n",
+          )
+          text = text.replace(
               '            "retrieval": "Context Builder records were available but not all were represented in scored patient evidence.",',
               '            "retrieval": (\n                "Context Builder records were available but not all were represented "\n                "in scored patient evidence."\n            ),',
           )
@@ -50,6 +54,27 @@ jobs:
           text = text.replace(
               '        "This report distinguishes retrieval, planning and tool routing, citation, and annotation causes.",',
               '        (\n            "This report distinguishes retrieval, planning and tool routing, citation, "\n            "and annotation causes."\n        ),',
+          )
+          text = text.replace(
+              '    for item in report["current_low_scores"]:\n        lines.append(\n            f"| {item[\'scenario_id\']} | {\', \'.join(item[\'categories\'])} | {item[\'review_status\']} |"\n        )',
+              '    current = cast(list[dict[str, object]], report["current_low_scores"])\n    for item in current:\n        categories = cast(list[str], item["categories"])\n        lines.append(\n            f"| {item[\'scenario_id\']} | {\', \'.join(categories)} | "\n            f"{item[\'review_status\']} |"\n        )',
+          )
+          path.write_text(text, encoding="utf-8")
+
+          path = Path("backend/evaluation/complete.py")
+          text = path.read_text(encoding="utf-8")
+          text = text.replace("from typing import Protocol\n", "from typing import Protocol, cast\n")
+          text = text.replace(
+              '    if int(plan_adaptation["applicable_count"]) < 2:',
+              '    if cast(int, plan_adaptation["applicable_count"]) < 2:',
+          )
+          text = text.replace(
+              '    if float(plan_adaptation["passed_rate"]) != 1.0:',
+              '    if cast(float, plan_adaptation["passed_rate"]) != 1.0:',
+          )
+          text = text.replace(
+              '    if int(low_score_review["unreviewed_current_low_score_count"]):',
+              '    if cast(int, low_score_review["unreviewed_current_low_score_count"]):',
           )
           path.write_text(text, encoding="utf-8")
           PY
