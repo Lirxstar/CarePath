@@ -1,5 +1,0 @@
-Traceback (most recent call last):
-  File "<stdin>", line 17, in <module>
-  File "cp018_patch.py", line 1
-    from pathlib import Path
-IndentationError: unexpected indent
