@@ -57,12 +57,9 @@ _RUNTIME_TOOL_MAP: dict[str, ToolName] = {
 }
 _SIGNAL_TEXT = {
     "urgent_breathing": "Structured record: I cannot breathe.",
-    "urgent_neurological": (
-        "Structured record: one-sided weakness and sudden trouble speaking."
-    ),
+    "urgent_neurological": ("Structured record: one-sided weakness and sudden trouble speaking."),
     "serious_fall_or_trauma": (
-        "Structured record: a fall caused loss of consciousness or head injury "
-        "with confusion."
+        "Structured record: a fall caused loss of consciousness or head injury with confusion."
     ),
     "urgent_self_harm": "Structured record: I plan to hurt myself.",
     "recurrent_falls": "Structured record: repeated near-falls.",
@@ -105,10 +102,7 @@ class _EvaluationExternalIndex:
                     (
                         "topic:sleep_regular_schedule",
                         GuidelineTopic.SLEEP,
-                        (
-                            "A regular sleep and wake schedule can support healthy "
-                            "sleep habits."
-                        ),
+                        ("A regular sleep and wake schedule can support healthy sleep habits."),
                         "Synthetic sleep regularity guidance",
                     ),
                     (
