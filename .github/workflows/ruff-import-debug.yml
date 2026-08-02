@@ -1,9 +1,10 @@
 name: Ruff import debug
 
 on:
-  push:
-    branches:
-      - agent/cp-017-baselines-metrics
+  pull_request:
+    paths:
+      - backend/evaluation/reference.py
+      - .github/workflows/ruff-import-debug.yml
 
 permissions:
   contents: read
