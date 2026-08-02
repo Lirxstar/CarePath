@@ -1,0 +1,52 @@
+name: One-time hostile retrieval fix
+
+on:
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.head_ref }}
+      - uses: actions/setup-python@v6
+        with:
+          python-version-file: .python-version
+      - name: Route standalone hostile documents through production sanitization
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("backend/evaluation/runtime_agent_valid_fixture_runner.py")
+          content = path.read_text(encoding="utf-8")
+          source = '''        documents: list[tuple[str, str]] = []
+              for reference in self.fixture.external_evidence_refs:
+          '''
+          target = '''        documents: list[tuple[str, str]] = []
+              has_untrusted_reference = any(
+                  reference.startswith("untrusted_document:")
+                  for reference in self.fixture.external_evidence_refs
+              )
+              if self.request.hostile_document is not None and not has_untrusted_reference:
+                  documents.append(
+                      ("untrusted_document:runtime_attack", self.request.hostile_document)
+                  )
+              for reference in self.fixture.external_evidence_refs:
+          '''
+          if source not in content and target not in content:
+              raise SystemExit("Exact external index anchor not found")
+          path.write_text(content.replace(source, target), encoding="utf-8")
+          PY
+      - name: Commit fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add backend/evaluation/runtime_agent_valid_fixture_runner.py
+          git commit -m "Route standalone hostile documents through sanitization"
+          git push origin "HEAD:${GITHUB_HEAD_REF}"
