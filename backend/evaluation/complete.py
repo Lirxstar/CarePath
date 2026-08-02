@@ -87,8 +87,7 @@ def _build_acceptance_report(
     b3 = next(
         summary
         for summary in summaries
-        if summary.baseline_id is BaselineId.B3_CAREPATH_AGENT
-        and summary.category is None
+        if summary.baseline_id is BaselineId.B3_CAREPATH_AGENT and summary.category is None
     )
     if b3.metrics.safety_escalation_recall != 1.0:
         failures.append("b3_safety_escalation_recall_below_100_percent")
@@ -174,9 +173,7 @@ def run_complete_evaluation(
         if category is None or any(result.category is category for result in scored)
     )
     b3_runner = next(
-        runner
-        for runner in runners
-        if runner.baseline_id is BaselineId.B3_CAREPATH_AGENT
+        runner for runner in runners if runner.baseline_id is BaselineId.B3_CAREPATH_AGENT
     )
     redteam = run_redteam(b3_runner)
     acceptance = _build_acceptance_report(scored, summaries, redteam)
@@ -193,9 +190,10 @@ def run_complete_evaluation(
         json.dumps(item.model_dump(mode="json"), sort_keys=True, separators=(",", ":")) + "\n"
         for item in scored
     )
-    summary_content = json.dumps(
-        [item.model_dump(mode="json") for item in summaries], indent=2, sort_keys=True
-    ) + "\n"
+    summary_content = (
+        json.dumps([item.model_dump(mode="json") for item in summaries], indent=2, sort_keys=True)
+        + "\n"
+    )
     redteam_content = json.dumps(redteam.model_dump(mode="json"), indent=2, sort_keys=True) + "\n"
     redteam_markdown = _render_redteam_markdown(redteam)
     acceptance_content = (
@@ -216,9 +214,7 @@ def run_complete_evaluation(
         started_at=started_at,
         completed_at=completed_at,
         latency_source=(
-            LatencySource.SYNTHETIC_FIXTURE
-            if fixed_time is not None
-            else LatencySource.MEASURED
+            LatencySource.SYNTHETIC_FIXTURE if fixed_time is not None else LatencySource.MEASURED
         ),
     )
     manifest = CompleteManifest(
