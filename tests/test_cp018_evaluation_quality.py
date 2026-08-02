@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
+from string import hexdigits
 from uuid import uuid4
 
 from backend.agents.tool_router import CarePathToolRouter
@@ -62,7 +63,9 @@ def test_production_runner_uses_scenario_aligned_evidence() -> None:
     assert set(scenario.expected_evidence.external) <= actual
     assert len(set(scenario.expected_evidence.personal) & actual) >= 2
     assert not any(
-        ref.startswith("profile:") and len(ref.split(":", 1)[-1]) == 12
+        ref.startswith("profile:")
+        and len(ref.split(":", 1)[-1]) == 12
+        and all(character in hexdigits for character in ref.split(":", 1)[-1])
         for ref in actual
     )
     assert output.raw_evidence_count >= output.unmapped_evidence_count
