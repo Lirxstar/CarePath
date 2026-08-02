@@ -204,13 +204,21 @@ def run_complete_evaluation(
     redteam_path.write_text(redteam_content, encoding="utf-8")
     redteam_markdown_path.write_text(redteam_markdown, encoding="utf-8")
     acceptance_path.write_text(acceptance_content, encoding="utf-8")
+
+    resolved_git_sha: str
+    if git_sha is not None:
+        resolved_git_sha = git_sha
+    else:
+        environment_git_sha = os.getenv("GITHUB_SHA")
+        resolved_git_sha = environment_git_sha if environment_git_sha is not None else "unknown"
+
     config = RunConfig(
         provider="mock",
         model="carepath-mock-v1",
         temperature=temperature,
         max_tokens=max_tokens,
         seed=seed,
-        git_sha=git_sha or os.getenv("GITHUB_SHA", "unknown"),
+        git_sha=resolved_git_sha,
         started_at=started_at,
         completed_at=completed_at,
         latency_source=(
