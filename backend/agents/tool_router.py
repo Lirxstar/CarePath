@@ -100,29 +100,29 @@ ToolFunction = Callable[[Mapping[str, Any]], Any]
 
 _METRIC_TERMS: dict[MetricType, tuple[str, ...]] = {
     MetricType.SLEEP_DURATION: (
-    "sleep duration",
-    "hours slept",
-    "how long did i sleep",
-    "睡眠时长",
-    "睡了多久",
-    "睡眠時間",
-),
-MetricType.SLEEP_START_TIME: (
-    "bedtime",
-    "fall asleep",
-    "go to bed",
-    "sleep start",
-    "when do i sleep",
-    "入睡",
-    "就寝",
-),
-MetricType.SLEEP_END_TIME: (
-    "wake time",
-    "wake up",
-    "sleep end",
-    "起床",
-    "醒来",
-),
+        "sleep duration",
+        "hours slept",
+        "how long did i sleep",
+        "睡眠时长",
+        "睡了多久",
+        "睡眠時間",
+    ),
+    MetricType.SLEEP_START_TIME: (
+        "bedtime",
+        "fall asleep",
+        "go to bed",
+        "sleep start",
+        "when do i sleep",
+        "入睡",
+        "就寝",
+    ),
+    MetricType.SLEEP_END_TIME: (
+        "wake time",
+        "wake up",
+        "sleep end",
+        "起床",
+        "醒来",
+    ),
     MetricType.STEPS: ("step", "steps", "walk", "walking", "步数", "走", "歩"),
     MetricType.ACTIVE_MINUTES: ("active minute", "activity", "exercise", "运动", "活動", "運動"),
     MetricType.RESTING_HEART_RATE: ("resting heart", "heart rate", "心率", "心拍"),
@@ -326,12 +326,8 @@ class CarePathToolRouter:
                 calls.extend(
                     [
                         self._metric_call(ToolName.TREND, user_id, metric, end_date),
-                        self._metric_call(
-                            ToolName.WINDOW_COMPARISON, user_id, metric, end_date
-                        ),
-                        self._metric_call(
-                            ToolName.CHANGE_DETECTION, user_id, metric, end_date
-                        ),
+                        self._metric_call(ToolName.WINDOW_COMPARISON, user_id, metric, end_date),
+                        self._metric_call(ToolName.CHANGE_DETECTION, user_id, metric, end_date),
                     ]
                 )
             elif wants_compare:
@@ -421,9 +417,7 @@ class CarePathToolRouter:
     @staticmethod
     def _metrics(text: str) -> list[MetricType]:
         metrics = [
-            metric
-            for metric, terms in _METRIC_TERMS.items()
-            if any(term in text for term in terms)
+            metric for metric, terms in _METRIC_TERMS.items() if any(term in text for term in terms)
         ]
         sleep_metrics = {
             MetricType.SLEEP_DURATION,

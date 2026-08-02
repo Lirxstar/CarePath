@@ -38,9 +38,7 @@ class _ExactEvaluationExternalIndex(_AlignedEvaluationExternalIndex):
             for reference in self.fixture.external_evidence_refs
         )
         if self.request.hostile_document is not None and not has_untrusted_reference:
-            documents.append(
-                ("untrusted_document:runtime_attack", self.request.hostile_document)
-            )
+            documents.append(("untrusted_document:runtime_attack", self.request.hostile_document))
         for reference in self.fixture.external_evidence_refs:
             content = (
                 self.request.hostile_document
@@ -156,9 +154,7 @@ class RuntimeAgentBaselineRunner(_AlignedRuntimeAgentBaselineRunner):
                 )
                 is_event = metric in _EVENT_METRICS
                 quality = (
-                    "suspect"
-                    if suspect and metric == quality_target and index == 26
-                    else "valid"
+                    "suspect" if suspect and metric == quality_target and index == 26 else "valid"
                 )
                 numeric, boolean = _fixture_value(metric, index, text)
                 if suspect and metric == MetricType.STEPS.value and index == 26:
@@ -187,7 +183,6 @@ class RuntimeAgentBaselineRunner(_AlignedRuntimeAgentBaselineRunner):
                     if not reference.startswith("quality_flag:") or quality == "suspect"
                 ]
                 self._register(observation_id, *registered)
-
 
     def _personal_refs(
         self,

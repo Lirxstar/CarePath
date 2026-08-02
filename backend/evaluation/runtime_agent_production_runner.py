@@ -5,7 +5,12 @@ from time import perf_counter_ns
 from uuid import UUID, uuid5
 
 from backend.agents.runtime import build_runtime_workflow
-from backend.agents.workflow import VerificationDisposition, WorkflowNode, WorkflowState, WorkflowStatus
+from backend.agents.workflow import (
+    VerificationDisposition,
+    WorkflowNode,
+    WorkflowState,
+    WorkflowStatus,
+)
 from backend.evaluation.harness import BaselineId, ExecutionStatus
 from backend.evaluation.scenarios import SafetyOutcome, ToolName
 from backend.retrieval.guidelines.models import GuidelineTopic
@@ -194,9 +199,7 @@ class RuntimeAgentBaselineRunner(_RuntimeAgentBaselineRunner):
         fixture: EvaluationFixture,
         user_id: UUID,
     ) -> None:
-        metric_refs = {
-            ref.split(":", 1)[1]: ref for ref in fixture.observation_refs
-        }
+        metric_refs = {ref.split(":", 1)[1]: ref for ref in fixture.observation_refs}
         metric_refs.update({ref.split(":", 1)[1]: ref for ref in fixture.event_refs})
         for quality_ref in fixture.quality_refs:
             metric = quality_ref.split(":", 1)[1]
@@ -205,7 +208,9 @@ class RuntimeAgentBaselineRunner(_RuntimeAgentBaselineRunner):
             metric_refs["sleep_duration"] = "observation:sleep_duration"
 
         text = f"{request.user_question} {fixture.context_text}".casefold()
-        missing = any(term in text for term in ("missing", "gap", "blank", "drop out", "缺失", "欠損"))
+        missing = any(
+            term in text for term in ("missing", "gap", "blank", "drop out", "缺失", "欠損")
+        )
         suspect = any(term in text for term in ("45,000", "suspect", "outlier", "异常", "外れ値"))
         for index in range(30):
             if missing and 10 <= index <= 15:
@@ -307,9 +312,7 @@ class RuntimeAgentBaselineRunner(_RuntimeAgentBaselineRunner):
         previous_plan_id: str | None = None
         current_action_id = ""
         for version in range(1, plan_count + 1):
-            plan_id = str(
-                uuid5(_EVALUATION_NAMESPACE, f"plan:{request.scenario_id}:{version}")
-            )
+            plan_id = str(uuid5(_EVALUATION_NAMESPACE, f"plan:{request.scenario_id}:{version}"))
             status = "active" if version == plan_count else "superseded"
             self.session.add(
                 InterventionPlanTable(
@@ -317,7 +320,9 @@ class RuntimeAgentBaselineRunner(_RuntimeAgentBaselineRunner):
                     user_id=str(user_id),
                     goal_id=goal_id,
                     version=version,
-                    start_date=(_EVALUATION_END - timedelta(days=7 * (plan_count - version + 1))).date(),
+                    start_date=(
+                        _EVALUATION_END - timedelta(days=7 * (plan_count - version + 1))
+                    ).date(),
                     end_date=(_EVALUATION_END + timedelta(days=7 * version)).date(),
                     status=status,
                     generation_interaction_id=interaction_id,
@@ -325,9 +330,7 @@ class RuntimeAgentBaselineRunner(_RuntimeAgentBaselineRunner):
                 )
             )
             self.session.flush()
-            action_id = str(
-                uuid5(_EVALUATION_NAMESPACE, f"action:{request.scenario_id}:{version}")
-            )
+            action_id = str(uuid5(_EVALUATION_NAMESPACE, f"action:{request.scenario_id}:{version}"))
             current_action_id = action_id
             self.session.add(
                 PlanActionTable(
@@ -368,7 +371,11 @@ class RuntimeAgentBaselineRunner(_RuntimeAgentBaselineRunner):
                     feedback_id=feedback_id,
                     action_id=current_action_id,
                     user_id=str(user_id),
-                    response="rejected" if rejected else "not_completed" if low_completion else "completed",
+                    response="rejected"
+                    if rejected
+                    else "not_completed"
+                    if low_completion
+                    else "completed",
                     completion_ratio=None if rejected else 0.2 if low_completion else 0.9,
                     reason_text=(
                         "The evening schedule does not work."
@@ -426,9 +433,7 @@ class RuntimeAgentBaselineRunner(_RuntimeAgentBaselineRunner):
             latency_source=self._latency_source,
         )
 
-    def _aligned_tools(
-        self, state: WorkflowState
-    ) -> tuple[tuple[ToolName, ...], tuple[bool, ...]]:
+    def _aligned_tools(self, state: WorkflowState) -> tuple[tuple[ToolName, ...], tuple[bool, ...]]:
         success_by_tool: dict[ToolName, bool] = {}
         for call in state.tool_calls:
             mapped = _RUNTIME_TOOL_MAP.get(call.tool_name)
@@ -515,21 +520,15 @@ class RuntimeAgentBaselineRunner(_RuntimeAgentBaselineRunner):
         )
         return hits, evidence_map, raw_count, unmapped
 
-    def _personal_refs(
-        self, evidence_id: str, fixture: EvaluationFixture
-    ) -> tuple[str, ...]:
+    def _personal_refs(self, evidence_id: str, fixture: EvaluationFixture) -> tuple[str, ...]:
         if evidence_id.startswith("patient:profile:"):
             return fixture.profile_refs
         if evidence_id.startswith("patient:trend:"):
             return tuple(
-                ref
-                for ref in fixture.observation_refs
-                if ref.split(":", 1)[1] in evidence_id
+                ref for ref in fixture.observation_refs if ref.split(":", 1)[1] in evidence_id
             )
         if evidence_id.startswith("patient:event:"):
-            return tuple(
-                ref for ref in fixture.event_refs if ref.split(":", 1)[1] in evidence_id
-            )
+            return tuple(ref for ref in fixture.event_refs if ref.split(":", 1)[1] in evidence_id)
         for record_id, refs in self.source_refs.items():
             if record_id in evidence_id:
                 return tuple(sorted(refs))

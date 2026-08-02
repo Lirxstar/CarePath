@@ -25,9 +25,7 @@ from .complete_models import (
 def score_output(scenario: EvaluationScenario, output: CompleteBaselineOutput) -> ScenarioMetrics:
     retrieval_applicable = scenario.expected_safety_outcome is SafetyOutcome.ROUTINE
     tool_routing_applicable = retrieval_applicable
-    citation_applicable = retrieval_applicable and any(
-        claim.is_medical for claim in output.claims
-    )
+    citation_applicable = retrieval_applicable and any(claim.is_medical for claim in output.claims)
     expected_personal = set(scenario.expected_evidence.personal)
     expected_external = set(scenario.expected_evidence.external)
     expected_all = expected_personal | expected_external
@@ -155,12 +153,8 @@ def _aggregate(
         mrr=_mean(retrieval, "mrr", empty=1.0),
         gold_evidence_coverage=_mean(retrieval, "gold_evidence_coverage", empty=1.0),
         citation_precision=_mean(citation, "citation_precision", empty=1.0),
-        evidence_supported_claim_rate=_mean(
-            citation, "evidence_supported_claim_rate", empty=1.0
-        ),
-        patient_context_fidelity=_mean(
-            retrieval, "patient_context_fidelity", empty=1.0
-        ),
+        evidence_supported_claim_rate=_mean(citation, "evidence_supported_claim_rate", empty=1.0),
+        patient_context_fidelity=_mean(retrieval, "patient_context_fidelity", empty=1.0),
         unsupported_claim_rate=_mean(citation, "unsupported_claim_rate", empty=0.0),
         contradiction_rate=_mean(citation, "contradiction_rate", empty=0.0),
         tool_selection_accuracy=_mean(routing, "tool_selection_accuracy", empty=1.0),
