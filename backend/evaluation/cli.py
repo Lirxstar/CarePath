@@ -5,7 +5,7 @@ import json
 from collections.abc import Sequence
 from pathlib import Path
 
-from .harness import EvaluationHarness
+from .harness import BaselineRunner, EvaluationHarness
 from .recorded import load_recorded_runners
 from .reference import reference_runners
 from .scenarios import load_scenario_set
@@ -40,6 +40,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.benchmark_valid and args.recorded_input is None:
         parser.error("--benchmark-valid requires --recorded-input")
 
+    runners: Sequence[BaselineRunner]
     if args.recorded_input is None:
         runners = reference_runners()
         execution_mode = "deterministic_reference_fixture"
