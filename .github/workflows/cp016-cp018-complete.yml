@@ -30,67 +30,8 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version-file: .python-version
-      - name: Apply audited patch and restore workflow
-        run: |
-          python - <<'PY'
-          import re
-          import subprocess
-          from pathlib import Path
-
-          patch_path = Path('.github/workflows/cp018-research-evaluation-patch.yml')
-          source = patch_path.read_text()
-          match = re.search(
-              r"run: \|\n          python - <<'PY'\n(?P<body>.*?)\n          PY\n",
-              source,
-              re.DOTALL,
-          )
-          if match is None:
-              raise SystemExit('could not locate audited patch body')
-          raw = match.group('body')
-          body = '\n'.join(
-              line[10:] if line.startswith('          ') else line
-              for line in raw.splitlines()
-          )
-
-          marker = "'''            elif call.tool_name == \"user_history\":"
-          marker_at = body.index(marker)
-          block_start = body.rfind('replace_once(', 0, marker_at)
-          block_end = body.index('\n)', marker_at) + 2
-          robust_call = '''replace_once(
-    production,
-    "\\n        personal_order = [\\n",
-    """
-        for record_id in _context_record_ids(state.context):
-            references = self.source_refs.get(record_id)
-            if references:
-                supported_personal.update(references)
-
-        personal_order = [
-""",
-)'''
-          body = body[:block_start] + robust_call + body[block_end:]
-          exec(compile(body, 'cp018_patch.py', 'exec'), {'__name__': '__main__'})
-
-          official = subprocess.check_output(
-              ['git', 'show', 'origin/main:.github/workflows/cp016-cp018-complete.yml'],
-              text=True,
-          )
-          official = official.replace(
-              '            tests/test_cp018_evaluation_quality.py',
-              '            tests/test_cp018_evaluation_quality.py \\\n            tests/test_cp018_research_claims.py',
-          )
-          Path('.github/workflows/cp016-cp018-complete.yml').write_text(official)
-          for path in (
-              '.github/workflows/run-cp018-patch.yml',
-              '.github/workflows/run-cp018-patch-diagnostic.yml',
-              '.github/workflows/run-cp018-patch-fixed.yml',
-              '.github/workflows/cp018-research-evaluation-patch.yml',
-              'cp018-patch-diagnostic.txt',
-          ):
-              target = Path(path)
-              if target.exists():
-                  target.unlink()
-          PY
+      - name: Apply deterministic migration
+        run: python scripts/cp018_apply.py
       - name: Install dependencies
         run: python -m pip install -c requirements-dev.lock -e '.[dev]'
       - name: Format and validate implementation
