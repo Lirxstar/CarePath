@@ -12,15 +12,7 @@ This board tracks only the current public backlog. Completed work remains docume
 
 ## In progress
 
-### [#3 — CP-018: Pass B acceptance thresholds](../../issues/3)
-
-**Labels:** `B-core`, `evaluation`, `safety`, `P0-application-blocking`  
-**Dependencies:** CP-011 and CP-017 are complete.  
-**Acceptance criteria:**
-
-- all frozen internal thresholds pass;
-- failures are categorised and analysed;
-- no metric is represented as clinical validation.
+None.
 
 ## Ready
 
@@ -47,7 +39,7 @@ This board tracks only the current public backlog. Completed work remains docume
 
 ### [#6 — CP-021: Produce B README and architecture diagram](../../issues/6)
 
-**Blocked by:** CP-018 and CP-019.  
+**Blocked by:** CP-019.  
 **Acceptance criteria:**
 
 - the first screen explains the problem, architecture, result, and startup;
@@ -56,7 +48,7 @@ This board tracks only the current public backlog. Completed work remains docume
 
 ### [#7 — CP-022: Produce B technical report and demo](../../issues/7)
 
-**Blocked by:** CP-018, CP-020, and CP-021.  
+**Blocked by:** CP-020 and CP-021.  
 **Acceptance criteria:**
 
 - a 4–6 page report is complete;
