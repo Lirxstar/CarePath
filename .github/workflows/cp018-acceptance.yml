@@ -8,57 +8,49 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: cp018-acceptance-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  direct-router-compatibility:
-    if: github.head_ref == 'agent/cp018-complete-research-evaluation'
-    name: Direct Router compatibility
+  measured-synthetic-evaluation:
+    name: Measured mock-provider B0-B3 evaluation
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 15
     env:
       CAREPATH_ENVIRONMENT: test
       CAREPATH_LLM_PROVIDER: mock
     steps:
-      - name: Check out implementation branch
+      - name: Check out repository
         uses: actions/checkout@v6
-        with:
-          ref: agent/cp018-complete-research-evaluation
-          fetch-depth: 0
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
           python-version-file: .python-version
-      - name: Apply compatibility layer
-        run: python scripts/cp018_compat.py
-      - name: Install dependencies
+          cache: pip
+          cache-dependency-path: |
+            pyproject.toml
+            requirements-dev.lock
+      - name: Install evaluation dependencies
         run: python -m pip install -c requirements-dev.lock -e '.[dev]'
-      - name: Validate direct and contextual routing
+      - name: Run measured B0-B3 synthetic evaluation
         run: |
-          python -m ruff format .
-          python -m ruff check . --fix
-          python -m mypy
-          pytest -o addopts='' \
-            tests/test_cp012_api_contract.py::test_coach_message_returns_interaction_id_and_persists_interaction \
-            tests/test_tool_router_v2.py::test_tool_router_selection_accuracy_is_measurable \
-            tests/test_cp018_research_claims.py::test_internal_research_targets_and_low_adherence_adaptation
-      - name: Commit source compatibility fix
+          carepath-evaluate \
+            --measured-mock \
+            --benchmark-valid \
+            --run-id "cp018-${GITHUB_SHA}" \
+            --output-dir test-results/cp018
+      - name: Apply frozen CP-018 thresholds
         run: |
-          git restore --source=origin/agent/cp018-complete-research-evaluation -- .github/workflows scripts
-          git config user.name "carepath-agent"
-          git config user.email "carepath-agent@users.noreply.github.com"
-          git add backend
-          git commit -m "Preserve direct Router contracts"
-          git push origin HEAD:agent/cp018-complete-research-evaluation
-
-  measured-synthetic-evaluation:
-    if: github.head_ref != 'agent/cp018-complete-research-evaluation'
-    name: Measured mock-provider B0-B3 evaluation
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - run: echo "Compatibility job owns this branch run."
+          carepath-acceptance \
+            test-results/cp018 \
+            --output-dir test-results/cp018
+      - name: Upload engineering acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cp018-acceptance-${{ github.run_attempt }}
+          path: test-results/cp018/**
+          if-no-files-found: error
