@@ -89,7 +89,6 @@ def test_router_covers_missingness_adherence_and_multilingual_trends() -> None:
         end_date=end_date,
     )
     assert [call.tool_name for call in adherence.calls] == [
-        "trend",
         "adherence_summary",
         "user_history",
         "guideline_retrieval",

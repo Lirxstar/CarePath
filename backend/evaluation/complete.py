@@ -7,7 +7,7 @@ import os
 from collections.abc import Iterable, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Protocol
+from typing import Protocol, cast
 
 from backend.evaluation.harness import BaselineId, ExecutionStatus, LatencySource
 from backend.evaluation.scenarios import SafetyOutcome, ScenarioCategory
@@ -32,6 +32,7 @@ from .complete_models import (
 from .complete_redteam import run_redteam
 from .complete_runner import CompleteBaselineRunner
 from .complete_scenarios import load_complete_scenarios
+from .manual_review import build_low_score_review, render_low_score_review_markdown
 from .quality_gate import (
     QUALITY_THRESHOLDS,
     evaluate_quality_thresholds,
@@ -88,6 +89,8 @@ def _build_acceptance_report(
     results: Sequence[ScoredResult],
     summaries: Sequence[GroupSummary],
     redteam: RedTeamReport,
+    plan_adaptation: dict[str, object],
+    low_score_review: dict[str, object],
 ) -> CompleteAcceptanceReport:
     failures: list[str] = []
     if len(results) != 192:
@@ -109,6 +112,12 @@ def _build_acceptance_report(
     if b3.metrics.failure_rate != 0.0:
         failures.append("b3_runner_failure")
     failures.extend(evaluate_quality_thresholds(b3.metrics))
+    if cast(int, plan_adaptation["applicable_count"]) < 2:
+        failures.append("low_adherence_plan_scenarios_missing")
+    if cast(float, plan_adaptation["passed_rate"]) != 1.0:
+        failures.append("low_adherence_plan_not_reduced")
+    if cast(int, low_score_review["unreviewed_current_low_score_count"]):
+        failures.append("unreviewed_low_score_scenarios")
 
     simple_baselines = {
         BaselineId.B0_LLM_ONLY,
@@ -220,7 +229,11 @@ def run_complete_evaluation(
         if category is None or any(result.category is category for result in scored)
     )
     redteam = run_redteam(b3_runner)
-    acceptance = _build_acceptance_report(scored, summaries, redteam)
+    plan_adaptation = b3_runner.plan_adaptation_report()
+    low_score_review = build_low_score_review(scored)
+    acceptance = _build_acceptance_report(
+        scored, summaries, redteam, plan_adaptation, low_score_review
+    )
     completed_at = fixed_time or datetime.now(UTC)
 
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -229,6 +242,9 @@ def run_complete_evaluation(
     redteam_path = output_dir / "redteam_report.json"
     redteam_markdown_path = output_dir / "redteam_report.md"
     acceptance_path = output_dir / "complete_acceptance.json"
+    plan_adaptation_path = output_dir / "plan_adaptation_report.json"
+    low_score_review_path = output_dir / "low_score_review.json"
+    low_score_review_markdown_path = output_dir / "low_score_review.md"
     manifest_path = output_dir / "complete_manifest.json"
     raw_content = "".join(
         json.dumps(item.model_dump(mode="json"), sort_keys=True, separators=(",", ":")) + "\n"
@@ -243,11 +259,17 @@ def run_complete_evaluation(
     acceptance_content = (
         json.dumps(acceptance.model_dump(mode="json"), indent=2, sort_keys=True) + "\n"
     )
+    plan_adaptation_content = json.dumps(plan_adaptation, indent=2, sort_keys=True) + "\n"
+    low_score_review_content = json.dumps(low_score_review, indent=2, sort_keys=True) + "\n"
+    low_score_review_markdown = render_low_score_review_markdown(low_score_review)
     raw_path.write_text(raw_content, encoding="utf-8")
     summary_path.write_text(summary_content, encoding="utf-8")
     redteam_path.write_text(redteam_content, encoding="utf-8")
     redteam_markdown_path.write_text(redteam_markdown, encoding="utf-8")
     acceptance_path.write_text(acceptance_content, encoding="utf-8")
+    plan_adaptation_path.write_text(plan_adaptation_content, encoding="utf-8")
+    low_score_review_path.write_text(low_score_review_content, encoding="utf-8")
+    low_score_review_markdown_path.write_text(low_score_review_markdown, encoding="utf-8")
 
     resolved_git_sha: str
     if git_sha is not None:
@@ -272,7 +294,7 @@ def run_complete_evaluation(
     manifest = CompleteManifest(
         run_id=run_id,
         suite_id="carepath-cp016-v1-complete",
-        schema_version="2.2",
+        schema_version="2.3",
         result_count=len(scored),
         run_config=config,
         raw_results_file=raw_path.name,
@@ -285,6 +307,12 @@ def run_complete_evaluation(
         redteam_markdown_sha256=_sha256(redteam_markdown),
         acceptance_file=acceptance_path.name,
         acceptance_sha256=_sha256(acceptance_content),
+        plan_adaptation_file=plan_adaptation_path.name,
+        plan_adaptation_sha256=_sha256(plan_adaptation_content),
+        low_score_review_file=low_score_review_path.name,
+        low_score_review_sha256=_sha256(low_score_review_content),
+        low_score_review_markdown_file=low_score_review_markdown_path.name,
+        low_score_review_markdown_sha256=_sha256(low_score_review_markdown),
     )
     manifest_path.write_text(
         json.dumps(manifest.model_dump(mode="json"), indent=2, sort_keys=True) + "\n",
@@ -296,6 +324,8 @@ def run_complete_evaluation(
         summaries=summaries,
         redteam=redteam,
         acceptance=acceptance,
+        plan_adaptation=plan_adaptation,
+        low_score_review=low_score_review,
     )
 
 
@@ -325,6 +355,9 @@ def _summary_payload(run: CompleteRun) -> dict[str, object]:
             "redteam": run.manifest.redteam_file,
             "redteam_markdown": run.manifest.redteam_markdown_file,
             "acceptance": run.manifest.acceptance_file,
+            "plan_adaptation": run.manifest.plan_adaptation_file,
+            "low_score_review": run.manifest.low_score_review_file,
+            "low_score_review_markdown": run.manifest.low_score_review_markdown_file,
         },
     }
 

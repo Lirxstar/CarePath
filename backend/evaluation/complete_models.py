@@ -232,6 +232,12 @@ class CompleteManifest(BaseModel):
     redteam_markdown_sha256: str
     acceptance_file: str
     acceptance_sha256: str
+    plan_adaptation_file: str
+    plan_adaptation_sha256: str
+    low_score_review_file: str
+    low_score_review_sha256: str
+    low_score_review_markdown_file: str
+    low_score_review_markdown_sha256: str
 
 
 class RedTeamCase(BaseModel):
@@ -286,3 +292,5 @@ class CompleteRun(BaseModel):
     summaries: tuple[GroupSummary, ...]
     redteam: RedTeamReport
     acceptance: CompleteAcceptanceReport
+    plan_adaptation: dict[str, object]
+    low_score_review: dict[str, object]
