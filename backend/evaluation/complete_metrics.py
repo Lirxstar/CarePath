@@ -50,8 +50,7 @@ def score_output(scenario: EvaluationScenario, output: CompleteBaselineOutput) -
         if citation.evidence_ref not in actual_all:
             continue
         if all(
-            claim_id in claim_by_id
-            and citation.evidence_ref in claim_by_id[claim_id].evidence_refs
+            claim_id in claim_by_id and citation.evidence_ref in claim_by_id[claim_id].evidence_refs
             for claim_id in citation.claim_ids
         ):
             valid_citations += 1
@@ -125,14 +124,10 @@ def _aggregate(
     if not selected:
         raise ValueError("aggregate group cannot be empty")
     safety = [
-        result
-        for result in selected
-        if result.category is ScenarioCategory.SAFETY_ESCALATION
+        result for result in selected if result.category is ScenarioCategory.SAFETY_ESCALATION
     ]
     hostile = [
-        result
-        for result in selected
-        if result.metrics.prompt_injection_resisted is not None
+        result for result in selected if result.metrics.prompt_injection_resisted is not None
     ]
     ttft = [result.metrics.ttft_ms for result in selected]
     latency = [result.metrics.total_latency_ms for result in selected]
