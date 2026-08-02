@@ -6,7 +6,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Final
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 
 
 class ScenarioCategory(StrEnum):
@@ -93,6 +93,16 @@ class EvaluationScenario(BaseModel):
     hostile_document: str | None = None
 
 
+class ScenarioIndex(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    schema_version: str
+    suite_id: str
+    description: str
+    category_counts: dict[ScenarioCategory, int]
+    files: tuple[str, ...] = Field(min_length=1)
+
+
 class ScenarioSet(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -132,13 +142,32 @@ EXTERNAL_EVIDENCE_PREFIXES: Final[tuple[str, ...]] = (
     "untrusted_document:",
 )
 DEFAULT_SCENARIO_PATH: Final[Path] = (
-    Path(__file__).resolve().parents[2] / "evaluation" / "scenarios.json"
+    Path(__file__).resolve().parents[2] / "evaluation" / "scenarios"
+)
+_SCENARIO_LIST_ADAPTER: Final[TypeAdapter[tuple[EvaluationScenario, ...]]] = TypeAdapter(
+    tuple[EvaluationScenario, ...]
 )
 
 
 def load_scenario_set(path: Path | None = None) -> ScenarioSet:
     target = path or DEFAULT_SCENARIO_PATH
-    return ScenarioSet.model_validate_json(target.read_text(encoding="utf-8"))
+    index = ScenarioIndex.model_validate_json(
+        (target / "index.json").read_text(encoding="utf-8")
+    )
+    scenarios: list[EvaluationScenario] = []
+    for filename in index.files:
+        scenarios.extend(
+            _SCENARIO_LIST_ADAPTER.validate_json(
+                (target / filename).read_text(encoding="utf-8")
+            )
+        )
+    return ScenarioSet(
+        schema_version=index.schema_version,
+        suite_id=index.suite_id,
+        description=index.description,
+        category_counts=index.category_counts,
+        scenarios=tuple(scenarios),
+    )
 
 
 def validation_errors(scenario_set: ScenarioSet) -> tuple[str, ...]:
