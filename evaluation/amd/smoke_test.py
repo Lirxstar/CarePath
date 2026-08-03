@@ -19,9 +19,7 @@ async def run_smoke(prompt: str) -> dict[str, Any]:
 
     health = await provider.health_check()
     if health.get("status") != "ok":
-        raise RuntimeError(
-            "Radeon runtime is not ready. Start the local ROCm model server first."
-        )
+        raise RuntimeError("Radeon runtime is not ready. Start the local ROCm model server first.")
 
     schema = {
         "type": "object",
