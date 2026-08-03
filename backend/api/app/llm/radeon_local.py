@@ -169,9 +169,7 @@ class RadeonLocalProvider(LLMProvider):
             with urlopen(request, timeout=self._timeout_seconds) as response:
                 raw = response.read()
         except HTTPError as exc:
-            raise RadeonProviderError(
-                f"Local Radeon runtime returned HTTP {exc.code}"
-            ) from None
+            raise RadeonProviderError(f"Local Radeon runtime returned HTTP {exc.code}") from None
         except (URLError, TimeoutError, OSError):
             raise RadeonProviderError("Local Radeon runtime is unavailable") from None
 
@@ -182,33 +180,23 @@ class RadeonLocalProvider(LLMProvider):
                 "Local Radeon runtime returned an invalid JSON response"
             ) from exc
         if not isinstance(decoded, dict):
-            raise RadeonProviderError(
-                "Local Radeon runtime returned a non-object response"
-            )
+            raise RadeonProviderError("Local Radeon runtime returned a non-object response")
         return cast(JsonObject, decoded)
 
     @staticmethod
     def _extract_content(payload: JsonObject) -> str:
         choices = payload.get("choices")
         if not isinstance(choices, list) or not choices:
-            raise RadeonProviderError(
-                "Local Radeon runtime response did not include choices"
-            )
+            raise RadeonProviderError("Local Radeon runtime response did not include choices")
         first = choices[0]
         if not isinstance(first, dict):
-            raise RadeonProviderError(
-                "Local Radeon runtime returned an invalid choice"
-            )
+            raise RadeonProviderError("Local Radeon runtime returned an invalid choice")
         message = first.get("message")
         if not isinstance(message, dict):
-            raise RadeonProviderError(
-                "Local Radeon runtime response did not include a message"
-            )
+            raise RadeonProviderError("Local Radeon runtime response did not include a message")
         content = message.get("content")
         if not isinstance(content, str) or not content.strip():
-            raise RadeonProviderError(
-                "Local Radeon runtime returned empty message content"
-            )
+            raise RadeonProviderError("Local Radeon runtime returned empty message content")
         return content
 
     @staticmethod
@@ -224,9 +212,7 @@ class RadeonLocalProvider(LLMProvider):
             or parsed.fragment
             or parsed.path not in {"", "/"}
         ):
-            raise ValueError(
-                "radeon_base_url must be a credential-free loopback HTTP origin"
-            )
+            raise ValueError("radeon_base_url must be a credential-free loopback HTTP origin")
         return normalized
 
     @staticmethod
