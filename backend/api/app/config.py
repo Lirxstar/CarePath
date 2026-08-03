@@ -97,9 +97,7 @@ class Settings(BaseSettings):
             or parsed.fragment
             or parsed.path not in {"", "/"}
         ):
-            raise ValueError(
-                "radeon_base_url must be a credential-free loopback HTTP origin"
-            )
+            raise ValueError("radeon_base_url must be a credential-free loopback HTTP origin")
         return normalized
 
     @field_validator("database_url")
