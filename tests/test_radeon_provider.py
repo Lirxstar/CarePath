@@ -57,9 +57,7 @@ def test_generate_calls_loopback_chat_completion(
         captured["url"] = request.full_url
         captured["timeout"] = timeout
         captured["payload"] = json.loads(request.data or b"{}")
-        return FakeResponse(
-            {"choices": [{"message": {"content": "Local Radeon response"}}]}
-        )
+        return FakeResponse({"choices": [{"message": {"content": "Local Radeon response"}}]})
 
     monkeypatch.setattr(
         "backend.api.app.llm.radeon_local.urlopen",
@@ -73,9 +71,7 @@ def test_generate_calls_loopback_chat_completion(
     assert captured["url"] == "http://127.0.0.1:8000/v1/chat/completions"
     assert captured["timeout"] == 1.0
     assert captured["payload"]["model"] == "carepath-test"
-    assert captured["payload"]["messages"] == [
-        {"role": "user", "content": "synthetic prompt"}
-    ]
+    assert captured["payload"]["messages"] == [{"role": "user", "content": "synthetic prompt"}]
     assert captured["payload"]["max_tokens"] == 64
     assert captured["payload"]["seed"] == 7
     assert captured["payload"]["stream"] is False
@@ -90,15 +86,7 @@ def test_generate_structured_uses_vllm_schema_constraint(
         del timeout
         captured["payload"] = json.loads(request.data or b"{}")
         return FakeResponse(
-            {
-                "choices": [
-                    {
-                        "message": {
-                            "content": '{"status":"ok","provider":"radeon_local"}'
-                        }
-                    }
-                ]
-            }
+            {"choices": [{"message": {"content": '{"status":"ok","provider":"radeon_local"}'}}]}
         )
 
     monkeypatch.setattr(
@@ -126,9 +114,7 @@ def test_generate_structured_uses_llama_cpp_schema_constraint(
     def fake_urlopen(request: Request, timeout: float) -> FakeResponse:
         del timeout
         captured["payload"] = json.loads(request.data or b"{}")
-        return FakeResponse(
-            {"choices": [{"message": {"content": '{"status":"ok"}'}}]}
-        )
+        return FakeResponse({"choices": [{"message": {"content": '{"status":"ok"}'}}]})
 
     monkeypatch.setattr(
         "backend.api.app.llm.radeon_local.urlopen",
@@ -137,9 +123,7 @@ def test_generate_structured_uses_llama_cpp_schema_constraint(
     schema = {"type": "object"}
     provider = RadeonLocalProvider(make_settings(radeon_runtime="llama_cpp_rocm"))
 
-    assert asyncio.run(provider.generate_structured("return JSON", schema)) == {
-        "status": "ok"
-    }
+    assert asyncio.run(provider.generate_structured("return JSON", schema)) == {"status": "ok"}
     assert captured["payload"]["response_format"] == {
         "type": "json_schema",
         "schema": schema,
