@@ -70,11 +70,7 @@ async def run_benchmark(warmups: int, repetitions: int) -> dict[str, Any]:
                 }
             )
 
-    successful = [
-        float(row["elapsed_seconds"])
-        for row in rows
-        if row["success"] is True
-    ]
+    successful = [float(row["elapsed_seconds"]) for row in rows if row["success"] is True]
     return {
         "schema_version": "1.0",
         "captured_at": datetime.now(UTC).isoformat(),
@@ -84,12 +80,8 @@ async def run_benchmark(warmups: int, repetitions: int) -> dict[str, Any]:
         "raw_requests": rows,
         "summary": {
             "success_rate": len(successful) / repetitions,
-            "latency_p50_seconds": percentile(successful, 0.50)
-            if successful
-            else None,
-            "latency_p95_seconds": percentile(successful, 0.95)
-            if successful
-            else None,
+            "latency_p50_seconds": percentile(successful, 0.50) if successful else None,
+            "latency_p95_seconds": percentile(successful, 0.95) if successful else None,
         },
     }
 
