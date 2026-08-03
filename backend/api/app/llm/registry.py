@@ -2,9 +2,13 @@ from collections.abc import Callable
 
 from .mock import MockLLMProvider
 from .provider import LLMProvider
+from .radeon_local import RadeonLocalProvider
 
 ProviderFactory = Callable[[], LLMProvider]
-_PROVIDERS: dict[str, ProviderFactory] = {"mock": MockLLMProvider}
+_PROVIDERS: dict[str, ProviderFactory] = {
+    "mock": MockLLMProvider,
+    "radeon_local": RadeonLocalProvider,
+}
 
 
 def register_provider(name: str, factory: ProviderFactory, *, replace: bool = False) -> None:
