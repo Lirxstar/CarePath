@@ -44,6 +44,17 @@ class RadeonCloudProvider(LLMProvider):
         schema: JsonObject,
         **kwargs: Any,
     ) -> JsonObject:
+        result, _ = await self.generate_structured_with_metadata(prompt, schema, **kwargs)
+        return result
+
+    async def generate_structured_with_metadata(
+        self,
+        prompt: str,
+        schema: JsonObject,
+        **kwargs: Any,
+    ) -> tuple[JsonObject, JsonObject]:
+        """Return the parsed object plus non-secret OpenAI-compatible usage metadata."""
+
         schema_text = json.dumps(schema, sort_keys=True, separators=(",", ":"))
         messages = [
             {
@@ -63,7 +74,7 @@ class RadeonCloudProvider(LLMProvider):
             raise RadeonCloudProviderError("Radeon Cloud returned invalid structured JSON") from exc
         if not isinstance(parsed, dict):
             raise RadeonCloudProviderError("Radeon Cloud returned a non-object structured result")
-        return cast(JsonObject, parsed)
+        return cast(JsonObject, parsed), self._safe_response_metadata(response)
 
     async def health_check(self) -> JsonObject:
         if self._api_key is None:
@@ -192,6 +203,28 @@ class RadeonCloudProvider(LLMProvider):
         if not isinstance(content, str) or not content.strip():
             raise RadeonCloudProviderError("Radeon Cloud returned empty message content")
         return content
+
+    @staticmethod
+    def _safe_response_metadata(payload: JsonObject) -> JsonObject:
+        metadata: JsonObject = {}
+        model = payload.get("model")
+        if isinstance(model, str):
+            metadata["model"] = model
+        choices = payload.get("choices")
+        if isinstance(choices, list) and choices and isinstance(choices[0], dict):
+            finish_reason = choices[0].get("finish_reason")
+            if isinstance(finish_reason, str):
+                metadata["finish_reason"] = finish_reason
+        usage = payload.get("usage")
+        if isinstance(usage, dict):
+            safe_usage: JsonObject = {}
+            for key in ("prompt_tokens", "completion_tokens", "total_tokens"):
+                value = usage.get(key)
+                if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+                    safe_usage[key] = value
+            if safe_usage:
+                metadata["usage"] = safe_usage
+        return metadata
 
     @staticmethod
     def _validate_base_url(value: str) -> str:

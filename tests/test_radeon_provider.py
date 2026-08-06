@@ -1,5 +1,6 @@
 import asyncio
 import json
+import socket
 from typing import Any
 from urllib.error import URLError
 from urllib.request import Request
@@ -53,15 +54,15 @@ def test_generate_calls_loopback_chat_completion(
 ) -> None:
     captured: dict[str, Any] = {}
 
-    def fake_urlopen(request: Request, timeout: float) -> FakeResponse:
+    def fake_open(request: Request, timeout: float) -> FakeResponse:
         captured["url"] = request.full_url
         captured["timeout"] = timeout
         captured["payload"] = json.loads(request.data or b"{}")
         return FakeResponse({"choices": [{"message": {"content": "Local Radeon response"}}]})
 
     monkeypatch.setattr(
-        "backend.api.app.llm.radeon_local.urlopen",
-        fake_urlopen,
+        "backend.api.app.llm.radeon_local._open_loopback",
+        fake_open,
     )
     provider = RadeonLocalProvider(make_settings())
 
@@ -77,21 +78,35 @@ def test_generate_calls_loopback_chat_completion(
     assert captured["payload"]["stream"] is False
 
 
-def test_generate_structured_uses_vllm_schema_constraint(
+def test_generate_structured_uses_vllm_schema_constraint_and_returns_metadata(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     captured: dict[str, Any] = {}
 
-    def fake_urlopen(request: Request, timeout: float) -> FakeResponse:
+    def fake_open(request: Request, timeout: float) -> FakeResponse:
         del timeout
         captured["payload"] = json.loads(request.data or b"{}")
         return FakeResponse(
-            {"choices": [{"message": {"content": '{"status":"ok","provider":"radeon_local"}'}}]}
+            {
+                "model": "carepath-test",
+                "choices": [
+                    {
+                        "message": {"content": '{"status":"ok","provider":"radeon_local"}'},
+                        "finish_reason": "stop",
+                    }
+                ],
+                "usage": {
+                    "prompt_tokens": 12,
+                    "completion_tokens": 7,
+                    "total_tokens": 19,
+                    "unsafe_extra": "ignored",
+                },
+            }
         )
 
     monkeypatch.setattr(
-        "backend.api.app.llm.radeon_local.urlopen",
-        fake_urlopen,
+        "backend.api.app.llm.radeon_local._open_loopback",
+        fake_open,
     )
     schema = {
         "type": "object",
@@ -100,9 +115,20 @@ def test_generate_structured_uses_vllm_schema_constraint(
     }
     provider = RadeonLocalProvider(make_settings())
 
-    result = asyncio.run(provider.generate_structured("return JSON", schema))
+    result, metadata = asyncio.run(
+        provider.generate_structured_with_metadata("return JSON", schema)
+    )
 
     assert result == {"status": "ok", "provider": "radeon_local"}
+    assert metadata == {
+        "model": "carepath-test",
+        "finish_reason": "stop",
+        "usage": {
+            "prompt_tokens": 12,
+            "completion_tokens": 7,
+            "total_tokens": 19,
+        },
+    }
     assert captured["payload"]["structured_outputs"] == {"json": schema}
 
 
@@ -111,14 +137,14 @@ def test_generate_structured_uses_llama_cpp_schema_constraint(
 ) -> None:
     captured: dict[str, Any] = {}
 
-    def fake_urlopen(request: Request, timeout: float) -> FakeResponse:
+    def fake_open(request: Request, timeout: float) -> FakeResponse:
         del timeout
         captured["payload"] = json.loads(request.data or b"{}")
         return FakeResponse({"choices": [{"message": {"content": '{"status":"ok"}'}}]})
 
     monkeypatch.setattr(
-        "backend.api.app.llm.radeon_local.urlopen",
-        fake_urlopen,
+        "backend.api.app.llm.radeon_local._open_loopback",
+        fake_open,
     )
     schema = {"type": "object"}
     provider = RadeonLocalProvider(make_settings(radeon_runtime="llama_cpp_rocm"))
@@ -133,14 +159,14 @@ def test_generate_structured_uses_llama_cpp_schema_constraint(
 def test_health_check_reports_ready_runtime(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def fake_urlopen(request: Request, timeout: float) -> FakeResponse:
+    def fake_open(request: Request, timeout: float) -> FakeResponse:
         del timeout
         assert request.full_url == "http://127.0.0.1:8000/v1/models"
         return FakeResponse({"data": [{"id": "carepath-test"}]})
 
     monkeypatch.setattr(
-        "backend.api.app.llm.radeon_local.urlopen",
-        fake_urlopen,
+        "backend.api.app.llm.radeon_local._open_loopback",
+        fake_open,
     )
     provider = RadeonLocalProvider(make_settings(radeon_inference_dtype="q4_k_m"))
 
@@ -160,13 +186,13 @@ def test_health_check_reports_ready_runtime(
 def test_health_check_sanitizes_unavailable_runtime(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def failing_urlopen(request: Request, timeout: float) -> FakeResponse:
+    def failing_open(request: Request, timeout: float) -> FakeResponse:
         del request, timeout
         raise URLError("private host details")
 
     monkeypatch.setattr(
-        "backend.api.app.llm.radeon_local.urlopen",
-        failing_urlopen,
+        "backend.api.app.llm.radeon_local._open_loopback",
+        failing_open,
     )
     provider = RadeonLocalProvider(make_settings())
 
@@ -180,13 +206,13 @@ def test_health_check_sanitizes_unavailable_runtime(
 def test_generation_error_does_not_expose_prompt(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def failing_urlopen(request: Request, timeout: float) -> FakeResponse:
+    def failing_open(request: Request, timeout: float) -> FakeResponse:
         del request, timeout
         raise URLError("network detail")
 
     monkeypatch.setattr(
-        "backend.api.app.llm.radeon_local.urlopen",
-        failing_urlopen,
+        "backend.api.app.llm.radeon_local._open_loopback",
+        failing_open,
     )
     provider = RadeonLocalProvider(make_settings())
 
@@ -215,6 +241,22 @@ def test_settings_reject_non_loopback_or_ambiguous_runtime_urls(base_url: str) -
         make_settings(radeon_base_url=base_url)
 
 
+def test_provider_rejects_loopback_name_that_resolves_off_host(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original = socket.getaddrinfo
+
+    def fake_getaddrinfo(host: str, port: int, **kwargs: Any) -> list[Any]:
+        if host == "localhost":
+            return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("203.0.113.4", port))]
+        return original(host, port, **kwargs)
+
+    monkeypatch.setattr(socket, "getaddrinfo", fake_getaddrinfo)
+
+    with pytest.raises(ValueError, match="resolve only to loopback"):
+        RadeonLocalProvider(make_settings(radeon_base_url="http://localhost:8000"))
+
+
 def test_generation_rejects_unsupported_options_before_network() -> None:
     provider = RadeonLocalProvider(make_settings())
 
@@ -225,13 +267,13 @@ def test_generation_rejects_unsupported_options_before_network() -> None:
 def test_structured_generation_rejects_non_object_json(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def fake_urlopen(request: Request, timeout: float) -> FakeResponse:
+    def fake_open(request: Request, timeout: float) -> FakeResponse:
         del request, timeout
         return FakeResponse({"choices": [{"message": {"content": '["not","object"]'}}]})
 
     monkeypatch.setattr(
-        "backend.api.app.llm.radeon_local.urlopen",
-        fake_urlopen,
+        "backend.api.app.llm.radeon_local._open_loopback",
+        fake_open,
     )
     provider = RadeonLocalProvider(make_settings())
 
