@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     request_id_max_length: int = Field(default=128, ge=16, le=256)
     llm_provider: str = "mock"
     llm_api_key: SecretStr | None = None
+
     radeon_base_url: str = "http://127.0.0.1:8000"
     radeon_model_id: str = Field(default="carepath-local", min_length=1)
     radeon_runtime: RadeonRuntime = "vllm_rocm"
@@ -41,6 +42,14 @@ class Settings(BaseSettings):
     radeon_request_timeout_seconds: float = Field(default=120.0, gt=0, le=600)
     radeon_max_new_tokens: int = Field(default=512, ge=1, le=4096)
     radeon_temperature: float = Field(default=0.0, ge=0.0, le=2.0)
+
+    radeon_cloud_base_url: str = "https://developer.amd.com.cn/radeon/api/v1"
+    radeon_cloud_model_id: str = Field(default="DeepSeek-V4-Flash", min_length=1)
+    radeon_cloud_api_key: SecretStr | None = None
+    radeon_cloud_request_timeout_seconds: float = Field(default=120.0, gt=0, le=600)
+    radeon_cloud_max_new_tokens: int = Field(default=512, ge=1, le=4096)
+    radeon_cloud_temperature: float = Field(default=0.0, ge=0.0, le=2.0)
+
     database_url: str = Field(default="sqlite:///./carepath.db", min_length=1)
     evidence_index_path: str = Field(default="data/guidelines/qdrant", min_length=1)
     evidence_collection_name: str = Field(
@@ -75,6 +84,7 @@ class Settings(BaseSettings):
         "evidence_embedding_model",
         "radeon_model_id",
         "radeon_device",
+        "radeon_cloud_model_id",
     )
     @classmethod
     def strip_non_empty(cls, value: str) -> str:
@@ -98,6 +108,22 @@ class Settings(BaseSettings):
             or parsed.path not in {"", "/"}
         ):
             raise ValueError("radeon_base_url must be a credential-free loopback HTTP origin")
+        return normalized
+
+    @field_validator("radeon_cloud_base_url")
+    @classmethod
+    def validate_radeon_cloud_base_url(cls, value: str) -> str:
+        normalized = value.strip().rstrip("/")
+        parsed = urlparse(normalized)
+        if (
+            parsed.scheme != "https"
+            or not parsed.hostname
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.query
+            or parsed.fragment
+        ):
+            raise ValueError("radeon_cloud_base_url must be a credential-free HTTPS URL")
         return normalized
 
     @field_validator("database_url")

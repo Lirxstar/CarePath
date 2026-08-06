@@ -2,11 +2,13 @@ from collections.abc import Callable
 
 from .mock import MockLLMProvider
 from .provider import LLMProvider
+from .radeon_cloud import RadeonCloudProvider
 from .radeon_local import RadeonLocalProvider
 
 ProviderFactory = Callable[[], LLMProvider]
 _PROVIDERS: dict[str, ProviderFactory] = {
     "mock": MockLLMProvider,
+    "radeon_cloud": RadeonCloudProvider,
     "radeon_local": RadeonLocalProvider,
 }
 
