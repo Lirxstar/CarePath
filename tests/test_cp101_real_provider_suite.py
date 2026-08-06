@@ -16,9 +16,7 @@ class FakeMeasuredProvider:
 
     def __init__(self) -> None:
         scenario_set = load_scenario_set()
-        self.scenarios = {
-            scenario.scenario_id: scenario for scenario in scenario_set.scenarios
-        }
+        self.scenarios = {scenario.scenario_id: scenario for scenario in scenario_set.scenarios}
 
     async def health_check(self) -> JsonObject:
         return {
@@ -37,9 +35,7 @@ class FakeMeasuredProvider:
         assert schema == RESULT_SCHEMA
         assert kwargs["seed"] == 0
         await asyncio.sleep(0.005)
-        scenario_id = next(
-            scenario_id for scenario_id in self.scenarios if scenario_id in prompt
-        )
+        scenario_id = next(scenario_id for scenario_id in self.scenarios if scenario_id in prompt)
         scenario = self.scenarios[scenario_id]
         result: JsonObject = {
             "response_text": "Synthetic bounded response.",

@@ -153,9 +153,7 @@ def main() -> int:
             {
                 "comparison": payload["comparison"],
                 "privacy_pass": payload["privacy_egress_evidence"]["pass"],
-                "telemetry_available": payload["resource_metrics"][
-                    "telemetry_available"
-                ],
+                "telemetry_available": payload["resource_metrics"]["telemetry_available"],
             },
             indent=2,
         )

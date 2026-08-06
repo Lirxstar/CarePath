@@ -213,9 +213,7 @@ class RadeonLocalProvider(LLMProvider):
             with _open_loopback(request, timeout=self._timeout_seconds) as response:
                 raw = response.read()
         except HTTPError as exc:
-            raise RadeonProviderError(
-                f"Local Radeon runtime returned HTTP {exc.code}"
-            ) from None
+            raise RadeonProviderError(f"Local Radeon runtime returned HTTP {exc.code}") from None
         except (URLError, TimeoutError, OSError):
             raise RadeonProviderError("Local Radeon runtime is unavailable") from None
 
@@ -250,13 +248,9 @@ class RadeonLocalProvider(LLMProvider):
             try:
                 parsed_address = ipaddress.ip_address(raw_address)
             except ValueError as exc:
-                raise ValueError(
-                    "radeon_base_url resolved to an invalid IP address"
-                ) from exc
+                raise ValueError("radeon_base_url resolved to an invalid IP address") from exc
             if not parsed_address.is_loopback:
-                raise ValueError(
-                    "radeon_base_url hostname must resolve only to loopback addresses"
-                )
+                raise ValueError("radeon_base_url hostname must resolve only to loopback addresses")
 
     @staticmethod
     def _extract_content(payload: JsonObject) -> str:

@@ -45,7 +45,11 @@ def validate(payload: dict[str, Any]) -> list[str]:
     if payload.get("run_mode") != "local_radeon_rocm_full_cp101":
         failures.append("run_mode must be local_radeon_rocm_full_cp101")
     health = payload.get("provider_health")
-    if not isinstance(health, dict) or health.get("status") != "ok" or health.get("local") is not True:
+    if (
+        not isinstance(health, dict)
+        or health.get("status") != "ok"
+        or health.get("local") is not True
+    ):
         failures.append("provider_health must be ok and local=true")
     suite = payload.get("scenario_suite")
     if not isinstance(suite, dict) or suite.get("scenario_count") != 48 or not suite.get("sha256"):
@@ -60,9 +64,7 @@ def validate(payload: dict[str, Any]) -> list[str]:
     if not isinstance(environment, dict) or not environment.get("carepath_commit"):
         failures.append("environment manifest must capture the CarePath commit")
     framework = (
-        environment.get("framework", {}).get("pytorch", {})
-        if isinstance(environment, dict)
-        else {}
+        environment.get("framework", {}).get("pytorch", {}) if isinstance(environment, dict) else {}
     )
     if not isinstance(framework, dict) or framework.get("accelerator_available") is not True:
         failures.append("PyTorch must report an available Radeon/HIP accelerator")

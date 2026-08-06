@@ -91,9 +91,7 @@ def test_generate_structured_uses_vllm_schema_constraint_and_returns_metadata(
                 "model": "carepath-test",
                 "choices": [
                     {
-                        "message": {
-                            "content": '{"status":"ok","provider":"radeon_local"}'
-                        },
+                        "message": {"content": '{"status":"ok","provider":"radeon_local"}'},
                         "finish_reason": "stop",
                     }
                 ],
