@@ -146,7 +146,7 @@ def external_torch_environment(runtime_python: str) -> dict[str, Any]:
             "error_code": "runtime_probe_non_object",
         }
     decoded["probe_mode"] = "external_runtime"
-    decoded["runtime_python"] = runtime_python
+    decoded["runtime_python_executable"] = Path(runtime_python).name
     return decoded
 
 
