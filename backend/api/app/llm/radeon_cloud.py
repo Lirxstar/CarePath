@@ -60,13 +60,9 @@ class RadeonCloudProvider(LLMProvider):
         try:
             parsed = json.loads(content)
         except json.JSONDecodeError as exc:
-            raise RadeonCloudProviderError(
-                "Radeon Cloud returned invalid structured JSON"
-            ) from exc
+            raise RadeonCloudProviderError("Radeon Cloud returned invalid structured JSON") from exc
         if not isinstance(parsed, dict):
-            raise RadeonCloudProviderError(
-                "Radeon Cloud returned a non-object structured result"
-            )
+            raise RadeonCloudProviderError("Radeon Cloud returned a non-object structured result")
         return cast(JsonObject, parsed)
 
     async def health_check(self) -> JsonObject:
@@ -167,9 +163,7 @@ class RadeonCloudProvider(LLMProvider):
             with urlopen(request, timeout=self._timeout_seconds) as response:
                 raw = response.read()
         except HTTPError as exc:
-            raise RadeonCloudProviderError(
-                f"Radeon Cloud returned HTTP {exc.code}"
-            ) from None
+            raise RadeonCloudProviderError(f"Radeon Cloud returned HTTP {exc.code}") from None
         except (URLError, TimeoutError, OSError):
             raise RadeonCloudProviderError("Radeon Cloud is unavailable") from None
 
@@ -211,9 +205,7 @@ class RadeonCloudProvider(LLMProvider):
             or parsed.query
             or parsed.fragment
         ):
-            raise ValueError(
-                "radeon_cloud_base_url must be a credential-free HTTPS URL"
-            )
+            raise ValueError("radeon_cloud_base_url must be a credential-free HTTPS URL")
         return normalized
 
     @staticmethod
