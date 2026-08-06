@@ -2,7 +2,7 @@
 
 ## Status
 
-CP-101 is complete at the repository/tooling level when this document is merged. The issue must remain open until one full run on a loopback Radeon/ROCm model endpoint produces a result bundle that passes `evaluation/amd/validate_cp101.py`.
+CP-101 is complete at the repository/tooling level. The issue must remain open until one full run on a loopback Radeon/ROCm model endpoint produces a result bundle that passes `evaluation/amd/validate_cp101.py`.
 
 The earlier Dedicated Radeon Cloud result is retained as a valid hosted baseline. It proves CarePath-to-Radeon structured inference and endpoint latency, but it is not local to the end user and cannot satisfy the local privacy, direct GPU telemetry, exact environment or full real-provider acceptance criteria.
 
@@ -68,6 +68,47 @@ This is a real-provider CP-016 audit. It does not replace the deterministic CP-0
 - raw per-request latency, schema, failure and token metrics.
 
 Run it only with `CAREPATH_LLM_PROVIDER=radeon_local`, `CAREPATH_PRIVACY_MODE=local_strict` and a model server bound to `127.0.0.1`.
+
+## One-command operator path
+
+Use a Notebook or Workspace created from this image:
+
+```text
+ROCm vLLM-dev (Navi)
+vllm-dev:rocm7.2.1_navi_ubuntu22.04_py3.10_pytorch_2.9_vllm_0.16.0
+```
+
+Configure the template with the CarePath repository and branch `amd-track2`. Do not use the hosted `vLLM Model API` deploy type for this final run, because that endpoint is remote from the CarePath client and cannot satisfy `local_strict`.
+
+The image's serving runtime uses Python 3.10, while CarePath requires Python 3.11 or later. `evaluation/amd/run_local_cp101.sh` handles this split without modifying the ROCm image:
+
+- resolves the Python interpreter that owns vLLM and PyTorch;
+- verifies that the runtime can access an AMD Radeon/HIP accelerator;
+- creates an isolated CarePath Python 3.12 environment with `uv`;
+- starts Qwen2.5-7B through vLLM on `127.0.0.1` only;
+- records PyTorch/HIP metadata from the serving Python rather than the client venv;
+- executes the privacy gate, exact environment capture, 48-scenario baseline, concurrency-4 optimization, GPU/VRAM sampling and blocking validator;
+- stops the model server automatically and writes a persistent backup when `/persistent` is available.
+
+From the repository root, the complete operator action is:
+
+```bash
+bash evaluation/amd/run_local_cp101.sh
+```
+
+The script refuses to run from another branch, refuses a dirty tracked working tree, fast-forwards `amd-track2`, refuses an already occupied model port and preserves logs/results when the model or validator fails.
+
+On success, upload only:
+
+```text
+evaluation/amd/results/local_radeon_cp101_full.json
+```
+
+Do not upload `.env` files, account screenshots, endpoint URLs, API keys, instance identifiers or private logs. The vLLM log is needed only for diagnosing a failed run and must be reviewed before sharing.
+
+### Manual equivalent
+
+For an already running loopback model server, the lower-level commands remain:
 
 ```bash
 python evaluation/amd/local_full_run.py \
