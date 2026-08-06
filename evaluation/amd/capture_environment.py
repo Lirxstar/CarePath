@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import platform
 import subprocess
 import sys
@@ -20,6 +21,46 @@ ROCMINFO_PREFIXES = (
     "Compute Unit:",
     "Max Queue Number:",
 )
+TORCH_PROBE = r"""
+import json
+import platform
+import sys
+
+try:
+    import torch
+except ImportError:
+    print(json.dumps({"available": False, "python": sys.version}))
+    raise SystemExit(0)
+
+accelerator_available = torch.cuda.is_available()
+devices = []
+if accelerator_available:
+    for index in range(torch.cuda.device_count()):
+        properties = torch.cuda.get_device_properties(index)
+        devices.append(
+            {
+                "index": index,
+                "name": torch.cuda.get_device_name(index),
+                "total_memory_bytes": properties.total_memory,
+                "architecture": getattr(properties, "gcnArchName", None),
+            }
+        )
+
+print(
+    json.dumps(
+        {
+            "available": True,
+            "python": sys.version,
+            "platform": platform.platform(),
+            "torch_version": torch.__version__,
+            "hip_version": getattr(torch.version, "hip", None),
+            "accelerator_available": accelerator_available,
+            "device_count": torch.cuda.device_count() if accelerator_available else 0,
+            "devices": devices,
+        }
+    )
+)
+"""
 
 
 def run_command(args: list[str]) -> dict[str, Any]:
@@ -59,11 +100,61 @@ def filtered_rocminfo() -> dict[str, Any]:
     return result
 
 
-def torch_environment() -> dict[str, Any]:
+def external_torch_environment(runtime_python: str) -> dict[str, Any]:
+    """Probe the Python environment that owns vLLM/ROCm, not the CarePath client venv."""
+
+    try:
+        completed = subprocess.run(
+            [runtime_python, "-c", TORCH_PROBE],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except FileNotFoundError:
+        return {
+            "available": False,
+            "probe_mode": "external_runtime",
+            "error_code": "runtime_python_not_found",
+        }
+    except subprocess.TimeoutExpired:
+        return {
+            "available": False,
+            "probe_mode": "external_runtime",
+            "error_code": "runtime_probe_timed_out",
+        }
+
+    if completed.returncode != 0:
+        return {
+            "available": False,
+            "probe_mode": "external_runtime",
+            "returncode": completed.returncode,
+            "error_code": "runtime_probe_failed",
+        }
+    try:
+        decoded = json.loads(completed.stdout)
+    except json.JSONDecodeError:
+        return {
+            "available": False,
+            "probe_mode": "external_runtime",
+            "error_code": "runtime_probe_invalid_json",
+        }
+    if not isinstance(decoded, dict):
+        return {
+            "available": False,
+            "probe_mode": "external_runtime",
+            "error_code": "runtime_probe_non_object",
+        }
+    decoded["probe_mode"] = "external_runtime"
+    decoded["runtime_python"] = runtime_python
+    return decoded
+
+
+def local_torch_environment() -> dict[str, Any]:
     try:
         import torch
     except ImportError:
-        return {"available": False}
+        return {"available": False, "probe_mode": "carepath_process"}
 
     accelerator_available = torch.cuda.is_available()
     devices = []
@@ -81,12 +172,21 @@ def torch_environment() -> dict[str, Any]:
 
     return {
         "available": True,
+        "probe_mode": "carepath_process",
+        "python": sys.version,
         "torch_version": torch.__version__,
         "hip_version": getattr(torch.version, "hip", None),
         "accelerator_available": accelerator_available,
         "device_count": torch.cuda.device_count() if accelerator_available else 0,
         "devices": devices,
     }
+
+
+def torch_environment() -> dict[str, Any]:
+    runtime_python = os.environ.get("CAREPATH_RADEON_RUNTIME_PYTHON", "").strip()
+    if runtime_python:
+        return external_torch_environment(runtime_python)
+    return local_torch_environment()
 
 
 def git_commit() -> str | None:
@@ -105,7 +205,7 @@ def build_manifest() -> dict[str, Any]:
             "system": platform.system(),
             "release": platform.release(),
             "machine": platform.machine(),
-            "python": sys.version,
+            "carepath_python": sys.version,
         },
         "amd_stack": {
             "rocm_smi": run_command(
