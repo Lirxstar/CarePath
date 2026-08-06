@@ -123,9 +123,7 @@ class Settings(BaseSettings):
             or parsed.query
             or parsed.fragment
         ):
-            raise ValueError(
-                "radeon_cloud_base_url must be a credential-free HTTPS URL"
-            )
+            raise ValueError("radeon_cloud_base_url must be a credential-free HTTPS URL")
         return normalized
 
     @field_validator("database_url")
