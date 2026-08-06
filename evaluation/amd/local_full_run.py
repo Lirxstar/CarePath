@@ -14,10 +14,31 @@ from typing import Any
 from backend.evaluation.scenarios import load_scenario_set
 from evaluation.amd.capture_environment import build_manifest
 from evaluation.amd.privacy_egress_check import run_check
-from evaluation.amd.real_provider_suite import _resolve_provider, run_suite
+from evaluation.amd.real_provider_suite import (
+    RESULT_SCHEMA,
+    _resolve_provider,
+    run_suite,
+)
 
 VRAM_PATTERN = re.compile(r"VRAM Total Used Memory \(B\)\s*:\s*(\d+)")
 GPU_USE_PATTERN = re.compile(r"GPU use \(%\)\s*:\s*(\d+(?:\.\d+)?)")
+
+
+def _remove_vllm_unsupported_schema_keywords(value: Any) -> None:
+    """Remove serving-only constraints unsupported by vLLM XGrammar.
+
+    CarePath still checks list uniqueness after generation in
+    ``real_provider_suite.validate_result``. Removing ``uniqueItems`` only
+    prevents the local server from rejecting the request before inference.
+    """
+
+    if isinstance(value, dict):
+        value.pop("uniqueItems", None)
+        for nested in value.values():
+            _remove_vllm_unsupported_schema_keywords(nested)
+    elif isinstance(value, list):
+        for nested in value:
+            _remove_vllm_unsupported_schema_keywords(nested)
 
 
 def _resource_sample() -> dict[str, Any]:
@@ -89,6 +110,7 @@ async def run_local_full(
     optimized_concurrency: int,
     warmups: int,
 ) -> dict[str, Any]:
+    _remove_vllm_unsupported_schema_keywords(RESULT_SCHEMA)
     privacy = await asyncio.to_thread(run_check)
     environment = await asyncio.to_thread(build_manifest)
     scenarios = load_scenario_set().scenarios
