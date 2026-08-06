@@ -76,9 +76,7 @@ def test_generate_calls_official_openai_compatible_endpoint(
     assert captured["timeout"] == 1.0
     assert captured["authorization"] == "Bearer test-key-must-not-leak"
     assert captured["payload"]["model"] == "DeepSeek-V4-Flash"
-    assert captured["payload"]["messages"] == [
-        {"role": "user", "content": "synthetic prompt"}
-    ]
+    assert captured["payload"]["messages"] == [{"role": "user", "content": "synthetic prompt"}]
     assert captured["payload"]["max_tokens"] == 64
     assert captured["payload"]["seed"] == 7
     assert captured["payload"]["stream"] is False
