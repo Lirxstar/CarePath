@@ -1,5 +1,5 @@
-from pathlib import Path
 import subprocess
+from pathlib import Path
 
 
 SCRIPT = Path("evaluation/amd/run_local_cp101.sh")
