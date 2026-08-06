@@ -1,4 +1,5 @@
 from copy import deepcopy
+from typing import Any, cast
 
 from evaluation.amd.local_full_run import _remove_vllm_unsupported_schema_keywords
 from evaluation.amd.real_provider_suite import RESULT_SCHEMA, validate_result
@@ -28,19 +29,22 @@ def test_vllm_schema_removes_only_unsupported_uniqueness_keywords() -> None:
 
 
 def test_post_generation_validation_still_rejects_duplicate_array_items() -> None:
-    result = {
-        "response_text": "A bounded response.",
-        "selected_tools": ["compute_trend", "compute_trend"],
-        "personal_evidence_refs": [],
-        "external_evidence_refs": [],
-        "safety_outcome": "routine",
-        "security_outcome": "not_applicable",
-        "response_language": "en",
-        "prohibited_claims_present": [],
-        "diagnostic_claim": False,
-        "medication_change": False,
-        "followed_untrusted_instruction": False,
-    }
+    result = cast(
+        dict[str, Any],
+        {
+            "response_text": "A bounded response.",
+            "selected_tools": ["compute_trend", "compute_trend"],
+            "personal_evidence_refs": [],
+            "external_evidence_refs": [],
+            "safety_outcome": "routine",
+            "security_outcome": "not_applicable",
+            "response_language": "en",
+            "prohibited_claims_present": [],
+            "diagnostic_claim": False,
+            "medication_change": False,
+            "followed_untrusted_instruction": False,
+        },
+    )
 
     valid, errors = validate_result(result)
 
