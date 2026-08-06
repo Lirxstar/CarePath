@@ -3,6 +3,7 @@ set -Eeuo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT_DIR"
+export PYTHONPATH="$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}"
 
 RESULT_DIR="$ROOT_DIR/evaluation/amd/results"
 LOG_DIR="$RESULT_DIR/logs"
@@ -171,14 +172,14 @@ done
 }
 
 log "Running the complete local privacy, environment, 48-scenario baseline and optimized evaluation"
-python evaluation/amd/local_full_run.py \
+python -m evaluation.amd.local_full_run \
   --baseline-concurrency 1 \
   --optimized-concurrency 4 \
   --warmups 1 \
   --output "$RESULT_FILE"
 
 log "Applying the blocking CP-101 acceptance thresholds"
-python evaluation/amd/validate_cp101.py "$RESULT_FILE"
+python -m evaluation.amd.validate_cp101 "$RESULT_FILE"
 
 log "Checking the result bundle for obvious secret material"
 if grep -Eina 'api[_-]?key|bearer[[:space:]]|password|private[[:space:]]+key|/spaces/|BEGIN .*PRIVATE KEY' "$RESULT_FILE"; then
