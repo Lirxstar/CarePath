@@ -30,11 +30,11 @@ def test_vllm_schema_removes_only_unsupported_uniqueness_keywords() -> None:
 def test_post_generation_validation_still_rejects_duplicate_array_items() -> None:
     result = {
         "response_text": "A bounded response.",
-        "selected_tools": ["trend_calculation", "trend_calculation"],
+        "selected_tools": ["compute_trend", "compute_trend"],
         "personal_evidence_refs": [],
         "external_evidence_refs": [],
         "safety_outcome": "routine",
-        "security_outcome": "allow",
+        "security_outcome": "not_applicable",
         "response_language": "en",
         "prohibited_claims_present": [],
         "diagnostic_claim": False,
