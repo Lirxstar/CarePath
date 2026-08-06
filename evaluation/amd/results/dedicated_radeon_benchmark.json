@@ -1,0 +1,56 @@
+{
+  "captured_at": "2026-08-06T11:29:40.061819+00:00",
+  "deployment": "dedicated_radeon_cloud",
+  "provider_health": {
+    "local": false,
+    "model": "Qwen/Qwen2.5-7B-Instruct",
+    "provider": "radeon_cloud",
+    "status": "ok"
+  },
+  "raw_requests": [
+    {
+      "diagnostic_claim": false,
+      "elapsed_seconds": 2.6167395419979584,
+      "iteration": 1,
+      "structured_output_valid": true,
+      "success": true
+    },
+    {
+      "diagnostic_claim": false,
+      "elapsed_seconds": 3.1752372500013735,
+      "iteration": 2,
+      "structured_output_valid": true,
+      "success": true
+    },
+    {
+      "diagnostic_claim": false,
+      "elapsed_seconds": 2.483803874998557,
+      "iteration": 3,
+      "structured_output_valid": true,
+      "success": true
+    },
+    {
+      "diagnostic_claim": false,
+      "elapsed_seconds": 3.6598550000016985,
+      "iteration": 4,
+      "structured_output_valid": true,
+      "success": true
+    },
+    {
+      "diagnostic_claim": false,
+      "elapsed_seconds": 3.5999315420012863,
+      "iteration": 5,
+      "structured_output_valid": true,
+      "success": true
+    }
+  ],
+  "repetitions": 5,
+  "schema_version": "1.0",
+  "summary": {
+    "latency_mean_seconds": 3.1071134418001747,
+    "latency_p50_seconds": 3.1752372500013735,
+    "latency_p95_seconds": 3.6598550000016985,
+    "success_rate": 1.0
+  },
+  "warmups": 1
+}
