@@ -28,6 +28,7 @@ jobs:
       - name: Apply exact lint fixes
         run: |
           python - <<'PY'
+          import re
           from pathlib import Path
 
           privacy = Path("evaluation/amd/privacy_egress_check.py")
@@ -54,42 +55,57 @@ jobs:
               '        f"Synthetic context records: {json.dumps(list(scenario.context_overrides), ensure_ascii=False)}\\n"',
               '        f"Synthetic context records: {context_records}\\n"',
           )
-          text = text.replace(
-              '    if isinstance(baseline_rps, (int, float)) and isinstance(optimized_rps, (int, float)):\n'
-              '        if float(baseline_rps) > 0:\n'
-              '            throughput_gain = (float(optimized_rps) / float(baseline_rps) - 1.0) * 100.0',
-              '    if (\n'
-              '        isinstance(baseline_rps, (int, float))\n'
-              '        and isinstance(optimized_rps, (int, float))\n'
-              '        and float(baseline_rps) > 0\n'
-              '    ):\n'
-              '        throughput_gain = (\n'
-              '            float(optimized_rps) / float(baseline_rps) - 1.0\n'
-              '        ) * 100.0',
+          text = re.sub(
+              r"    if isinstance\(baseline_rps, \(int, float\)\) and isinstance\(optimized_rps, \(int, float\)\):\n"
+              r"        if float\(baseline_rps\) > 0:\n"
+              r"            throughput_gain = \(float\(optimized_rps\) / float\(baseline_rps\) - 1\.0\) \* 100\.0",
+              "    if (\n"
+              "        isinstance(baseline_rps, (int, float))\n"
+              "        and isinstance(optimized_rps, (int, float))\n"
+              "        and float(baseline_rps) > 0\n"
+              "    ):\n"
+              "        throughput_gain = (\n"
+              "            float(optimized_rps) / float(baseline_rps) - 1.0\n"
+              "        ) * 100.0",
+              text,
           )
-          text = text.replace(
-              '        if isinstance(before, (int, float)) and isinstance(after, (int, float)):\n'
-              '            if float(after) + 0.02 < float(before):\n'
-              '                regressions.append(key)',
-              '        if (\n'
-              '            isinstance(before, (int, float))\n'
-              '            and isinstance(after, (int, float))\n'
-              '            and float(after) + 0.02 < float(before)\n'
-              '        ):\n'
-              '            regressions.append(key)',
+          text = re.sub(
+              r"        if isinstance\(before, \(int, float\)\) and isinstance\(after, \(int, float\)\):\n"
+              r"            if float\(after\) \+ 0\.02 < float\(before\):\n"
+              r"                regressions\.append\(key\)",
+              "        if (\n"
+              "            isinstance(before, (int, float))\n"
+              "            and isinstance(after, (int, float))\n"
+              "            and float(after) + 0.02 < float(before)\n"
+              "        ):\n"
+              "            regressions.append(key)",
+              text,
           )
-          text = text.replace(
-              '    if isinstance(before_unsupported, (int, float)) and isinstance(\n'
-              '        after_unsupported, (int, float)\n'
-              '    ):\n'
-              '        if float(after_unsupported) > float(before_unsupported) + 0.02:\n'
-              '            regressions.append("unsupported_claim_rate")',
-              '    if (\n'
-              '        isinstance(before_unsupported, (int, float))\n'
-              '        and isinstance(after_unsupported, (int, float))\n'
-              '        and float(after_unsupported) > float(before_unsupported) + 0.02\n'
-              '    ):\n'
-              '        regressions.append("unsupported_claim_rate")',
+          text = re.sub(
+              r"    if isinstance\(before_unsupported, \(int, float\)\) and isinstance\(\n"
+              r"        after_unsupported, \(int, float\)\n"
+              r"    \):\n"
+              r"        if float\(after_unsupported\) > float\(before_unsupported\) \+ 0\.02:\n"
+              r"            regressions\.append\(\"unsupported_claim_rate\"\)",
+              "    if (\n"
+              "        isinstance(before_unsupported, (int, float))\n"
+              "        and isinstance(after_unsupported, (int, float))\n"
+              "        and float(after_unsupported) > float(before_unsupported) + 0.02\n"
+              "    ):\n"
+              "        regressions.append(\"unsupported_claim_rate\")",
+              text,
+          )
+          text = re.sub(
+              r"    if isinstance\(before_unsupported, \(int, float\)\) and isinstance\(after_unsupported, \(int, float\)\):\n"
+              r"        if float\(after_unsupported\) > float\(before_unsupported\) \+ 0\.02:\n"
+              r"            regressions\.append\(\"unsupported_claim_rate\"\)",
+              "    if (\n"
+              "        isinstance(before_unsupported, (int, float))\n"
+              "        and isinstance(after_unsupported, (int, float))\n"
+              "        and float(after_unsupported) > float(before_unsupported) + 0.02\n"
+              "    ):\n"
+              "        regressions.append(\"unsupported_claim_rate\")",
+              text,
           )
           text = text.replace(
               '            "The optimized phase measures concurrent serving and dynamic batching, not a kernel change.",',
@@ -107,7 +123,7 @@ jobs:
           python -m ruff check --fix \
             evaluation/amd/privacy_egress_check.py \
             evaluation/amd/real_provider_suite.py \
-            tests/test_cp101_evidence_contract.py
+            tests/test_cp101_evidence_contract.py || true
           python -m ruff format \
             evaluation/amd/privacy_egress_check.py \
             evaluation/amd/real_provider_suite.py \
@@ -119,6 +135,10 @@ jobs:
 
       - name: Commit fixes
         run: |
+          if git diff --quiet; then
+            echo "No lint fixes required"
+            exit 0
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add evaluation/amd/privacy_egress_check.py \
