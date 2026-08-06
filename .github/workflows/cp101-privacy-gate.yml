@@ -1,0 +1,56 @@
+name: CP-101 local privacy gate
+
+on:
+  pull_request:
+    paths:
+      - "backend/api/app/llm/radeon_local.py"
+      - "backend/api/app/llm/registry.py"
+      - "evaluation/amd/**"
+      - "tests/test_cp101_*.py"
+      - "tests/test_radeon_provider.py"
+      - ".github/workflows/cp101-privacy-gate.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  local-privacy-egress:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: python -m pip install -c requirements-dev.lock -e '.[dev]'
+
+      - name: Run local-only privacy and egress evidence
+        run: |
+          python evaluation/amd/privacy_egress_check.py \
+            --output evaluation/amd/results/ci_local_privacy_egress.json
+
+      - name: Verify blocking privacy result
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path("evaluation/amd/results/ci_local_privacy_egress.json")
+          payload = json.loads(path.read_text(encoding="utf-8"))
+          assert payload["pass"] is True
+          assert payload["network_observation"]["proxy_or_redirect_trap_requests"] == 0
+          assert all(payload["checks"].values())
+          PY
+
+      - name: Upload privacy evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: cp101-local-privacy-egress
+          path: evaluation/amd/results/ci_local_privacy_egress.json
+          if-no-files-found: error
