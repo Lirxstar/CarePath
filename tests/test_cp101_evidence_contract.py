@@ -4,7 +4,6 @@ from pathlib import Path
 from backend.api.app.llm.radeon_cloud import RadeonCloudProvider
 from backend.api.app.llm.radeon_local import RadeonLocalProvider
 
-
 EVIDENCE_PATH = Path("evaluation/amd/results/dedicated_radeon_environment.json")
 
 
