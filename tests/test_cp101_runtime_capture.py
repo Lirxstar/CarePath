@@ -38,9 +38,7 @@ def test_external_runtime_probe_captures_gpu_metadata_without_full_path(
 
     monkeypatch.setattr(capture_environment.subprocess, "run", fake_run)
 
-    result = capture_environment.external_torch_environment(
-        "/private/account/runtime/python3"
-    )
+    result = capture_environment.external_torch_environment("/private/account/runtime/python3")
 
     assert result["accelerator_available"] is True
     assert result["hip_version"] == "7.2.1"
