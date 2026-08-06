@@ -63,10 +63,16 @@ RUNTIME_PYTHON="${CAREPATH_RADEON_RUNTIME_PYTHON:-}"
 if [[ -z "$RUNTIME_PYTHON" ]]; then
   VLLM_SHEBANG="$(head -n 1 "$VLLM_BIN" 2>/dev/null || true)"
   if [[ "$VLLM_SHEBANG" == '#!'* ]]; then
-    CANDIDATE="${VLLM_SHEBANG#\#!}"
-    CANDIDATE="${CANDIDATE%% *}"
-    if [[ -x "$CANDIDATE" ]]; then
-      RUNTIME_PYTHON="$CANDIDATE"
+    SHEBANG_BODY="${VLLM_SHEBANG#\#!}"
+    if [[ "$SHEBANG_BODY" == '/usr/bin/env '* ]]; then
+      ENV_COMMAND="${SHEBANG_BODY#/usr/bin/env }"
+      ENV_COMMAND="${ENV_COMMAND%% *}"
+      RUNTIME_PYTHON="$(command -v "$ENV_COMMAND" || true)"
+    else
+      CANDIDATE="${SHEBANG_BODY%% *}"
+      if [[ -x "$CANDIDATE" ]]; then
+        RUNTIME_PYTHON="$CANDIDATE"
+      fi
     fi
   fi
 fi
