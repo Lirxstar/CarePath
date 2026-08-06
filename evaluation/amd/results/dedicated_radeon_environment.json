@@ -1,0 +1,55 @@
+{
+  "schema_version": "1.0",
+  "recorded_at": "2026-08-06T11:37:00+00:00",
+  "deployment": "dedicated_radeon_cloud",
+  "local_to_end_user": false,
+  "provenance": {
+    "kind": "operator_transcribed",
+    "sources": [
+      "Radeon Cloud rocm-smi output displayed during the accepted participant session",
+      "Radeon Cloud rocminfo output displayed during the accepted participant session",
+      "Radeon Cloud final serving image label",
+      "Dedicated vLLM /v1/models response"
+    ],
+    "secrets_or_endpoint_identifiers_included": false,
+    "carepath_commit_capture": "inferred_from_amd-track2 head used immediately before PR #26; a future full suite run must capture git rev-parse directly"
+  },
+  "hardware": {
+    "gpu_count": 1,
+    "product_name": "AMD Radeon Graphics",
+    "gfx_architecture": "gfx1100",
+    "compute_units": 96,
+    "vram_total_bytes": 51522830336,
+    "card_model": "0x744b",
+    "card_sku": "D070910",
+    "subsystem_id": "0x0e0c",
+    "device_revision": "0x00"
+  },
+  "driver_and_runtime": {
+    "driver_version": "6.16.13",
+    "container_image": "vllm-dev:rocm7.2.1_navi_ubuntu22.04_py3.10_pytorch_2.9_vllm_0.16.0",
+    "operating_system": "Ubuntu 22.04",
+    "rocm_version": "7.2.1",
+    "python_version": "3.10",
+    "pytorch_version": "2.9",
+    "vllm_version": "0.16.0"
+  },
+  "model_and_serve_config": {
+    "model_id": "Qwen/Qwen2.5-7B-Instruct",
+    "dtype": "half",
+    "max_model_len": 4096,
+    "gpu_memory_utilization": 0.85,
+    "host": "0.0.0.0",
+    "port": 8000
+  },
+  "carepath": {
+    "branch": "amd-track2",
+    "commit_at_run_inferred": "477bf339fd2c45c6d24ed8b6892c73c27581c436",
+    "commit_verified_by_git_rev_parse": false
+  },
+  "limitations": [
+    "The dedicated endpoint did not expose live GPU utilisation or peak VRAM to the client.",
+    "The CarePath commit was reconstructed from the run sequence rather than captured by git rev-parse.",
+    "A local Radeon workspace run is still required for direct resource telemetry and exact commit attestation."
+  ]
+}
