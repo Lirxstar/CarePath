@@ -61,9 +61,7 @@ def test_generate_calls_official_openai_compatible_endpoint(
         captured["timeout"] = timeout
         captured["authorization"] = request.get_header("Authorization")
         captured["payload"] = json.loads(request.data or b"{}")
-        return FakeResponse(
-            {"choices": [{"message": {"content": "Radeon Cloud response"}}]}
-        )
+        return FakeResponse({"choices": [{"message": {"content": "Radeon Cloud response"}}]})
 
     monkeypatch.setattr(
         "backend.api.app.llm.radeon_cloud.urlopen",
@@ -74,9 +72,7 @@ def test_generate_calls_official_openai_compatible_endpoint(
     result = asyncio.run(provider.generate("synthetic prompt", max_tokens=64, seed=7))
 
     assert result == "Radeon Cloud response"
-    assert captured["url"] == (
-        "https://developer.amd.com.cn/radeon/api/v1/chat/completions"
-    )
+    assert captured["url"] == "https://developer.amd.com.cn/radeon/api/v1/chat/completions"
     assert captured["timeout"] == 1.0
     assert captured["authorization"] == "Bearer test-key-must-not-leak"
     assert captured["payload"]["model"] == "DeepSeek-V4-Flash"
@@ -97,15 +93,7 @@ def test_structured_generation_uses_schema_instruction_and_parses_object(
         del timeout
         captured["payload"] = json.loads(request.data or b"{}")
         return FakeResponse(
-            {
-                "choices": [
-                    {
-                        "message": {
-                            "content": '{"summary":"Synthetic summary","safe":true}'
-                        }
-                    }
-                ]
-            }
+            {"choices": [{"message": {"content": '{"summary":"Synthetic summary","safe":true}'}}]}
         )
 
     monkeypatch.setattr(
@@ -156,9 +144,7 @@ def test_health_check_reports_configured_model(
 
 
 def test_health_check_reports_missing_key_without_network() -> None:
-    provider = RadeonCloudProvider(
-        make_settings(radeon_cloud_api_key=None, llm_api_key=None)
-    )
+    provider = RadeonCloudProvider(make_settings(radeon_cloud_api_key=None, llm_api_key=None))
 
     assert asyncio.run(provider.health_check()) == {
         "status": "not_configured",
