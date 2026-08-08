@@ -304,9 +304,8 @@ def test_private_session_close_waits_for_inflight_database_operation() -> None:
         assert close_future.result(timeout=2) is True
 
     assert close_finished.is_set()
-    with pytest.raises(KeyError):
-        with store.session(session_id):
-            pass
+    with pytest.raises(KeyError), store.session(session_id):
+        pass
 
 
 def test_private_session_store_validates_capacity_and_evicts_oldest() -> None:
@@ -318,9 +317,8 @@ def test_private_session_store_validates_capacity_and_evicts_oldest() -> None:
     store = PrivateSessionStore(ttl_minutes=5, max_sessions=1)
     first = store.create()
     second = store.create()
-    with pytest.raises(KeyError):
-        with store.session(first):
-            pass
+    with pytest.raises(KeyError), store.session(first):
+        pass
     with store.session(second) as session:
         assert session is not None
     store.close_all()
