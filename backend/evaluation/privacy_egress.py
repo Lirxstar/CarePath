@@ -39,9 +39,10 @@ class _ModelHandler(_SilentHandler):
 
     def do_GET(self) -> None:
         type(self).requests_seen += 1
-        if type(self).redirect_target is not None:
+        redirect_target = type(self).redirect_target
+        if redirect_target is not None:
             self.send_response(302)
-            self.send_header("Location", type(self).redirect_target)
+            self.send_header("Location", redirect_target)
             self.end_headers()
             return
         self._write_json(200, {"data": [{"id": "privacy-test-model"}]})
