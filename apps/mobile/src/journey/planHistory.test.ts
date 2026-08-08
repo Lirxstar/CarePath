@@ -140,6 +140,46 @@ describe("plan history feedback", () => {
     ]);
   });
 
+  test("explains increased difficulty and same-difficulty wording changes", () => {
+    const previousLow = item([
+      action({ difficulty: "low", description: "Walk for 5 minutes.", rationale: "Start small." }),
+    ]);
+    const currentMedium = item(
+      [
+        action({
+          difficulty: "medium",
+          description: "Walk for 15 minutes.",
+          rationale: "Stable completion supports a cautious increase.",
+        }),
+      ],
+      { plan_id: "plan-2", version: 2 },
+    );
+    expect(explainPlanChanges(currentMedium, previousLow)).toEqual([
+      "Difficulty increased: Stable completion supports a cautious increase.",
+    ]);
+
+    const previousMedium = item([
+      action({
+        difficulty: "medium",
+        description: "Walk after lunch.",
+        rationale: "Use an existing routine cue.",
+      }),
+    ]);
+    const revisedMedium = item(
+      [
+        action({
+          difficulty: "medium",
+          description: "Walk after the first work block.",
+          rationale: "The recorded constraint makes this timing easier to use.",
+        }),
+      ],
+      { plan_id: "plan-3", version: 3 },
+    );
+    expect(explainPlanChanges(revisedMedium, previousMedium)).toEqual([
+      "Action changed while difficulty stayed medium: The recorded constraint makes this timing easier to use.",
+    ]);
+  });
+
   test("covers unchanged, absent and added actions across versions", () => {
     const previous = item([action()]);
     expect(comparePlanVersions(previous, undefined)).toEqual({
@@ -232,7 +272,7 @@ describe("plan history feedback", () => {
     expect(body.submission_key).toMatch(/^mobile-action-1-[0-9a-f]{8}$/);
   });
 
-  test("collapses rapid duplicate submissions into one request", async () => {
+  test("collapses rapid duplicates but permits a later retry after completion", async () => {
     const calls: RecordedCall[] = [];
     let resolveRequest: ((value: ApiResponse) => void) | undefined;
     const pending = new Promise<ApiResponse>((resolve) => {
@@ -262,5 +302,10 @@ describe("plan history feedback", () => {
     expect(calls).toHaveLength(1);
     resolveRequest?.(response(feedback, 201));
     await expect(first).resolves.toMatchObject({ ok: true, data: feedback });
+
+    const later = api.submitFeedback("plan-1", "action-1", { response: "accepted" });
+    expect(later).not.toBe(first);
+    expect(calls).toHaveLength(2);
+    await expect(later).resolves.toMatchObject({ ok: true, data: feedback });
   });
 });
