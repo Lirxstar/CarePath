@@ -31,7 +31,8 @@ from backend.domain.models import (
 from backend.imports.csv_importer import CSVHealthImporter
 from backend.imports.fhir.parser import FHIRBundleImporter
 from backend.imports.json_importer import JSONHealthImporter
-from backend.imports.models import ImportReport
+from backend.imports.models import ImportReport, PreparedImport
+from backend.imports.ownership import assign_import_user, is_synthetic_import
 from backend.imports.service import ImportService
 from backend.personalization.plan_calendar import user_local_date
 from backend.personalization.planner import (
@@ -39,7 +40,6 @@ from backend.personalization.planner import (
     InterventionPlanner,
     PlanFeedbackWindowError,
 )
-from backend.storage.database import get_session
 from backend.storage.models import (
     AuditEventTable,
     InteractionTable,
@@ -50,6 +50,8 @@ from backend.storage.models import (
 )
 from backend.timeseries import compare_periods, compute_trend
 
+from .access import ensure_user_access
+from .auth import carepath_account_user_id, get_optional_auth_identity
 from .contracts import (
     AuditTraceResponse,
     CoachMessageRequest,
@@ -63,9 +65,10 @@ from .contracts import (
     RecordTrendsResponse,
 )
 from .errors import CarePathError, get_request_id
+from .session_scope import get_request_session
 
 router = APIRouter()
-SessionDependency = Annotated[Session, Depends(get_session)]
+SessionDependency = Annotated[Session, Depends(get_request_session)]
 
 
 def _as_utc(value: datetime) -> datetime:
@@ -130,13 +133,25 @@ def _audit_from_row(row: AuditEventTable) -> AuditEvent:
     )
 
 
+def _assign_authenticated_import(request: Request, prepared: PreparedImport) -> PreparedImport:
+    identity = get_optional_auth_identity(request)
+    if identity is None or is_synthetic_import(prepared):
+        return prepared
+    return assign_import_user(prepared, carepath_account_user_id(identity.subject))
+
+
 @router.post(
     "/profiles",
     response_model=UserProfile,
     status_code=HTTPStatus.CREATED,
     summary="Create a CarePath user profile",
 )
-def create_profile(profile: UserProfile, session: SessionDependency) -> UserProfile:
+def create_profile(
+    request: Request,
+    profile: UserProfile,
+    session: SessionDependency,
+) -> UserProfile:
+    ensure_user_access(request, session, profile.user_id)
     if session.get(UserProfileTable, str(profile.user_id)) is not None:
         raise CarePathError(
             "profile_exists",
@@ -166,7 +181,11 @@ def create_profile(profile: UserProfile, session: SessionDependency) -> UserProf
     response_model=ImportReport,
     summary="Import canonical CarePath CSV or project JSON data",
 )
-def import_records(payload: RecordsImportRequest, session: SessionDependency) -> ImportReport:
+def import_records(
+    payload: RecordsImportRequest,
+    request: Request,
+    session: SessionDependency,
+) -> ImportReport:
     if payload.source_format is RecordsImportFormat.CSV:
         assert isinstance(payload.content, str)
         prepared = CSVHealthImporter().prepare(payload.content.encode("utf-8"))
@@ -176,7 +195,7 @@ def import_records(payload: RecordsImportRequest, session: SessionDependency) ->
             "utf-8"
         )
         prepared = JSONHealthImporter().prepare(data)
-    return ImportService().persist(prepared, session)
+    return ImportService().persist(_assign_authenticated_import(request, prepared), session)
 
 
 @router.post(
@@ -184,14 +203,18 @@ def import_records(payload: RecordsImportRequest, session: SessionDependency) ->
     response_model=ImportReport,
     summary="Import the limited CarePath FHIR Bundle subset",
 )
-def import_fhir_bundle(payload: FHIRBundleRequest, session: SessionDependency) -> ImportReport:
+def import_fhir_bundle(
+    payload: FHIRBundleRequest,
+    request: Request,
+    session: SessionDependency,
+) -> ImportReport:
     data = json.dumps(
         payload.model_dump(mode="json", by_alias=True),
         ensure_ascii=False,
         separators=(",", ":"),
     ).encode("utf-8")
     prepared = FHIRBundleImporter().prepare(data)
-    return ImportService().persist(prepared, session)
+    return ImportService().persist(_assign_authenticated_import(request, prepared), session)
 
 
 @router.get(
@@ -200,12 +223,14 @@ def import_fhir_bundle(payload: FHIRBundleRequest, session: SessionDependency) -
     summary="Return deterministic trend and period-comparison analytics",
 )
 def records_trends(
+    request: Request,
     user_id: UUID,
     metric_type: MetricType,
     session: SessionDependency,
     days: Annotated[int, Query(ge=1, le=60)] = 7,
     end_date: date | None = None,
 ) -> RecordTrendsResponse:
+    ensure_user_access(request, session, user_id)
     rows = session.scalars(
         select(ObservationTable)
         .where(
@@ -261,6 +286,7 @@ def coach_message(
     request: Request,
     session: SessionDependency,
 ) -> CoachMessageResponse:
+    ensure_user_access(request, session, payload.user_id)
     if session.get(UserProfileTable, str(payload.user_id)) is None:
         raise CarePathError(
             "profile_not_found",
@@ -352,10 +378,12 @@ def coach_message(
     summary="Return the latest active, in-window plan for a user",
 )
 def current_plan(
+    request: Request,
     user_id: UUID,
     session: SessionDependency,
     goal_id: UUID | None = None,
 ) -> CurrentPlanResponse:
+    ensure_user_access(request, session, user_id)
     try:
         today = user_local_date(session, user_id)
     except ValueError as exc:
@@ -406,8 +434,10 @@ def current_plan(
 def plan_feedback(
     plan_id: UUID,
     payload: PlanFeedbackRequest,
+    request: Request,
     session: SessionDependency,
 ) -> PlanFeedbackResponse:
+    ensure_user_access(request, session, payload.user_id)
     plan = session.get(InterventionPlanTable, str(plan_id))
     if plan is None or plan.user_id != str(payload.user_id):
         raise CarePathError(
@@ -453,13 +483,19 @@ def plan_feedback(
     response_model=AuditTraceResponse,
     summary="Return audit events currently persisted for an interaction",
 )
-def audit_trace(interaction_id: UUID, session: SessionDependency) -> AuditTraceResponse:
-    if session.get(InteractionTable, str(interaction_id)) is None:
+def audit_trace(
+    interaction_id: UUID,
+    request: Request,
+    session: SessionDependency,
+) -> AuditTraceResponse:
+    interaction = session.get(InteractionTable, str(interaction_id))
+    if interaction is None:
         raise CarePathError(
             "interaction_not_found",
             "The requested interaction does not exist",
             status_code=HTTPStatus.NOT_FOUND,
         )
+    ensure_user_access(request, session, UUID(interaction.user_id))
     rows = session.scalars(
         select(AuditEventTable)
         .where(AuditEventTable.interaction_id == str(interaction_id))
