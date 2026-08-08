@@ -1,53 +1,43 @@
 flowchart LR
-  CLIENT["React Native / Expo reviewer client"]
+  REVIEWER["Reviewer browser / Expo client"]
 
-  subgraph Local["Local Docker Compose · developer/operator boundary"]
-    LAPI["FastAPI + Agent Workflow container"]
-    LMP["ModelProvider"]
-    LDB[("Local PostgreSQL/SQLite")]
-    LLOG[("Local metadata-only logs")]
-    LMODEL["Optional local model endpoint"]
-    LRADEON["Optional local Radeon/ROCm runtime"]
+  subgraph Local["Local Docker Compose"]
+    LWEB["Single application image\nExpo Web + FastAPI + bounded workflow"]
+    LDB[("PostgreSQL\npersistent local volume")]
+    LMODEL["ModelProvider\nmock or approved local endpoint"]
+    LLOG[("Metadata-only logs / audit")]
   end
 
-  subgraph AWS["AWS deployment boundary · concrete cloud backend"]
-    AAPI["FastAPI + Agent Workflow service"]
-    AMP["ModelProvider"]
-    ADB[("Managed PostgreSQL/storage")]
-    ASECRETS["AWS-managed secret/config injection"]
-    ALOG[("AWS metadata-only logs/audit")]
+  subgraph Cloud["Reviewer cloud deployment"]
+    CWEB["Single web service\nExpo Web + FastAPI + bounded workflow"]
+    CDB[("Managed PostgreSQL")]
+    CCONFIG["Runtime environment / secret injection"]
+    CLOG[("Metadata-only logs / audit")]
   end
 
-  subgraph CloudProvider["Third-party cloud model provider boundary"]
-    CM["Hosted LLM endpoint\nminimized payload only"]
+  subgraph Endpoint["Optional model processing boundary"]
+    MODEL["Approved local or remote endpoint\nminimized ModelRequest only"]
   end
 
-  subgraph RadeonHosted["Hosted Radeon provider boundary · optional AMD extension"]
-    ROCM["Hosted Radeon/ROCm model runtime\nminimized payload only"]
-  end
+  REVIEWER -->|"HTTPS · same-origin UI and API"| CWEB
+  REVIEWER -. "local review" .-> LWEB
 
-  CLIENT -->|"HTTPS API"| LAPI
-  CLIENT -->|"HTTPS API"| AAPI
+  LWEB <-->|"validated application state"| LDB
+  LWEB -->|"IDs/status/latency only"| LLOG
+  LWEB --> LMODEL
+  LMODEL -. "optional minimized request" .-> MODEL
+  MODEL -. "untrusted completion" .-> LMODEL
 
-  LAPI <-->|"local application data"| LDB
-  LAPI -->|"IDs/status/latency only"| LLOG
-  LAPI --> LMP
-  LMP -->|"local-only ModelRequest"| LMODEL
-  LMODEL -->|"completion"| LMP
-  LMP -. "local-only AMD path" .-> LRADEON
-  LRADEON -. "completion" .-> LMP
-  LMP -. "optional third-party egress\nsanitized minimal request" .-> CM
-  CM -. "untrusted completion" .-> LMP
+  CWEB <-->|"validated application state"| CDB
+  CCONFIG -->|"runtime configuration\nnever sent to client/model"| CWEB
+  CWEB -->|"IDs/status/latency only"| CLOG
+  CWEB -->|"sanitized request via ModelProvider"| MODEL
+  MODEL -->|"untrusted completion"| CWEB
 
-  AAPI <-->|"AWS-boundary application data"| ADB
-  ASECRETS -->|"runtime injection · never client/model payload"| AAPI
-  AAPI -->|"IDs/status/latency only"| ALOG
-  AAPI --> AMP
-  AMP -->|"third-party egress\nsanitized minimal request"| CM
-  CM -->|"untrusted completion"| AMP
-  AMP -. "optional AMD extension\nsanitized minimal request" .-> ROCM
-  ROCM -. "untrusted completion" .-> AMP
+  LIVE["/health/live\nprocess liveness"]
+  READY["/health/ready\ndatabase + provider readiness"]
+  CWEB --> LIVE
+  CWEB --> READY
 
-  CORE["B core\nExpo + Local Docker + AWS backend\nCloud/Radeon endpoints remain replaceable behind ModelProvider"]
-  PRIVACY["local_strict\nlocal endpoint only · no silent cloud fallback"]
-  PRIVACY -. "constrains" .-> LMP
+  SAMEORIGIN["Production invariant\nreviewer HTML and API share one origin\nno second frontend service or CORS dependency"]
+  SAMEORIGIN -. "constrains" .-> CWEB

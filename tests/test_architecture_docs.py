@@ -97,18 +97,21 @@ def test_sensitive_crossings_declare_minimization_or_scope() -> None:
         assert control in system
 
 
-def test_deployment_diagram_distinguishes_all_required_targets() -> None:
+def test_deployment_diagram_distinguishes_current_core_targets() -> None:
     deployment = read(DIAGRAMS / "deployment-boundary.mmd")
     required_targets = {
         "Local Docker Compose",
-        "AWS deployment boundary",
-        "Third-party cloud model provider boundary",
-        "local Radeon/ROCm runtime",
-        "Hosted Radeon provider boundary",
-        "local_strict",
-        "no silent cloud fallback",
+        "Reviewer cloud deployment",
+        "Optional model processing boundary",
+        "Single web service",
+        "Managed PostgreSQL",
+        "/health/live",
+        "/health/ready",
+        "reviewer HTML and API share one origin",
+        "no second frontend service or CORS dependency",
     }
     for target in required_targets:
         assert target in deployment
 
-    assert 'CM -. "untrusted completion" .-> LMP' in deployment
+    assert 'MODEL -. "untrusted completion" .-> LMODEL' in deployment
+    assert 'MODEL -->|"untrusted completion"| CWEB' in deployment

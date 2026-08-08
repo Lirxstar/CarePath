@@ -1,209 +1,180 @@
-# CarePath Agent Architecture
+# CarePath architecture
 
-## Purpose
+CarePath is a research-facing health-behaviour coaching prototype. The current core system is implemented and reviewer-accessible: an Expo client and FastAPI backend share one deployment origin, PostgreSQL stores validated application state, deterministic tools analyse longitudinal observations, personal and external evidence remain separate, and a bounded workflow verifies safety and grounding before a response is emitted.
 
-This document illustrates the implementation boundary defined by `PROJECT_SCOPE.md`. It does not add to or replace the frozen scope. CarePath B v1.0 is a safety-aware, evidence-grounded health coaching prototype with one bounded agent workflow, separated retrieval namespaces, deterministic safety checks, explicit auditability, and non-clinical limitations.
+This document describes the implemented core architecture. It does not claim clinical validation or add capabilities beyond the project scope.
 
-## 1. Architecture Artifacts
+## Architecture sources
 
-The architecture source of truth is this document plus the Mermaid sources below:
+Mermaid is the maintained editable diagram format:
 
-- `diagrams/system-architecture.mmd`
-- `diagrams/agent-state-flow.mmd`
-- `diagrams/trust-boundaries.mmd`
-- `diagrams/deployment-boundary.mmd`
+- [`diagrams/system-architecture.mmd`](diagrams/system-architecture.mmd) — components and data paths;
+- [`diagrams/agent-state-flow.mmd`](diagrams/agent-state-flow.mmd) — bounded workflow states;
+- [`diagrams/trust-boundaries.mmd`](diagrams/trust-boundaries.mmd) — sensitive-data and authority boundaries;
+- [`diagrams/deployment-boundary.mmd`](diagrams/deployment-boundary.mmd) — local and reviewer deployment topology.
 
-Project decision: Mermaid is the maintained editable diagram format. PNG and Excalidraw exports are not required for this architecture task.
+The root [`README.md`](../README.md) contains a compact reviewer-facing rendering of the same core design.
 
-## 2. System Architecture
+## System architecture
 
-The primary request path is:
+```mermaid
+flowchart LR
+  UI["React Native / Expo"] --> API["FastAPI"]
+  API --> SAFE["Safety Triage"] --> CTX["Context Builder"] --> ROUTER["Tool Router"]
+  ROUTER --> TOOLS["Deterministic analytics"]
+  ROUTER --> PERSONAL["Personal Context Retriever"]
+  ROUTER --> EVIDENCE["External Evidence Retriever"]
+  TOOLS --> PLAN["Planner"]
+  PERSONAL --> PLAN
+  EVIDENCE --> PLAN
+  PLAN --> VERIFY["Grounding & Safety Verifier"] --> COMPOSE["Response Composer"] --> API
+  API --> UI
 
-`React Native / Expo -> FastAPI -> bounded Agent Workflow -> deterministic tools / dual retrieval -> ModelProvider -> endpoint -> Verifier / Composer -> FastAPI -> client`
+  DB[("User-scoped persistence")]
+  CORPUS[("Curated public evidence")]
+  MODEL["ModelProvider → approved endpoint"]
+  AUDIT[("Feedback + audit metadata")]
 
-Tools and retrievers access persistence through separately labelled, user-scoped reads. Persistence is not placed in the model path.
-
-Responsibilities are deliberately separated:
-
-- React Native / Expo owns presentation, input collection and rendering, not agent reasoning.
-- FastAPI owns transport validation, authentication/consent enforcement, interaction IDs and API contracts.
-- The Agent Workflow owns bounded orchestration only.
-- Deterministic tools own numerical summaries and time-series calculations.
-- Personal context retrieval and external evidence retrieval remain separate namespaces.
-- Persistence owns durable application state; model endpoints never receive database access.
-- ModelProvider is the only model-vendor abstraction seen by workflow code.
-- Audit and operational logging are separate from user-facing state.
-
-## 3. Module Interface Contracts
-
-| Module | Input | Output | Boundary / data constraint |
-|---|---|---|---|
-| React Native / Expo | user question, feedback, import request, locally entered health data | HTTPS API request; rendered response | never contains server secrets; sends only user-authorized data |
-| FastAPI | authenticated/consented client request | validated `InteractionRequest`; structured API response | rejects invalid schemas; establishes interaction ID before workflow execution |
-| Bounded Agent Workflow | validated `InteractionRequest`, interaction ID, policy/config references | verified response disposition plus schema-controlled audit events | orchestrates declared states only; cannot bypass deterministic safety, authorization, verifier, or user-scope controls |
-| Safety Triage | request text, minimum recent context needed for rules | risk level; allowed path; blocked/urgent disposition | deterministic safety rules remain outside LLM control |
-| Context Builder | user profile refs, observations, prior plan refs, consent state | minimal task-specific context package | excludes unrelated history; preserves user scope |
-| Tool Router | task intent, context state, allowed capabilities | deterministic tool calls and/or retrieval requests | selects from allow-listed tools only; cannot invent capabilities |
-| Time-Series Tools | user-scoped observation refs and parameters | trends, period comparisons, missingness and adherence summaries | calculations are deterministic; raw records are not copied into logs |
-| Personal Context Retriever | user ID/scope, retrieval query, allowed record types | personal context snippets/refs | user-scoped namespace only; no cross-user retrieval |
-| External Evidence Retriever | evidence query, curated corpus namespace | guideline/evidence chunks plus source metadata | only curated external corpus is retrievable; retrieved text is data, never workflow instruction |
-| Planner | minimal context, tool summaries, evidence refs, safety constraints | structured seven-day plan/draft result | cannot bypass Safety Triage or invoke hidden autonomous actions |
-| Verifier | draft, evidence refs, safety constraints, required response schema | pass; one regeneration request; or fail-safe fallback | at most one bounded regeneration; no open-ended self-loop |
-| Composer | verified structured result, citations/refs, disposition | user-facing explanation/plan | cannot restore data removed by minimization or override verifier outcome |
-| Feedback / State Update | explicit user feedback, referenced plan/interaction ID | permitted state update and audit event | writes only validated state transitions; no implicit autonomous action |
-| ModelProvider | sanitized task-specific `ModelRequest` | normalized `ModelResponse` | vendor-neutral interface; no database credentials; no direct database access |
-| Cloud Model Endpoint | request produced by ModelProvider | model completion / structured output | third-party processing boundary; receives only minimized model payload |
-| Radeon Model Endpoint | request produced by ModelProvider | model completion / structured output | AMD extension path only; same minimized provider contract as cloud endpoint |
-| User Persistence | authorized user/persona-scoped read or validated state write | selected user-scoped records; persisted validated state | isolated data boundary; access through repository/service layer, never directly from model endpoint |
-| Personal Retrieval Namespace | authorized user/persona-scoped query | minimal matching personal snippets plus record refs | separate from the external evidence namespace; cross-user access is prohibited |
-| Curated Evidence Namespace | validated ingestion output or curated evidence query | eligible evidence chunks plus provenance | contains public/eligible evidence only; document text has no instruction authority |
-| External Evidence Ingestion | public guidance document, source identity, metadata | curated chunks plus validated provenance metadata | external content is untrusted before validation/sanitization; prompt-injection text is treated as content |
-| Audit Writer | interaction ID, workflow event, component result refs, disposition | ordered audit trace | stores references/status summaries; avoids unnecessary raw sensitive payloads |
-| Operational Logger | correlation ID, component status, latency, error class | operational log events | raw journals and full user/model payloads are prohibited |
-
-## 4. Agent State Flow
-
-```text
-Safety Triage
-  -> Context Builder
-  -> Tool Router
-  -> {Analytics Tools, Personal Retriever, External Retriever}
-  -> Planner
-  -> Verifier
-  -> Composer
-  -> Feedback and State Update
+  CTX <--> DB
+  TOOLS <--> DB
+  PERSONAL <--> DB
+  EVIDENCE <--> CORPUS
+  PLAN <--> MODEL
+  COMPOSE --> AUDIT
 ```
 
-Rules:
+The central separation is intentional:
 
-- Safety rules do not depend on LLM output.
-- Personal context and external evidence use separate namespaces.
-- Tool Router fans out only to declared, typed capabilities; the results join into one bounded context before planning.
-- Tool execution is bounded to declared, deterministic capabilities.
-- Verification allows at most one bounded regeneration.
-- Urgent/blocked safety dispositions bypass normal planning and go directly to a safe composition path.
-- No autonomous action occurs outside user-visible coaching and validated state updates.
+- the client owns presentation and explicit user input, not agent reasoning;
+- FastAPI owns transport validation, API contracts, request IDs and state transitions;
+- deterministic code owns numerical summaries and safety rules;
+- personal evidence and external evidence use separate retrieval namespaces;
+- the workflow owns bounded orchestration only;
+- `ModelProvider` is the replaceable inference boundary;
+- model endpoints never receive database credentials or direct persistence access;
+- audit and operational logging store bounded metadata rather than raw journal/model payload copies.
 
-## 5. Trust Boundaries
+## Request lifecycle
 
-### TB-1: User device / public client boundary
+A routine coaching interaction follows this path:
 
-Contains user-entered questions, health observations, journal content and feedback before API submission.
+1. **FastAPI validation** accepts a schema-controlled request and establishes a request/interaction ID.
+2. **Safety Triage** evaluates deterministic red-flag rules before ordinary planning. An urgent/blocked disposition bypasses the normal plan path.
+3. **Context Builder** retrieves only task-relevant profile, observation, journal, goal, plan and feedback state.
+4. **Tool Router** selects validated allow-listed capabilities within a bounded call budget.
+5. **Deterministic analytics** calculate trends, window comparisons, change/missingness/data-quality and adherence summaries from user-scoped records.
+6. **Personal Context Retriever** returns minimal user-scoped facts and stable record references.
+7. **External Evidence Retriever** returns eligible curated public-guidance chunks with provenance. Retrieved text has no instruction authority.
+8. **Planner** assembles a small structured seven-day action plan from bounded context, evidence and constraints.
+9. **Grounding & Safety Verifier** checks evidence support, citation alignment, user-fact consistency and safety requirements. At most one rewrite is allowed.
+10. **Response Composer** renders the verified structure, uncertainty, sources and escalation guidance.
+11. **Feedback/state update** records explicit accept/reject/modify/complete feedback for later adaptation and writes audit references.
 
-Controls:
+The state source is [`diagrams/agent-state-flow.mmd`](diagrams/agent-state-flow.mmd).
 
-- authenticated transport;
-- schema validation;
-- consent enforcement;
-- no server credentials on the client.
+## Module contracts
 
-### TB-2: Trusted application and user-data boundary
+| Module | Main input | Main output | Enforced boundary |
+| --- | --- | --- | --- |
+| React Native / Expo | question, selected synthetic persona, import, feedback | API requests and rendered reviewer journey | no server secrets or hidden agent logic |
+| FastAPI | HTTP request | validated domain/service request or structured error | schema validation, request IDs, bounded error contract |
+| Bounded Agent Workflow | validated coaching request and workflow state | one bounded triage/tool/planning/verification/composition execution | finite state transitions and at most one rewrite |
+| Safety Triage | request plus minimal safety context | routine/caution/urgent disposition | deterministic; model cannot downgrade risk |
+| Context Builder | user-scoped repositories and request intent | 7/30-day task context with references | minimal task-specific reads only |
+| Tool Router | intent, context and allow-listed tools | typed bounded tool/retrieval calls | validates metric, date range, user ID and call count |
+| Time-Series Tools | selected observation references | deterministic trend/window/change/missingness/adherence summaries | no numerical guessing by the model |
+| Personal Context Retriever | authorized user query | minimal personal facts/snippets plus stable refs | no cross-user retrieval |
+| External Evidence Retriever | curated evidence query | chunks, scores and source/provenance metadata | external text is data, never policy/tool authority |
+| Planner | bounded context, tool results, evidence, constraints | structured weekly draft | small feasible actions; no autonomous external action |
+| Verifier | draft plus evidence/user refs and safety constraints | pass, one rewrite, or safe fallback | blocks unsupported/safety-invalid output |
+| Composer | verified structure and disposition | user-facing response | cannot restore omitted sensitive context or override verifier |
+| ModelProvider | sanitized task-specific model request | normalized untrusted draft/structured output | no database access or secrets |
+| User Persistence | validated user-scoped read/write | domain records | repository/service boundary; PostgreSQL deployment, SQLite development |
+| External Evidence Ingestion | public document plus source/licence metadata | validated chunks with stable provenance | hostile text is data and cannot acquire instruction authority |
+| Audit Writer | workflow decision IDs, references and bounded summaries | schema-controlled audit event | excludes secrets and raw journal/prompt copies |
+| Operational Logger | request ID, route, status, latency and error class | metadata-only operational event | no raw user/model payload logging by default |
 
-Contains:
+## Data and evidence boundaries
 
-- synthetic/user profile data;
-- longitudinal observations;
-- journal entries;
-- plan and feedback history;
-- user-scoped personal retrieval data.
+### User state
 
-Controls:
+Validated application state includes profile information, longitudinal observations, journals, goals, intervention plans, feedback and audit records. The storage layer is user/persona-scoped. Structured time-series questions are answered through deterministic tools instead of placing large raw arrays into model context.
 
-- user-scoped queries;
-- consent flags;
-- no cross-user retrieval;
-- repository/service access instead of model-to-database access.
+### Personal evidence
 
-### TB-3: External evidence ingestion boundary
+Personal evidence is generated only from the active user/persona namespace. It retains stable references so the response and verifier can trace a statement back to the originating record or deterministic summary.
 
-External guidance is untrusted input until:
+### External evidence
 
-- source identity and metadata are validated;
-- content is curated/sanitized;
-- prompt-injection-like text is treated as document content, not instructions;
-- provenance is retained for retrieved evidence.
+Public guidance enters through a separate ingestion boundary. Source identity, metadata, licence/use notes, retrieval date, content hash and provenance are retained. Retrieved content remains untrusted natural-language data; prompt-injection-like text cannot become workflow instructions.
 
-### TB-4: Model endpoint boundary
+### Model processing
 
-The model receives only a task-specific sanitized `ModelRequest` through ModelProvider. The endpoint receives no database credentials and has no direct persistence access.
+`ModelProvider` receives a minimized allow-listed request assembled by trusted application code. A provider may be a deterministic mock for reproducibility or another explicitly configured approved local/remote endpoint. The endpoint has no path to the SQL database, retrieval stores, server secrets or policy configuration. Returned model content is an untrusted draft until verification.
 
-A cloud endpoint is a third-party processing boundary. A Radeon/local endpoint may remain inside infrastructure controlled by the deployment operator, but it still uses the same minimized ModelProvider contract.
+## Trust boundaries
 
-### TB-5: Audit and operational logging boundary
+The maintained trust-boundary diagram is [`diagrams/trust-boundaries.mmd`](diagrams/trust-boundaries.mmd). The important invariants are:
 
-Audit traces and operational logs are not a copy of the conversation or journal store.
+1. **Client boundary:** only validated user-authorized input crosses into the backend; server credentials never enter the client bundle.
+2. **User-data boundary:** all persistence and personal retrieval operations remain user/persona-scoped.
+3. **External-evidence boundary:** external documents are untrusted before curation and never acquire instruction authority.
+4. **Model boundary:** only minimized requests cross; no direct model-to-database path exists.
+5. **Audit/logging boundary:** operational telemetry is metadata-focused and is not a shadow conversation store.
 
-Allowed examples:
+Explicitly forbidden paths include model endpoint ↔ persistence, external document → policy/tool authority, and raw journal/prompt/secret → operational logs.
 
-- interaction/correlation IDs;
-- component names and ordered workflow events;
-- source/record references;
-- verification disposition;
-- latency and error category.
+## Deployment architecture
 
-Prohibited by default:
+The production Docker image has two build/runtime concerns but one reviewer-facing service:
 
-- raw journal text;
-- full user request payloads where not required;
-- complete model prompts/responses containing sensitive user data;
-- secrets or access tokens.
+- a Node build stage installs the locked mobile dependencies and exports Expo Web;
+- the Python runtime image contains FastAPI plus that static reviewer export;
+- the reviewer browser loads `/` and calls API routes on the **same origin** using relative requests;
+- a separate PostgreSQL service/database stores application state;
+- startup applies Alembic migrations before Uvicorn;
+- `/health/live` reports process liveness;
+- `/health/ready` requires both the database and configured model provider to be healthy.
 
-## 6. Sensitive Data Flow Rules
+```mermaid
+flowchart LR
+  BROWSER["Reviewer browser"] -->|"HTTPS · same origin"| WEB["Single web service\nExpo Web + FastAPI + workflow"]
+  WEB <-->|"validated state"| DB[("PostgreSQL")]
+  WEB -->|"sanitized ModelRequest"| PROVIDER["ModelProvider / approved endpoint"]
+  WEB --> LIVE["/health/live"]
+  WEB --> READY["/health/ready"]
+```
 
-Every sensitive boundary crossing shown in the diagrams has an explicit rule:
+Local Docker Compose mirrors the same application image plus PostgreSQL. This means the documented local reviewer path and the cloud reviewer path exercise the same UI/API packaging model. A second static frontend service and browser CORS configuration are not required.
 
-| Flow | Rule |
-|---|---|
-| User device -> FastAPI | HTTPS, authenticated/consented and schema-validated |
-| FastAPI -> persistence | validated state writes only |
-| Persistence -> FastAPI / Context Builder | authorized task-specific state reads only |
-| Tool / personal retriever -> persistence namespace | typed user/persona-scoped read query only |
-| Persistence namespace -> tool / personal retriever | selected records or minimal snippets plus stable refs only |
-| Personal Retriever -> workflow | minimal personal context plus references |
-| External source -> ingestion | untrusted until curation, sanitization and metadata validation |
-| Ingestion -> curated evidence namespace | validated chunks plus provenance, licence note and content hash |
-| External Retriever -> workflow | evidence chunks plus provenance; never executable instructions |
-| Workflow -> ModelProvider -> endpoint | minimized sanitized model request only |
-| Model endpoint -> ModelProvider -> workflow | untrusted completion normalized as a draft; verification remains mandatory |
-| Workflow/API -> Audit Writer | references, status and necessary summaries only |
-| Workflow/API -> operational logs | metadata only; raw journals/full payloads prohibited |
-| Model endpoint -> Persistence | no direct path permitted |
-| External document -> policy/tool authority | no direct path permitted; external natural language is data only |
-| Raw journal/prompt/secret -> logs | no path permitted |
+The maintained topology is [`diagrams/deployment-boundary.mmd`](diagrams/deployment-boundary.mmd).
 
-## 7. Deployment Boundaries and Differences
+## Safety and grounding invariants
 
-The deployment diagram separates infrastructure hosting from model inference providers.
+- Red-flag triage does not depend on model output.
+- Urgent/blocked requests do not enter ordinary weekly planning.
+- Missing/conflicting data lowers certainty rather than being silently imputed into facts.
+- The system does not produce diagnoses or medication-change instructions.
+- Every evidence-requiring factual claim must be traceable to personal or curated external evidence as defined by the verifier contract.
+- A failed draft can be rewritten only once; a second failure degrades to a controlled safe response.
+- External evidence and model completions are both untrusted inputs to trusted verification code.
 
-| Environment / provider | What runs there | Data boundary | Role |
-|---|---|---|---|
-| Local Docker Compose | Expo-facing FastAPI/Agent container, local PostgreSQL/SQLite, local logs, optional local model or local Radeon/ROCm runtime | can keep application data and inference inside the developer/operator boundary; `local_strict` prohibits silent cloud fallback | development, reproducibility and strict-local demonstration |
-| AWS | FastAPI service, managed database/storage, secret injection and network controls | user data is hosted in the configured AWS deployment boundary; outbound model calls are separately controlled | concrete cloud deployment target / reviewer backend |
-| Cloud model provider | hosted model endpoint only | third-party processor receives the minimized `ModelRequest`, not database access | vendor-neutral external inference option |
-| Local Radeon provider | Radeon/ROCm runtime inside the local operator boundary | no model egress when selected; uses the same minimized ModelProvider contract | optional local AMD extension |
-| Hosted Radeon provider | Radeon-hosted model runtime outside the application/AWS boundary | third-party egress of the minimized `ModelRequest`; never receives database credentials or access | optional hosted AMD extension, not an B core dependency |
+## Limitations and non-goals
 
-The core dependency is:
+This architecture is for a research prototype using synthetic/openly licensed data. It is not a clinical system, medical device, emergency service, clinical-risk predictor or treatment recommender. It does not provide medication initiation/cessation/dose advice. It is not clinically validated and does not claim that synthetic evaluation predicts real-world health outcomes.
 
-`Agent Workflow -> ModelProvider -> Endpoint`
+The core system also does not implement full FHIR conformance, live EHR/commercial-wearable integrations, model training/fine-tuning, reinforcement learning, unconstrained autonomous action, regulatory certification, penetration-tested production security or 24/7 service guarantees.
 
-The workflow does not depend on AWS, a specific LLM vendor, or Radeon-specific APIs. AWS is an infrastructure deployment choice; Cloud Model Provider and local/hosted Radeon Provider are inference choices behind ModelProvider. Provider responses are untrusted drafts until verification.
+The reviewer deployment uses the mock model provider for deterministic public demonstration. Free demo infrastructure may cold-start after inactivity and is not a durable production storage/SLA design.
 
-## 8. Architecture Acceptance Checklist
+## Reproducibility evidence
 
-This task is complete when all of the following remain true:
+Architecture-sensitive behavior is covered by automated tests and CI:
 
-- [x] React Native / Expo, FastAPI, bounded agent workflow, tools/RAG, persistence and model provider are separated in the system diagram.
-- [x] Safety Triage, Context Builder, Tool Router, Evidence Retriever, Planner, Verifier and Composer are present in the state flow.
-- [x] User data, external guidance, logs/audit and model endpoints have explicit trust boundaries.
-- [x] Local Docker, AWS, Cloud Model Provider and Radeon Provider responsibilities are distinguished.
-- [x] Every architecture module has declared input and output contracts.
-- [x] Sensitive boundary crossings are explicitly described; no model-to-database path exists.
-- [x] Mermaid source files are the maintained diagram artifacts.
-- [x] PNG and Excalidraw exports are not required by the agreed acceptance criteria.
-- [x] Diagram edge direction matches the declared read/write contract.
-- [x] Forbidden model-to-data, external-text-to-policy and raw-sensitive-data-to-log paths are explicit.
+- repository quality tests validate backend/frontend contracts;
+- complete evaluation/red-team gates exercise the bounded workflow and safety invariants;
+- CP-019 builds the production image with PostgreSQL and verifies migrations plus health endpoints;
+- CP-020 executes the recorded primary browser journey against both an integrated Docker deployment and the real reviewer origin;
+- CP-021 executes the README clean-start command from a fresh GitHub-hosted runner, verifies the reviewer HTML/API readiness, and checks the documentation/diagram contract.
 
-## 9. Implementation Order
-
-`ISSUE_BOARD.md` is the only canonical implementation order and dependency graph. This architecture document does not redefine issue sequencing. Work may begin only when the corresponding CP issue is Ready under the board policy.
+See [`../evaluation/COMPLETE_EVALUATION.md`](../evaluation/COMPLETE_EVALUATION.md) for synthetic benchmark methodology and results, and [`../deployment/README.md`](../deployment/README.md) for deployment/fallback procedures.

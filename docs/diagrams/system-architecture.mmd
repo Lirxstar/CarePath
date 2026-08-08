@@ -1,72 +1,66 @@
 flowchart LR
   subgraph Client["TB-1 · User device / public client boundary"]
-    RN["React Native / Expo\nToday · Coach · Health Data · Plan & History"]
+    UI["React Native / Expo\nToday · Coach · Health Data · Plan & History"]
   end
 
-  subgraph App["Trusted application and policy boundary"]
-    API["FastAPI\nschema validation · consent · request/interaction ID"]
-    WF["Bounded Agent Workflow\nSafety → Context → Tools/RAG → Plan → Verify → Compose"]
-    TOOLS["Deterministic time-series tools\ntrend · period comparison · missingness · adherence"]
-    PRAG["Personal Context Retriever\nuser-scoped access only"]
-    ERAG["External Evidence Retriever\ncurated namespace only"]
-    INGEST["Evidence ingestion gate\nprovenance · licence · hash · hostile-content handling"]
-    MP["ModelProvider\nvendor-neutral allow-listed payload"]
-    AUDIT["Audit writer\nschema-controlled refs + summaries"]
+  subgraph Application["Trusted application and policy boundary"]
+    API["FastAPI\nschema validation · request IDs · API contracts"]
+    SAFE["Safety Triage\ndeterministic rules"]
+    CTX["Context Builder\nminimal task context"]
+    ROUTER["Tool Router\ntyped allow-listed calls"]
+    TOOLS["Deterministic time-series tools\ntrend · windows · change · missingness · adherence"]
+    PERSONAL["Personal Context Retriever\nuser-scoped namespace"]
+    EXTERNAL["External Evidence Retriever\ncurated namespace"]
+    PLAN["Planner\nsmall seven-day actions"]
+    VERIFY["Grounding & Safety Verifier\none bounded rewrite"]
+    COMPOSE["Response Composer\nstructured answer + uncertainty"]
+    PROVIDER["ModelProvider\nreplaceable approved endpoint"]
   end
 
-  subgraph Data["TB-2 · User data and persistence boundary"]
-    DB[("User-scoped application records\nPostgreSQL · SQLite for local development")]
-    PNS[("Personal retrieval namespace\nisolated by user/persona")]
+  subgraph UserData["TB-2 · User data / persistence boundary"]
+    DB[("User-scoped records\nPostgreSQL · SQLite for development")]
+    PERSONAL_NS[("Personal retrieval namespace\nisolated by user/persona")]
   end
 
   subgraph Evidence["TB-3 · External evidence lifecycle boundary"]
-    EXT["Public health / behavioural guidance\nUNTRUSTED before ingestion"]
-    ENS[("Curated evidence namespace\npublic guidance + provenance")]
+    SOURCE["Public health / behavioural guidance\nuntrusted before ingestion"]
+    INGEST["Evidence ingestion gate\nsource · licence · hash · sanitization"]
+    CORPUS[("Curated evidence namespace\nchunks + provenance")]
   end
 
   subgraph Model["TB-4 · Model endpoint boundary"]
-    CLOUD["Cloud model endpoint\nthird-party processor"]
-    RADEON["Radeon/ROCm endpoint\nlocal or hosted AMD extension"]
+    ENDPOINT["Approved local or remote model endpoint\nminimized payload · no database access"]
   end
 
-  subgraph Logs["TB-5 · Audit and operational logging boundary"]
-    AUDITDB[("Audit events\nordered refs + bounded summaries")]
-    OPSLOG[("Operational logs\nIDs · route · status · latency · error class")]
+  subgraph Audit["TB-5 · Feedback, audit and operations"]
+    AUDIT[("Audit events\nrefs + bounded summaries")]
+    LOGS[("Operational logs\nIDs · route · status · latency · error class")]
   end
 
-  RN -->|"HTTPS · authenticated + consented request / feedback · no server secrets"| API
-  API -->|"validated InteractionRequest · request/interaction ID"| WF
-  WF -->|"verified structured result"| API
-  API -->|"response JSON · risk/evidence/plan/audit reference"| RN
+  UI -->|"authenticated + consented"| API
+  API --> SAFE --> CTX --> ROUTER
+  ROUTER --> TOOLS
+  ROUTER --> PERSONAL
+  ROUTER --> EXTERNAL
+  TOOLS --> PLAN
+  PERSONAL --> PLAN
+  EXTERNAL --> PLAN
+  PLAN --> VERIFY --> COMPOSE --> API
+  API -->|"structured response"| UI
 
-  WF -->|"bounded parameters + user-scoped observation refs"| TOOLS
-  TOOLS -->|"trends + missingness + source observation refs"| WF
-  TOOLS -->|"authorized user-scoped read request"| DB
-  DB -->|"selected observations only"| TOOLS
+  CTX <-->|"user-scoped"| DB
+  TOOLS <-->|"selected observations only"| DB
+  PERSONAL <-->|"minimal personal context"| PERSONAL_NS
+  API -->|"validated plan / feedback writes"| DB
 
-  WF -->|"user/persona-scoped retrieval query + allowed record types"| PRAG
-  PRAG -->|"minimal personal context + record refs"| WF
-  PRAG -->|"authorized namespace query"| PNS
-  PNS -->|"matching user-scoped snippets only"| PRAG
-  API -->|"validated state write"| DB
-  DB -->|"authorized task-specific state read"| API
+  SOURCE -->|"document + metadata"| INGEST
+  INGEST -->|"validated/sanitized chunks"| CORPUS
+  EXTERNAL <-->|"eligible chunks + provenance"| CORPUS
 
-  WF -->|"curated evidence query · no policy instructions"| ERAG
-  ERAG -->|"evidence chunks + source/chunk IDs + provenance"| WF
-  ERAG -->|"curated namespace query"| ENS
-  ENS -->|"eligible chunks + provenance"| ERAG
-  EXT -->|"untrusted document + source metadata"| INGEST
-  INGEST -->|"validated/sanitized chunks + provenance + content hash"| ENS
+  PLAN <-->|"sanitized ModelRequest / normalized draft"| PROVIDER
+  PROVIDER -->|"no DB credentials/access"| ENDPOINT
+  ENDPOINT -->|"untrusted completion"| PROVIDER
 
-  WF -->|"sanitized minimal ModelRequest · explicit field allowlist"| MP
-  MP -->|"minimized request · no DB credentials/access"| CLOUD
-  CLOUD -->|"untrusted completion / structured output"| MP
-  MP -. "same minimized contract · AMD extension" .-> RADEON
-  RADEON -. "untrusted completion / structured output" .-> MP
-  MP -->|"normalized ModelResponse"| WF
-
-  WF -->|"component decisions + refs + disposition only"| AUDIT
-  API -->|"request/interaction refs + response status only"| AUDIT
-  AUDIT -->|"schema-controlled audit event"| AUDITDB
-  API -->|"request ID · route · status · latency only"| OPSLOG
-  WF -->|"component · status · latency · error class only"| OPSLOG
+  API -->|"schema-controlled audit event"| AUDIT
+  COMPOSE -->|"decision refs + disposition"| AUDIT
+  API -->|"status · latency · error class only"| LOGS

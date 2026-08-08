@@ -1,0 +1,69 @@
+name: CP-021 docs and clean setup
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+    paths:
+      - README.md
+      - Dockerfile
+      - compose.yaml
+      - deployment/**
+      - docs/architecture.md
+      - docs/diagrams/**
+      - docs/verify_cp021_docs.py
+      - .github/workflows/cp021-docs-clean-setup.yml
+
+permissions:
+  contents: read
+
+jobs:
+  clean-room:
+    name: README clean-room startup
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Verify reviewer documentation contract
+        run: python docs/verify_cp021_docs.py
+
+      - name: Run README one-command startup
+        run: docker compose --env-file deployment/.env.compose.example up -d --build --wait
+
+      - name: Verify reviewer root and backend readiness
+        run: |
+          python - <<'PY'
+          import urllib.request
+
+          request = urllib.request.Request(
+              "http://127.0.0.1:8000/",
+              headers={"Accept": "text/html"},
+          )
+          with urllib.request.urlopen(request, timeout=15) as response:
+              body = response.read().decode("utf-8")
+              content_type = response.headers.get("Content-Type", "")
+          if "text/html" not in content_type.lower():
+              raise SystemExit(f"reviewer root content type is not HTML: {content_type}")
+          if "<!doctype html" not in body.lower():
+              raise SystemExit("reviewer root is not the Expo Web document")
+          PY
+          python deployment/verify_backend.py http://127.0.0.1:8000
+
+      - name: Verify database migration head
+        run: |
+          docker compose --env-file deployment/.env.compose.example exec -T api \
+            python -m alembic current | tee /tmp/alembic-current.txt
+          grep -F "(head)" /tmp/alembic-current.txt
+
+      - name: Show clean-room service logs on failure
+        if: failure()
+        run: |
+          docker compose --env-file deployment/.env.compose.example ps || true
+          docker compose --env-file deployment/.env.compose.example logs --no-color || true
+
+      - name: Tear down clean-room stack
+        if: always()
+        run: docker compose --env-file deployment/.env.compose.example down -v --remove-orphans
