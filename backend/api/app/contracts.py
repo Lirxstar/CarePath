@@ -94,6 +94,12 @@ class PlanFeedbackRequest(BaseModel):
     response: FeedbackResponse
     completion_ratio: float | None = Field(default=None, ge=0, le=1)
     reason_text: str | None = Field(default=None, min_length=1, max_length=2_000)
+    submission_key: str | None = Field(
+        default=None,
+        min_length=8,
+        max_length=64,
+        pattern=r"^[A-Za-z0-9._:-]+$",
+    )
 
 
 class PlanFeedbackResponse(BaseModel):
