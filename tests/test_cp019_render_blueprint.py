@@ -9,10 +9,7 @@ def test_render_blueprint_pins_free_instances() -> None:
 
     assert "  - name: carepath-db\n    plan: free\n" in content
     assert (
-        "  - type: web\n"
-        "    name: carepath-api\n"
-        "    runtime: docker\n"
-        "    plan: free\n"
+        "  - type: web\n    name: carepath-api\n    runtime: docker\n    plan: free\n"
     ) in content
     assert content.count("plan: free") == 2
 
