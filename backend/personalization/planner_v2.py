@@ -9,7 +9,6 @@ from typing import Literal, Self
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from backend.agents.context_builder import UserStateSummary
-from backend.analysis_quality import ReliabilityLevel
 from backend.domain.models import ActionDifficulty, Domain, MetricType
 from backend.retrieval.evidence import ClaimScope, EvidenceBundle
 
@@ -125,10 +124,7 @@ class PersonalizedInterventionPlanner:
             and not isinstance(profile_adherence, bool)
         ):
             completion = max(0.0, min(1.0, float(profile_adherence)))
-        accepted_feedback_present = (
-            summary.adherence.total_feedback_count > summary.adherence.scored_feedback_count
-            and summary.adherence.reliability is not ReliabilityLevel.LOW
-        )
+        accepted_feedback_present = summary.adherence.accepted_count > 0
 
         metric = summary.metric(_DOMAIN_METRIC[domain], 7)
         data_limited = metric is None or not metric.data_sufficient
