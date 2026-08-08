@@ -51,7 +51,9 @@ def public_runtime_config(request: Request) -> PublicRuntimeConfig:
     return PublicRuntimeConfig(
         auth_enabled=auth_enabled,
         supabase_url=settings.supabase_url if auth_enabled else None,
-        supabase_publishable_key=key.get_secret_value() if auth_enabled and key is not None else None,
+        supabase_publishable_key=key.get_secret_value()
+        if auth_enabled and key is not None
+        else None,
         private_session_ttl_minutes=settings.private_session_ttl_minutes,
     )
 
