@@ -1,5 +1,10 @@
-import { describe, expect, test } from "@jest/globals";
+import { afterEach, describe, expect, test } from "@jest/globals";
 
+import {
+  resetRuntimeAuthState,
+  setRuntimeAccountUserId,
+  setRuntimePrivateSession,
+} from "../auth/runtimeState";
 import { buildDemoScenario } from "./demoScenario";
 import {
   buildCustomScenario,
@@ -10,6 +15,17 @@ import {
 function expectSubjectNull(format: CustomImportFormat, content: string): void {
   expect(extractCustomImportSubject(format, content)).toBeNull();
 }
+
+function validCustomContent(userId = "33333333-3333-4333-8333-333333333333"): string {
+  return JSON.stringify({
+    profile: { user_id: userId },
+    observations: [{ observed_at: "2026-08-08T10:00:00+09:00" }],
+  });
+}
+
+afterEach(() => {
+  resetRuntimeAuthState();
+});
 
 describe("custom import subject adoption", () => {
   test("extracts user and latest observation date from JSON", () => {
@@ -126,20 +142,39 @@ describe("custom import subject adoption", () => {
     expectSubjectNull("csv", "user_id,observed_at\n77777777-7777-4777-8777-777777777777,invalid");
   });
 
-  test("builds a reviewer-facing scenario using imported subject identifiers", () => {
-    const base = buildDemoScenario();
-    const scenario = buildCustomScenario(
-      "json",
-      JSON.stringify({
-        profile: { user_id: "33333333-3333-4333-8333-333333333333" },
-        observations: [{ observed_at: "2026-08-08T10:00:00+09:00" }],
-      }),
-      base,
-    );
+  test("builds a standard reviewer scenario using imported subject identifiers", () => {
+    const scenario = buildCustomScenario("json", validCustomContent(), buildDemoScenario());
 
     expect(scenario?.userId).toBe("33333333-3333-4333-8333-333333333333");
     expect(scenario?.endDate).toBe("2026-08-08");
     expect(scenario?.displayName).toBe("Your imported data");
+    expect(scenario?.description).toMatch(/may be retained/u);
+  });
+
+  test("binds signed-in imports to the stable account user", () => {
+    setRuntimeAccountUserId("99999999-9999-4999-8999-999999999999");
+    const scenario = buildCustomScenario("json", validCustomContent(), buildDemoScenario());
+
+    expect(scenario?.userId).toBe("99999999-9999-4999-8999-999999999999");
+    expect(scenario?.description).toMatch(/signed-in CarePath account/u);
+  });
+
+  test("describes private imports as non-persistent", () => {
+    setRuntimePrivateSession("private-session");
+    const scenario = buildCustomScenario("json", validCustomContent(), buildDemoScenario());
+
+    expect(scenario?.userId).toBe("33333333-3333-4333-8333-333333333333");
+    expect(scenario?.description).toMatch(/temporary server memory/u);
+    expect(scenario?.description).toMatch(/not written to persistent storage/u);
+  });
+
+  test("private signed-in imports keep account identity inside the isolated workspace", () => {
+    setRuntimeAccountUserId("99999999-9999-4999-8999-999999999999");
+    setRuntimePrivateSession("private-session");
+    const scenario = buildCustomScenario("json", validCustomContent(), buildDemoScenario());
+
+    expect(scenario?.userId).toBe("99999999-9999-4999-8999-999999999999");
+    expect(scenario?.description).toMatch(/Private mode/u);
   });
 
   test("does not build a custom scenario when subject metadata is missing", () => {
