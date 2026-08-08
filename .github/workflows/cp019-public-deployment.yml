@@ -1,0 +1,43 @@
+name: CP-019 public deployment
+
+on:
+  pull_request:
+    paths:
+      - deployment/public_backend_url.txt
+      - deployment/verify_backend.py
+      - .github/workflows/cp019-public-deployment.yml
+  push:
+    branches:
+      - main
+    paths:
+      - deployment/public_backend_url.txt
+      - deployment/verify_backend.py
+      - .github/workflows/cp019-public-deployment.yml
+
+permissions:
+  contents: read
+
+jobs:
+  verify-public-backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Verify public backend
+        shell: bash
+        run: |
+          set -euo pipefail
+          public_url="$(tr -d '\r\n' < deployment/public_backend_url.txt)"
+          for attempt in {1..8}; do
+            echo "Public deployment verification attempt ${attempt}/8"
+            if python deployment/verify_backend.py "${public_url}"; then
+              exit 0
+            fi
+            if [ "${attempt}" -eq 8 ]; then
+              echo "Public backend did not become ready after 8 attempts." >&2
+              exit 1
+            fi
+            sleep 15
+          done
