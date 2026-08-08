@@ -11,6 +11,12 @@ import { Platform } from "react-native";
 
 import { createRuntimeApiClient } from "../api/runtime";
 import {
+  runtimeApiHeaders,
+  setRuntimeAccessToken,
+  setRuntimeAccountUserId,
+  setRuntimePrivateSession,
+} from "./runtimeState";
+import {
   AuthClientError,
   googleAuthorizeUrl,
   loadStoredSession,
@@ -64,7 +70,7 @@ interface WebRuntime {
     assign: (url: string) => void;
   };
   history?: {
-    replaceState: (data: unknown, unused: string, url?: string | URL | null) => void;
+    replaceState: (data: unknown, unused: string, url?: string | null) => void;
   };
 }
 
@@ -82,6 +88,11 @@ function errorText(error: unknown): string {
     return error.message;
   }
   return "Account operation failed.";
+}
+
+function clearAccountRuntime(): void {
+  setRuntimeAccessToken(null);
+  setRuntimeAccountUserId(null);
 }
 
 export function AuthProvider({ children, apiBaseUrl }: AuthProviderProps) {
@@ -108,10 +119,13 @@ export function AuthProvider({ children, apiBaseUrl }: AuthProviderProps) {
           saveSession(null);
           setSession(null);
           setAccount(null);
+          clearAccountRuntime();
         }
         return false;
       }
       saveSession(nextSession);
+      setRuntimeAccessToken(nextSession.accessToken);
+      setRuntimeAccountUserId(result.data.carepath_user_id);
       setSession(nextSession);
       setAccount(result.data);
       setAuthStatus("authenticated");
@@ -124,7 +138,7 @@ export function AuthProvider({ children, apiBaseUrl }: AuthProviderProps) {
   useEffect(() => {
     let cancelled = false;
     const initialise = async () => {
-      const client = createRuntimeApiClient(apiBaseUrl);
+      const client = createRuntimeApiClient(apiBaseUrl, () => ({}));
       const configResult = await client.get<PublicRuntimeConfig>("/config/public");
       if (cancelled) {
         return;
@@ -140,6 +154,7 @@ export function AuthProvider({ children, apiBaseUrl }: AuthProviderProps) {
 
       if (!config.auth_enabled) {
         saveSession(null);
+        clearAccountRuntime();
         setAuthStatus("anonymous");
         return;
       }
@@ -160,6 +175,7 @@ export function AuthProvider({ children, apiBaseUrl }: AuthProviderProps) {
 
       let restored = redirected ?? loadStoredSession();
       if (restored === null) {
+        clearAccountRuntime();
         setAuthStatus("anonymous");
         return;
       }
@@ -168,6 +184,7 @@ export function AuthProvider({ children, apiBaseUrl }: AuthProviderProps) {
           restored = await refreshSupabaseSession(config, restored.refreshToken);
         } catch (error) {
           saveSession(null);
+          clearAccountRuntime();
           if (!cancelled) {
             setAuthStatus("anonymous");
             setAuthMessage(errorText(error));
@@ -185,16 +202,7 @@ export function AuthProvider({ children, apiBaseUrl }: AuthProviderProps) {
     };
   }, [apiBaseUrl, loadAccount]);
 
-  const requestHeaders = useCallback((): Record<string, string> => {
-    const headers: Record<string, string> = {};
-    if (session !== null) {
-      headers.Authorization = `Bearer ${session.accessToken}`;
-    }
-    if (privateSessionId !== null) {
-      headers[PRIVATE_SESSION_HEADER] = privateSessionId;
-    }
-    return headers;
-  }, [privateSessionId, session]);
+  const requestHeaders = useCallback((): Record<string, string> => runtimeApiHeaders(), []);
 
   const signInEmail = useCallback(
     async (email: string, password: string) => {
@@ -208,6 +216,7 @@ export function AuthProvider({ children, apiBaseUrl }: AuthProviderProps) {
         const nextSession = await signInWithPassword(runtimeConfig, email.trim(), password);
         await loadAccount(nextSession);
       } catch (error) {
+        clearAccountRuntime();
         setAuthStatus("anonymous");
         setAuthMessage(errorText(error));
       } finally {
@@ -228,12 +237,14 @@ export function AuthProvider({ children, apiBaseUrl }: AuthProviderProps) {
       try {
         const result = await signUpWithPassword(runtimeConfig, email.trim(), password);
         if (result.session === null) {
+          clearAccountRuntime();
           setAuthStatus("anonymous");
           setAuthMessage("Registration received. Check your email to confirm the account.");
         } else {
           await loadAccount(result.session);
         }
       } catch (error) {
+        clearAccountRuntime();
         setAuthStatus("anonymous");
         setAuthMessage(errorText(error));
       } finally {
@@ -250,7 +261,7 @@ export function AuthProvider({ children, apiBaseUrl }: AuthProviderProps) {
     }
     if (Platform.OS !== "web") {
       setAuthMessage(
-        "Google sign-in is enabled for the Web demo. Native OAuth can be added with platform client IDs later.",
+        "Google sign-in is enabled for the Web demo. Email sign-in remains available in Expo Go.",
       );
       return;
     }
@@ -276,14 +287,18 @@ export function AuthProvider({ children, apiBaseUrl }: AuthProviderProps) {
       setAuthMessage(null);
       try {
         if (enabled) {
-          const headers = (): Record<string, string> =>
-            session === null ? {} : { Authorization: `Bearer ${session.accessToken}` };
-          const client = createRuntimeApiClient(apiBaseUrl, headers);
+          const client = createRuntimeApiClient(apiBaseUrl, () => {
+            if (session === null) {
+              return {};
+            }
+            return { Authorization: `Bearer ${session.accessToken}` };
+          });
           const result = await client.post<PrivateSessionResponse>("/privacy/session", {});
           if (!result.ok) {
             setAuthMessage(result.error.message);
             return;
           }
+          setRuntimePrivateSession(result.data.session_id);
           setPrivateSessionId(result.data.session_id);
           setPrivateTtlMinutes(result.data.ttl_minutes);
           setAuthMessage(
@@ -301,6 +316,7 @@ export function AuthProvider({ children, apiBaseUrl }: AuthProviderProps) {
             });
             await client.post("/privacy/session/end", {});
           }
+          setRuntimePrivateSession(null);
           setPrivateSessionId(null);
           setAuthMessage("Private mode is off. Standard demo storage rules apply to new activity.");
         }
@@ -321,6 +337,7 @@ export function AuthProvider({ children, apiBaseUrl }: AuthProviderProps) {
         await signOutSupabase(runtimeConfig, session.accessToken);
       }
       saveSession(null);
+      clearAccountRuntime();
       setSession(null);
       setAccount(null);
       setAuthStatus("anonymous");
