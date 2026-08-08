@@ -116,7 +116,7 @@ def verify_local_links(path: Path, text: str) -> None:
     for raw_target in LINK_RE.findall(text):
         target = raw_target.strip().split(maxsplit=1)[0].strip("<>")
         parsed = urlparse(target)
-        if parsed.scheme or target.startswith("#") or target.startswith("mailto:"):
+        if parsed.scheme or target.startswith(("#", "mailto:")):
             continue
         clean_target = target.split("#", 1)[0].split("?", 1)[0]
         if not clean_target:
