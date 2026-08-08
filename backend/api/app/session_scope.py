@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Generator
 from http import HTTPStatus
-from typing import Annotated, cast
+from typing import Annotated
 from uuid import UUID
 
 from fastapi import Depends, Request
@@ -38,7 +38,7 @@ def get_request_session(
         return
 
     session_id = parse_private_session_id(raw_session_id)
-    store = cast(PrivateSessionStore, request.app.state.private_sessions)
+    store: PrivateSessionStore = request.app.state.private_sessions
     try:
         scoped_session = store.open(session_id)
     except KeyError as exc:
