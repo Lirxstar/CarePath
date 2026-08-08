@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 JsonObject = dict[str, Any]
+ProviderMetadata = JsonObject
 
 
 class LLMProvider(ABC):
@@ -20,6 +21,17 @@ class LLMProvider(ABC):
         schema: JsonObject,
         **kwargs: Any,
     ) -> JsonObject: ...
+
+    async def generate_structured_with_metadata(
+        self,
+        prompt: str,
+        schema: JsonObject,
+        **kwargs: Any,
+    ) -> tuple[JsonObject, ProviderMetadata]:
+        """Return structured output plus provider-safe metadata when available."""
+
+        result = await self.generate_structured(prompt, schema, **kwargs)
+        return result, {}
 
     @abstractmethod
     async def health_check(self) -> JsonObject: ...
