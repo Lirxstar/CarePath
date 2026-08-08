@@ -88,7 +88,7 @@ class SupabaseAuthVerifier:
             )
 
         try:
-            payload = cast(object, response.json())
+            payload = response.json()
         except ValueError as exc:
             raise AuthServiceUnavailableError("Supabase Auth returned invalid JSON") from exc
         if not isinstance(payload, dict):
