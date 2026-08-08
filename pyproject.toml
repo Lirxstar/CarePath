@@ -35,6 +35,7 @@ carepath-db = "backend.storage.cli:main"
 carepath-evaluate = "backend.evaluation.cli:main"
 carepath-evaluate-complete = "backend.evaluation.complete:main"
 carepath-index = "backend.retrieval.vector_cli:main"
+carepath-privacy-egress = "backend.evaluation.privacy_egress:main"
 
 [tool.setuptools.packages.find]
 include = ["backend*"]
