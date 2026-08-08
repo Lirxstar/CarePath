@@ -13,7 +13,7 @@
 **Run locally from a clean clone.** With Docker Engine and Docker Compose v2 installed:
 
 ```bash
-docker compose --env-file deployment/.env.compose.example up --build --wait
+docker compose --env-file deployment/.env.compose.example up -d --build --wait
 ```
 
 Then open **http://127.0.0.1:8000/**. The same container serves the Expo Web reviewer client and FastAPI; PostgreSQL runs as the second Compose service. Stop with `docker compose --env-file deployment/.env.compose.example down`.
