@@ -8,7 +8,7 @@ export default defineConfig({
   workers: 1,
   outputDir: "../../../docs/evidence/v08/run",
   use: {
-    baseURL: "http://127.0.0.1:4173",
+    baseURL: process.env.CAREPATH_E2E_BASE_URL ?? "http://127.0.0.1:4173",
     viewport: { width: 390, height: 844 },
     video: "on",
     trace: "on",
