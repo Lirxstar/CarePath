@@ -65,8 +65,7 @@ class SupabaseAuthVerifier:
             cached = self._cache.get(digest)
             if cached is not None and cached.expires_at > now:
                 return cached.identity
-            if cached is not None:
-                self._cache.pop(digest, None)
+            self._cache.pop(digest, None)
 
         try:
             response = httpx.get(
