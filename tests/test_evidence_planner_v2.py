@@ -95,14 +95,20 @@ def _metric(metric: MetricType, mean: float) -> MetricWindowSummary:
     )
 
 
-def _summary(*, completion: float) -> UserStateSummary:
+def _summary(
+    *,
+    completion: float | None,
+    scored_feedback_count: int = 7,
+    total_feedback_count: int = 7,
+    reliability: ReliabilityLevel = ReliabilityLevel.HIGH,
+) -> UserStateSummary:
     user_id = uuid4()
     adherence = AdherenceContext(
         completion_rate=completion,
         recent_completion_rate=completion,
-        scored_feedback_count=7,
-        total_feedback_count=7,
-        reliability=ReliabilityLevel.HIGH,
+        scored_feedback_count=scored_feedback_count,
+        total_feedback_count=total_feedback_count,
+        reliability=reliability,
         source_record_ids=("feedback-1",),
     )
     return UserStateSummary(
@@ -161,6 +167,37 @@ def test_planner_v2_is_schema_valid_evidence_aware_and_reduces_low_adherence() -
     assert "external:activity-1" in high.evidence_ids
     assert all(action.alternatives for action in high.actions)
     assert "completion" in low.rationale
+
+
+def test_planner_v2_accept_feedback_maintains_scope_with_explanation() -> None:
+    planner = PersonalizedInterventionPlanner()
+    accepted = planner.plan(
+        summary=_summary(
+            completion=None,
+            scored_feedback_count=0,
+            total_feedback_count=1,
+            reliability=ReliabilityLevel.HIGH,
+        ),
+        evidence=EvidenceAggregator().build(external_hits=(_external_hit(),)),
+        start_date=date(2026, 7, 31),
+        request_text="Build a physical activity plan",
+    )
+    no_feedback = planner.plan(
+        summary=_summary(
+            completion=None,
+            scored_feedback_count=0,
+            total_feedback_count=0,
+            reliability=ReliabilityLevel.HIGH,
+        ),
+        evidence=EvidenceAggregator().build(external_hits=(_external_hit(),)),
+        start_date=date(2026, 7, 31),
+        request_text="Build a physical activity plan",
+    )
+
+    assert accepted.difficulty == no_feedback.difficulty
+    assert accepted.actions[0].description == no_feedback.actions[0].description
+    assert "accepted feedback supports maintaining" in accepted.rationale
+    assert accepted.rationale != no_feedback.rationale
 
 
 def test_planner_v2_labels_unreferenced_fallback_as_general_low_risk() -> None:
