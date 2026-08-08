@@ -215,12 +215,9 @@ export class PlanHistoryApi {
       ...payload,
     });
     this.pendingFeedback.set(submissionKey, request);
-    const cleanup = () => {
-      if (this.pendingFeedback.get(submissionKey) === request) {
-        this.pendingFeedback.delete(submissionKey);
-      }
-    };
-    void request.then(cleanup, cleanup);
+    void request.finally(() => {
+      this.pendingFeedback.delete(submissionKey);
+    });
     return request;
   }
 }
