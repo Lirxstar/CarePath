@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Generator
-from datetime import date
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from uuid import UUID, uuid4
 
@@ -110,15 +110,9 @@ def _primary_package() -> tuple[dict[str, object], UUID, UUID, list[UUID]]:
     plan_id = uuid4()
     interaction_id = uuid4()
     action_ids = [uuid4() for _ in range(7)]
-    action_dates = (
-        "2026-07-30",
-        "2026-07-31",
-        "2026-08-01",
-        "2026-08-02",
-        "2026-08-03",
-        "2026-08-04",
-        "2026-08-05",
-    )
+    plan_start = datetime.now(UTC).date()
+    plan_end = plan_start + timedelta(days=6)
+    action_dates = tuple((plan_start + timedelta(days=offset)).isoformat() for offset in range(7))
     actions: list[dict[str, object]] = []
     for index, (action_id, action_date) in enumerate(zip(action_ids, action_dates, strict=True)):
         actions.append(
@@ -197,8 +191,8 @@ def _primary_package() -> tuple[dict[str, object], UUID, UUID, list[UUID]]:
                     "user_id": str(user_id),
                     "goal_id": str(goal_id),
                     "version": 1,
-                    "start_date": "2026-07-30",
-                    "end_date": "2026-08-05",
+                    "start_date": plan_start.isoformat(),
+                    "end_date": plan_end.isoformat(),
                     "status": "active",
                     "generation_interaction_id": str(interaction_id),
                 }
