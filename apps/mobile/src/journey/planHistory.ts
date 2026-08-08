@@ -7,12 +7,7 @@ import type {
 } from "./apiTypes";
 
 export type PlanFeedbackKind =
-  | "accepted"
-  | "rejected"
-  | "modified"
-  | "completed"
-  | "partially_completed"
-  | "not_completed";
+  "accepted" | "rejected" | "modified" | "completed" | "partially_completed" | "not_completed";
 
 export interface PlanHistoryItem {
   plan: InterventionPlan;
