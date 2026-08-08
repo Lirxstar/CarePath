@@ -1,4 +1,9 @@
-import { CarePathApiClient, type ApiFetcher, type ApiRequestInit } from "./client";
+import {
+  CarePathApiClient,
+  type ApiFetcher,
+  type ApiHeaderProvider,
+  type ApiRequestInit,
+} from "./client";
 
 export const LOCAL_API_URL = "http://127.0.0.1:8000";
 export const SAME_ORIGIN_API_URL = "__CAREPATH_SAME_ORIGIN__";
@@ -38,9 +43,13 @@ const expoFetch: RuntimeFetch = async (url, init) => {
   };
 };
 
-export function createRuntimeApiClient(baseUrl?: string): CarePathApiClient {
+export function createRuntimeApiClient(
+  baseUrl?: string,
+  headerProvider: ApiHeaderProvider = () => ({}),
+): CarePathApiClient {
   return new CarePathApiClient(
     baseUrl ?? resolveApiBaseUrl(process.env.EXPO_PUBLIC_CAREPATH_API_URL),
     createRuntimeFetcher(expoFetch),
+    headerProvider,
   );
 }
