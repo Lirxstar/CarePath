@@ -2,18 +2,19 @@ from __future__ import annotations
 
 from collections.abc import Generator
 from http import HTTPStatus
-from typing import cast
+from typing import Annotated, cast
 from uuid import UUID
 
-from fastapi import Request
+from fastapi import Depends, Request
 from sqlalchemy.orm import Session
 
-from backend.storage.database import SessionLocal
+from backend.storage.database import get_session
 from backend.storage.private_sessions import PrivateSessionStore
 
 from .errors import CarePathError
 
 PRIVATE_SESSION_HEADER = "X-CarePath-Private-Session"
+PersistentSessionDependency = Annotated[Session, Depends(get_session)]
 
 
 def parse_private_session_id(value: str) -> UUID:
@@ -27,11 +28,13 @@ def parse_private_session_id(value: str) -> UUID:
         ) from exc
 
 
-def get_request_session(request: Request) -> Generator[Session, None, None]:
+def get_request_session(
+    request: Request,
+    persistent_session: PersistentSessionDependency,
+) -> Generator[Session, None, None]:
     raw_session_id = request.headers.get(PRIVATE_SESSION_HEADER)
     if raw_session_id is None:
-        with SessionLocal() as session:
-            yield session
+        yield persistent_session
         return
 
     session_id = parse_private_session_id(raw_session_id)
