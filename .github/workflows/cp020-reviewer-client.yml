@@ -44,7 +44,7 @@ jobs:
           with urllib.request.urlopen(root_request, timeout=15) as response:
               body = response.read().decode("utf-8")
               content_type = response.headers.get("Content-Type", "")
-          if "text/html" not in content_type or "<!DOCTYPE html" not in body.upper():
+          if "text/html" not in content_type or "<!DOCTYPE HTML" not in body.upper():
               raise SystemExit("reviewer root is not the Expo Web document")
 
           with urllib.request.urlopen("http://127.0.0.1:8000/health/ready", timeout=15) as response:
@@ -118,6 +118,7 @@ jobs:
         run: |
           set -euo pipefail
           public_url="$(tr -d '\r\n' < deployment/public_backend_url.txt)"
+          echo "CAREPATH_E2E_BASE_URL=${public_url}" >> "${GITHUB_ENV}"
           for attempt in {1..80}; do
             echo "Reviewer deployment probe ${attempt}/80"
             if curl --fail --silent --show-error \
@@ -135,8 +136,6 @@ jobs:
 
       - name: Run primary journey against public deployment
         working-directory: apps/mobile
-        env:
-          CAREPATH_E2E_BASE_URL: https://carepath-api-8edq.onrender.com
         run: npx playwright test --config=e2e/playwright.v08.config.ts
 
       - name: Upload public reviewer evidence
