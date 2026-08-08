@@ -40,12 +40,14 @@ function jsonResponse(payload: unknown, status = 200): Response {
   });
 }
 
-function setFetch(handler: (url: string, init?: RequestInit) => Promise<Response>): void {
-  globalThis.fetch = ((input: string | URL | Request, init?: RequestInit) =>
-    handler(
-      typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url,
-      init,
-    )) as typeof fetch;
+function setFetch(handler: (url: string, init?: RequestInit) => Response | Promise<Response>): void {
+  globalThis.fetch = (input, init) =>
+    Promise.resolve(
+      handler(
+        typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url,
+        init,
+      ),
+    );
 }
 
 class MemoryStorage {
@@ -139,10 +141,10 @@ describe("Supabase auth REST client", () => {
     let seenUrl = "";
     let seenHeaders: HeadersInit | undefined;
     let seenBody = "";
-    setFetch(async (url, init) => {
+    setFetch((url, init) => {
       seenUrl = url;
       seenHeaders = init?.headers;
-      seenBody = String(init?.body ?? "");
+      seenBody = typeof init?.body === "string" ? init.body : "";
       return jsonResponse({
         access_token: "access",
         refresh_token: "refresh",
@@ -164,7 +166,7 @@ describe("Supabase auth REST client", () => {
 
   test("derives token expiry from expires_in and default fallback", async () => {
     const now = Math.floor(Date.now() / 1000);
-    setFetch(async () =>
+    setFetch(() =>
       jsonResponse({
         access_token: "a",
         refresh_token: "r",
@@ -175,7 +177,7 @@ describe("Supabase auth REST client", () => {
     const relative = await signInWithPassword(CONFIG, "a@b.co", "password1");
     expect(relative.expiresAt).toBeGreaterThanOrEqual(now + 120);
 
-    setFetch(async () =>
+    setFetch(() =>
       jsonResponse({ access_token: "a", refresh_token: "r", token_type: "bearer" }),
     );
     const fallback = await signInWithPassword(CONFIG, "a@b.co", "password1");
@@ -190,7 +192,7 @@ describe("Supabase auth REST client", () => {
       [{ error: "error failure" }, "error failure"],
       [null, "Email sign-in failed."],
     ] as const) {
-      setFetch(async () => jsonResponse(payload, 400));
+      setFetch(() => jsonResponse(payload, 400));
       await expect(signInWithPassword(CONFIG, "a@b.co", "password1")).rejects.toThrow(expected);
     }
   });
@@ -202,7 +204,7 @@ describe("Supabase auth REST client", () => {
       { access_token: "a", token_type: "bearer" },
       { access_token: "a", refresh_token: "r" },
     ]) {
-      setFetch(async () => jsonResponse(payload));
+      setFetch(() => jsonResponse(payload));
       await expect(signInWithPassword(CONFIG, "a@b.co", "password1")).rejects.toThrow(
         "Email sign-in failed.",
       );
@@ -210,7 +212,7 @@ describe("Supabase auth REST client", () => {
   });
 
   test("registers accounts with immediate sessions or email confirmation", async () => {
-    setFetch(async () =>
+    setFetch(() =>
       jsonResponse({
         access_token: "a",
         refresh_token: "r",
@@ -222,20 +224,20 @@ describe("Supabase auth REST client", () => {
     expect(immediate.session?.accessToken).toBe("a");
     expect(immediate.confirmationRequired).toBe(false);
 
-    setFetch(async () => jsonResponse({ id: "new-user" }));
+    setFetch(() => jsonResponse({ id: "new-user" }));
     await expect(signUpWithPassword(CONFIG, "a@b.co", "password1")).resolves.toEqual({
       session: null,
       confirmationRequired: true,
     });
 
-    setFetch(async () => jsonResponse({ message: "already registered" }, 400));
+    setFetch(() => jsonResponse({ message: "already registered" }, 400));
     await expect(signUpWithPassword(CONFIG, "a@b.co", "password1")).rejects.toThrow(
       "already registered",
     );
   });
 
   test("refreshes an account session and reports invalid refreshes", async () => {
-    setFetch(async () =>
+    setFetch(() =>
       jsonResponse({
         access_token: "new-access",
         refresh_token: "new-refresh",
@@ -248,7 +250,7 @@ describe("Supabase auth REST client", () => {
       refreshToken: "new-refresh",
     });
 
-    setFetch(async () => jsonResponse({ message: "expired" }, 401));
+    setFetch(() => jsonResponse({ message: "expired" }, 401));
     await expect(refreshSupabaseSession(CONFIG, "old-refresh")).rejects.toThrow(
       "saved account session has expired",
     );
@@ -256,22 +258,17 @@ describe("Supabase auth REST client", () => {
 
   test("signs out with bearer auth and tolerates service or JSON failures", async () => {
     let authorization: string | null = null;
-    setFetch(async (_url, init) => {
+    setFetch((_url, init) => {
       authorization = new Headers(init?.headers).get("Authorization");
       return jsonResponse({});
     });
     await expect(signOutSupabase(CONFIG, "access-token")).resolves.toBeUndefined();
     expect(authorization).toBe("Bearer access-token");
 
-    globalThis.fetch = (() => Promise.reject(new Error("offline"))) as typeof fetch;
+    setFetch(() => Promise.reject(new Error("offline")));
     await expect(signOutSupabase(CONFIG, "access-token")).resolves.toBeUndefined();
 
-    globalThis.fetch = (() =>
-      Promise.resolve({
-        ok: true,
-        status: 200,
-        json: () => Promise.reject(new Error("bad json")),
-      } as Response)) as typeof fetch;
+    setFetch(() => new Response("not-json", { status: 200 }));
     await expect(signOutSupabase(CONFIG, "access-token")).resolves.toBeUndefined();
   });
 
