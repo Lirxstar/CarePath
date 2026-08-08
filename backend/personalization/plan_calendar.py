@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, tzinfo
 from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -26,6 +26,7 @@ def user_local_date(
     else:
         resolved = resolved.astimezone(UTC)
 
+    zone: tzinfo
     try:
         zone = ZoneInfo(profile.timezone)
     except ZoneInfoNotFoundError:
