@@ -1,0 +1,51 @@
+name: Temporary browser diagnostic
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  integrated-browser-diagnostic:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v6
+      - name: Build integrated reviewer quietly
+        run: |
+          docker compose --env-file deployment/.env.compose.example up -d --build --wait --wait-timeout 180 >/tmp/docker-build.log 2>&1 || {
+            tail -80 /tmp/docker-build.log
+            exit 1
+          }
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: apps/mobile/.nvmrc
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+      - name: Install browser runtime quietly
+        working-directory: apps/mobile
+        run: |
+          npm ci >/tmp/npm-ci.log 2>&1
+          npm install --no-save --package-lock=false @playwright/test@1.54.1 >>/tmp/npm-ci.log 2>&1
+          npx playwright install --with-deps chromium >/tmp/playwright-install.log 2>&1
+      - name: Run compact reviewer diagnosis
+        working-directory: apps/mobile
+        env:
+          CAREPATH_E2E_BASE_URL: http://127.0.0.1:8000
+        run: |
+          set +e
+          npx playwright test --config=e2e/playwright.v08.config.ts --reporter=line >/tmp/playwright.log 2>&1
+          status=$?
+          set -e
+          if [ "$status" -ne 0 ]; then
+            echo '--- PLAYWRIGHT FAILURE ---'
+            tail -140 /tmp/playwright.log
+            echo '--- API/REVIEWER LOG TAIL ---'
+            docker compose --env-file ../../deployment/.env.compose.example logs --no-color --tail=100 2>/dev/null || true
+            exit "$status"
+          fi
+          tail -40 /tmp/playwright.log
+      - name: Tear down
+        if: always()
+        run: docker compose --env-file deployment/.env.compose.example down -v --remove-orphans >/dev/null 2>&1 || true
