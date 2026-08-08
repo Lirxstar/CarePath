@@ -35,4 +35,9 @@ def assign_import_user(prepared: PreparedImport, user_id: UUID) -> PreparedImpor
         for record in group:
             if "user_id" in record:
                 record["user_id"] = user_id
+    for profile in assigned.user_profiles:
+        consent = profile.get("consent_flags")
+        flags = dict(consent) if isinstance(consent, dict) else {}
+        flags["account_managed"] = True
+        profile["consent_flags"] = flags
     return assigned
