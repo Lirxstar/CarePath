@@ -102,6 +102,7 @@ class AdherenceContext(BaseModel):
 
     completion_rate: float | None = Field(default=None, ge=0, le=1)
     recent_completion_rate: float | None = Field(default=None, ge=0, le=1)
+    accepted_count: int = Field(default=0, ge=0)
     scored_feedback_count: int = Field(ge=0)
     total_feedback_count: int = Field(ge=0)
     reliability: ReliabilityLevel
@@ -166,6 +167,7 @@ class ContextBuilderService:
         adherence = AdherenceContext(
             completion_rate=adherence_summary.completion_rate,
             recent_completion_rate=adherence_summary.recent.completion_rate,
+            accepted_count=adherence_summary.accepted_count,
             scored_feedback_count=adherence_summary.scored_feedback_count,
             total_feedback_count=adherence_summary.total_feedback_count,
             reliability=adherence_summary.reliability.level,

@@ -3,12 +3,13 @@ from __future__ import annotations
 import csv
 import io
 from collections.abc import Generator
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from backend.api.app.config import Settings
@@ -20,6 +21,7 @@ from backend.storage.models import (
     InteractionTable,
     InterventionPlanTable,
     PlanActionTable,
+    PlanFeedbackTable,
 )
 
 TEST_SETTINGS = Settings(environment="test", llm_provider="mock")
@@ -279,7 +281,7 @@ def test_coach_message_returns_interaction_id_and_persists_interaction(
     assert event_types[-3:] == ["plan_generated", "verification", "response_emitted"]
 
 
-def test_current_plan_feedback_and_ordered_audit_trace(
+def test_current_plan_feedback_is_idempotent_and_audit_is_ordered(
     api_client: tuple[TestClient, sessionmaker[Session]],
 ) -> None:
     client, factory = api_client
@@ -288,7 +290,8 @@ def test_current_plan_feedback_and_ordered_audit_trace(
     interaction_id = uuid4()
     plan_id = uuid4()
     action_id = uuid4()
-    now = datetime(2026, 7, 30, 6, 0, tzinfo=UTC)
+    now = datetime.now(UTC)
+    today = now.date()
 
     assert client.post("/profiles", json=_profile_payload(user_id)).status_code == 201
     with factory() as session:
@@ -323,8 +326,8 @@ def test_current_plan_feedback_and_ordered_audit_trace(
                 user_id=str(user_id),
                 goal_id=str(goal_id),
                 version=1,
-                start_date=date(2026, 7, 30),
-                end_date=date(2026, 8, 5),
+                start_date=today,
+                end_date=today + timedelta(days=6),
                 status="active",
                 generation_interaction_id=str(interaction_id),
                 supersedes_plan_id=None,
@@ -337,7 +340,7 @@ def test_current_plan_feedback_and_ordered_audit_trace(
                 plan_id=str(plan_id),
                 domain="sleep",
                 description="Keep a regular bedtime",
-                frequency="once on 2026-07-30",
+                frequency=f"once on {today.isoformat()}",
                 difficulty="low",
                 rationale="Supports the current sleep goal",
                 status="proposed",
@@ -374,28 +377,126 @@ def test_current_plan_feedback_and_ordered_audit_trace(
     assert current.json()["plan"]["plan_id"] == str(plan_id)
     assert current.json()["actions"][0]["action_id"] == str(action_id)
 
+    feedback_payload = {
+        "user_id": str(user_id),
+        "action_id": str(action_id),
+        "response": "rejected",
+        "completion_ratio": 0,
+        "reason_text": "Not feasible this week",
+        "submission_key": "feedback-current-plan-001",
+    }
+    feedback = client.post(f"/plans/{plan_id}/feedback", json=feedback_payload)
+    replay = client.post(f"/plans/{plan_id}/feedback", json=feedback_payload)
+    assert feedback.status_code == 201
+    assert replay.status_code == 201
+    assert feedback.json()["plan_id"] == str(plan_id)
+    assert feedback.json()["feedback"]["response"] == "rejected"
+    assert replay.json()["feedback"]["feedback_id"] == feedback.json()["feedback"]["feedback_id"]
+
+    conflict = client.post(
+        f"/plans/{plan_id}/feedback",
+        json={**feedback_payload, "response": "accepted", "completion_ratio": None},
+    )
+    assert conflict.status_code == 409
+    assert conflict.json()["error"]["code"] == "feedback_idempotency_conflict"
+
+    with factory() as session:
+        action = session.get(PlanActionTable, str(action_id))
+        rows = session.scalars(select(PlanFeedbackTable)).all()
+        assert action is not None
+        assert action.status == "rejected"
+        assert len(rows) == 1
+        assert rows[0].submission_key == "feedback-current-plan-001"
+
+    audit = client.get(f"/audit/{interaction_id}")
+    assert audit.status_code == 200
+    assert [event["sequence_number"] for event in audit.json()["events"]] == [1, 2]
+
+
+def test_expired_plan_is_not_current_and_rejects_new_feedback(
+    api_client: tuple[TestClient, sessionmaker[Session]],
+) -> None:
+    client, factory = api_client
+    user_id = uuid4()
+    goal_id = uuid4()
+    interaction_id = uuid4()
+    plan_id = uuid4()
+    action_id = uuid4()
+    now = datetime.now(UTC)
+    today = now.date()
+
+    assert client.post("/profiles", json=_profile_payload(user_id)).status_code == 201
+    with factory() as session:
+        session.add(
+            GoalTable(
+                goal_id=str(goal_id),
+                user_id=str(user_id),
+                domain="physical_activity",
+                description="Keep moving",
+                status="active",
+                created_at=now - timedelta(days=10),
+                target_date=None,
+            )
+        )
+        session.add(
+            InteractionTable(
+                interaction_id=str(interaction_id),
+                user_id=str(user_id),
+                request_text="Generate old plan",
+                language="en",
+                started_at=now - timedelta(days=10),
+                completed_at=now - timedelta(days=10),
+                risk_level="routine",
+                final_status="completed",
+                response_json={},
+            )
+        )
+        session.flush()
+        session.add(
+            InterventionPlanTable(
+                plan_id=str(plan_id),
+                user_id=str(user_id),
+                goal_id=str(goal_id),
+                version=1,
+                start_date=today - timedelta(days=7),
+                end_date=today - timedelta(days=1),
+                status="active",
+                generation_interaction_id=str(interaction_id),
+                supersedes_plan_id=None,
+            )
+        )
+        session.flush()
+        session.add(
+            PlanActionTable(
+                action_id=str(action_id),
+                plan_id=str(plan_id),
+                domain="physical_activity",
+                description="Take a short walk",
+                frequency=f"once on {(today - timedelta(days=7)).isoformat()}",
+                difficulty="low",
+                rationale="Old action",
+                status="proposed",
+            )
+        )
+        session.commit()
+
+    current = client.get("/plans/current", params={"user_id": str(user_id)})
+    assert current.status_code == 404
+    assert current.json()["error"]["code"] == "plan_not_found"
+
     feedback = client.post(
         f"/plans/{plan_id}/feedback",
         json={
             "user_id": str(user_id),
             "action_id": str(action_id),
-            "response": "rejected",
-            "completion_ratio": 0,
-            "reason_text": "Not feasible this week",
+            "response": "accepted",
+            "submission_key": "expired-plan-feedback-001",
         },
     )
-    assert feedback.status_code == 201
-    assert feedback.json()["plan_id"] == str(plan_id)
-    assert feedback.json()["feedback"]["response"] == "rejected"
-
+    assert feedback.status_code == 409
+    assert feedback.json()["error"]["code"] == "plan_expired"
     with factory() as session:
-        action = session.get(PlanActionTable, str(action_id))
-        assert action is not None
-        assert action.status == "rejected"
-
-    audit = client.get(f"/audit/{interaction_id}")
-    assert audit.status_code == 200
-    assert [event["sequence_number"] for event in audit.json()["events"]] == [1, 2]
+        assert session.scalars(select(PlanFeedbackTable)).all() == []
 
 
 def test_endpoint_errors_are_structured_and_do_not_expose_internal_details(

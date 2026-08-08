@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from datetime import UTC, date, datetime, timedelta
 from typing import Self
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from backend.domain.models import (
@@ -20,6 +23,7 @@ from backend.domain.models import (
 )
 from backend.personalization.analysis import difficulty_signal, summarise_adherence
 from backend.personalization.models import DifficultyDirection
+from backend.personalization.plan_calendar import user_local_date
 from backend.storage.models import (
     GoalTable,
     InteractionTable,
@@ -41,6 +45,18 @@ _ACTION_STATUS_BY_FEEDBACK: dict[FeedbackResponse, ActionStatus] = {
     FeedbackResponse.PARTIALLY_COMPLETED: ActionStatus.PARTIALLY_COMPLETED,
     FeedbackResponse.NOT_COMPLETED: ActionStatus.NOT_COMPLETED,
 }
+
+
+class PlanFeedbackWindowError(ValueError):
+    """Feedback cannot be applied to the requested plan at this time."""
+
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
+
+
+class FeedbackSubmissionConflictError(ValueError):
+    """One idempotency key was reused for a different logical feedback payload."""
 
 
 class DailyActionTemplate(BaseModel):
@@ -200,14 +216,55 @@ class InterventionPlanner:
         completion_ratio: float | None = None,
         reason_text: str | None = None,
         created_at: datetime | None = None,
+        submission_key: str | None = None,
     ) -> PlanFeedback:
-        """Persist accepted/rejected/completion feedback and update the action status."""
+        """Persist one idempotent feedback event and update the action status."""
         action = self.session.get(PlanActionTable, str(action_id))
         if action is None:
             raise ValueError("action does not exist")
         plan = self.session.get(InterventionPlanTable, action.plan_id)
         if plan is None or plan.user_id != str(user_id):
             raise ValueError("action does not belong to the user")
+
+        effective_created_at = created_at or datetime.now(UTC)
+        if effective_created_at.tzinfo is None or effective_created_at.utcoffset() is None:
+            effective_created_at = effective_created_at.replace(tzinfo=UTC)
+        else:
+            effective_created_at = effective_created_at.astimezone(UTC)
+        plan_date = user_local_date(self.session, user_id, instant=effective_created_at)
+        if PlanStatus(plan.status) is not PlanStatus.ACTIVE:
+            raise PlanFeedbackWindowError(
+                "plan_not_active",
+                "Feedback can only be recorded for the active plan version",
+            )
+        if plan_date < plan.start_date:
+            raise PlanFeedbackWindowError(
+                "plan_not_started",
+                "Feedback cannot be recorded before the plan starts",
+            )
+        if plan_date > plan.end_date:
+            raise PlanFeedbackWindowError(
+                "plan_expired",
+                "Feedback cannot be recorded after the plan has expired",
+            )
+
+        resolved_key = submission_key or self._canonical_submission_key(
+            action_id=action_id,
+            user_id=user_id,
+            response=response,
+            completion_ratio=completion_ratio,
+            reason_text=reason_text,
+        )
+        existing = self._feedback_by_submission_key(user_id, resolved_key)
+        if existing is not None:
+            self._require_matching_submission(
+                existing,
+                action_id=action_id,
+                response=response,
+                completion_ratio=completion_ratio,
+                reason_text=reason_text,
+            )
+            return self._feedback_from_row(existing)
 
         feedback = PlanFeedback(
             feedback_id=uuid4(),
@@ -216,19 +273,35 @@ class InterventionPlanner:
             response=response,
             completion_ratio=completion_ratio,
             reason_text=reason_text,
-            created_at=created_at or datetime.now(UTC),
+            created_at=effective_created_at,
         )
-        self.session.add(
-            PlanFeedbackTable(
-                feedback_id=str(feedback.feedback_id),
-                action_id=str(feedback.action_id),
-                user_id=str(feedback.user_id),
-                response=feedback.response.value,
-                completion_ratio=feedback.completion_ratio,
-                reason_text=feedback.reason_text,
-                created_at=feedback.created_at,
+        row = PlanFeedbackTable(
+            feedback_id=str(feedback.feedback_id),
+            action_id=str(feedback.action_id),
+            user_id=str(feedback.user_id),
+            response=feedback.response.value,
+            completion_ratio=feedback.completion_ratio,
+            reason_text=feedback.reason_text,
+            submission_key=resolved_key,
+            created_at=feedback.created_at,
+        )
+        try:
+            with self.session.begin_nested():
+                self.session.add(row)
+                self.session.flush()
+        except IntegrityError:
+            existing = self._feedback_by_submission_key(user_id, resolved_key)
+            if existing is None:
+                raise
+            self._require_matching_submission(
+                existing,
+                action_id=action_id,
+                response=response,
+                completion_ratio=completion_ratio,
+                reason_text=reason_text,
             )
-        )
+            return self._feedback_from_row(existing)
+
         action.status = _ACTION_STATUS_BY_FEEDBACK[feedback.response].value
         self.session.flush()
         return feedback
@@ -296,6 +369,7 @@ class InterventionPlanner:
             if pattern.pattern_type in _FAILURE_PATTERN_TYPES and pattern.count >= 2
         ]
         rejected = [item for item in feedback if item.response is FeedbackResponse.REJECTED]
+        accepted = [item for item in feedback if item.response is FeedbackResponse.ACCEPTED]
         must_reduce = bool(rejected or repeated)
         direction = (
             DifficultyDirection.REDUCE if must_reduce else signal.recommended_difficulty_direction
@@ -306,6 +380,8 @@ class InterventionPlanner:
             reasons.append("rejected_action")
         if repeated:
             reasons.append("repeated_failure")
+        if accepted and direction is DifficultyDirection.MAINTAIN:
+            reasons.append("accepted_current_difficulty")
         reasons.extend(signal.reason_codes)
 
         if must_reduce:
@@ -325,6 +401,9 @@ class InterventionPlanner:
                     ]
                 )
             )
+        elif accepted and direction is DifficultyDirection.MAINTAIN:
+            source_action_ids = tuple(dict.fromkeys(item.action_id for item in accepted))
+            source_feedback_ids = tuple(item.feedback_id for item in accepted)
         else:
             source_action_ids = signal.supporting_action_ids
             source_feedback_ids = signal.supporting_feedback_ids
@@ -365,6 +444,60 @@ class InterventionPlanner:
             if template.difficulty is ActionDifficulty.MEDIUM:
                 return template.description, ActionDifficulty.HIGH
         return template.description, template.difficulty
+
+    @staticmethod
+    def _canonical_submission_key(
+        *,
+        action_id: UUID,
+        user_id: UUID,
+        response: FeedbackResponse,
+        completion_ratio: float | None,
+        reason_text: str | None,
+    ) -> str:
+        canonical = json.dumps(
+            {
+                "action_id": str(action_id),
+                "user_id": str(user_id),
+                "response": response.value,
+                "completion_ratio": completion_ratio,
+                "reason_text": reason_text,
+            },
+            ensure_ascii=True,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+    def _feedback_by_submission_key(
+        self,
+        user_id: UUID,
+        submission_key: str,
+    ) -> PlanFeedbackTable | None:
+        return self.session.scalar(
+            select(PlanFeedbackTable).where(
+                PlanFeedbackTable.user_id == str(user_id),
+                PlanFeedbackTable.submission_key == submission_key,
+            )
+        )
+
+    @staticmethod
+    def _require_matching_submission(
+        row: PlanFeedbackTable,
+        *,
+        action_id: UUID,
+        response: FeedbackResponse,
+        completion_ratio: float | None,
+        reason_text: str | None,
+    ) -> None:
+        if (
+            row.action_id != str(action_id)
+            or row.response != response.value
+            or row.completion_ratio != completion_ratio
+            or row.reason_text != reason_text
+        ):
+            raise FeedbackSubmissionConflictError(
+                "submission_key was already used for different feedback"
+            )
 
     @staticmethod
     def _plan_from_row(row: InterventionPlanTable) -> InterventionPlan:

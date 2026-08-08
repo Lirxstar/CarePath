@@ -191,6 +191,7 @@ class PlanFeedbackTable(Base):
     response: Mapped[str] = mapped_column(String(ENUM_LENGTH), nullable=False)
     completion_ratio: Mapped[float | None] = mapped_column(Float, nullable=True)
     reason_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    submission_key: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
     __table_args__ = (
@@ -199,6 +200,12 @@ class PlanFeedbackTable(Base):
             name="ck_plan_feedback_completion_ratio",
         ),
         Index("ix_plan_feedback_user_created", "user_id", "created_at"),
+        Index(
+            "uq_plan_feedback_user_submission_key",
+            "user_id",
+            "submission_key",
+            unique=True,
+        ),
     )
 
 

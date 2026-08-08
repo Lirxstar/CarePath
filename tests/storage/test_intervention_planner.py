@@ -1,12 +1,18 @@
 from datetime import UTC, date, datetime, timedelta
 from uuid import UUID
 
+import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from backend.domain.models import ActionDifficulty, FeedbackResponse
 from backend.personalization.models import DifficultyDirection
-from backend.personalization.planner import DailyActionTemplate, InterventionPlanner
+from backend.personalization.planner import (
+    DailyActionTemplate,
+    FeedbackSubmissionConflictError,
+    InterventionPlanner,
+    PlanFeedbackWindowError,
+)
 from backend.storage.models import (
     GoalTable,
     InteractionTable,
@@ -148,6 +154,144 @@ def test_plan_and_action_feedback_are_persisted(database_session: Session) -> No
     assert len(action_rows) == 7
     assert [row.status for row in action_rows[:3]] == ["accepted", "rejected", "not_completed"]
     assert [row.response for row in feedback_rows] == ["accepted", "rejected", "not_completed"]
+    assert all(row.submission_key for row in feedback_rows)
+
+
+def test_identical_feedback_submission_is_idempotent(database_session: Session) -> None:
+    _seed_user_goal_and_interactions(database_session)
+    planner = InterventionPlanner(database_session)
+    structured = planner.build_seven_day_plan(
+        user_id=USER_ID,
+        goal_id=GOAL_ID,
+        generation_interaction_id=INTERACTION_1,
+        start_date=START,
+        template=_template(),
+    )
+    planner.persist_plan(structured)
+    created_at = datetime(2026, 7, 1, 20, tzinfo=UTC)
+
+    first = planner.record_feedback(
+        action_id=structured.actions[0].action_id,
+        user_id=USER_ID,
+        response=FeedbackResponse.ACCEPTED,
+        created_at=created_at,
+        submission_key="same-feedback-request",
+    )
+    replay = planner.record_feedback(
+        action_id=structured.actions[0].action_id,
+        user_id=USER_ID,
+        response=FeedbackResponse.ACCEPTED,
+        created_at=created_at + timedelta(minutes=1),
+        submission_key="same-feedback-request",
+    )
+
+    rows = database_session.scalars(select(PlanFeedbackTable)).all()
+    assert replay.feedback_id == first.feedback_id
+    assert len(rows) == 1
+    assert rows[0].submission_key == "same-feedback-request"
+
+
+def test_submission_key_cannot_be_reused_for_different_feedback(database_session: Session) -> None:
+    _seed_user_goal_and_interactions(database_session)
+    planner = InterventionPlanner(database_session)
+    structured = planner.build_seven_day_plan(
+        user_id=USER_ID,
+        goal_id=GOAL_ID,
+        generation_interaction_id=INTERACTION_1,
+        start_date=START,
+        template=_template(),
+    )
+    planner.persist_plan(structured)
+    planner.record_feedback(
+        action_id=structured.actions[0].action_id,
+        user_id=USER_ID,
+        response=FeedbackResponse.ACCEPTED,
+        created_at=datetime(2026, 7, 1, 20, tzinfo=UTC),
+        submission_key="conflicting-feedback-request",
+    )
+
+    with pytest.raises(FeedbackSubmissionConflictError):
+        planner.record_feedback(
+            action_id=structured.actions[0].action_id,
+            user_id=USER_ID,
+            response=FeedbackResponse.REJECTED,
+            completion_ratio=0,
+            created_at=datetime(2026, 7, 1, 21, tzinfo=UTC),
+            submission_key="conflicting-feedback-request",
+        )
+
+
+def test_feedback_is_rejected_outside_active_plan_window(database_session: Session) -> None:
+    _seed_user_goal_and_interactions(database_session)
+    planner = InterventionPlanner(database_session)
+    first = planner.build_seven_day_plan(
+        user_id=USER_ID,
+        goal_id=GOAL_ID,
+        generation_interaction_id=INTERACTION_1,
+        start_date=START,
+        template=_template(),
+    )
+    planner.persist_plan(first)
+
+    with pytest.raises(PlanFeedbackWindowError) as expired:
+        planner.record_feedback(
+            action_id=first.actions[0].action_id,
+            user_id=USER_ID,
+            response=FeedbackResponse.ACCEPTED,
+            created_at=datetime(2026, 7, 8, 12, tzinfo=UTC),
+        )
+    assert expired.value.code == "plan_expired"
+
+    second = planner.build_seven_day_plan(
+        user_id=USER_ID,
+        goal_id=GOAL_ID,
+        generation_interaction_id=INTERACTION_2,
+        start_date=START + timedelta(days=7),
+        template=_template(),
+    )
+    planner.persist_plan(second)
+    with pytest.raises(PlanFeedbackWindowError) as superseded:
+        planner.record_feedback(
+            action_id=first.actions[1].action_id,
+            user_id=USER_ID,
+            response=FeedbackResponse.ACCEPTED,
+            created_at=datetime(2026, 7, 2, 12, tzinfo=UTC),
+        )
+    assert superseded.value.code == "plan_not_active"
+
+
+def test_single_accepted_action_explicitly_maintains_next_plan(database_session: Session) -> None:
+    _seed_user_goal_and_interactions(database_session)
+    planner = InterventionPlanner(database_session)
+    first = planner.build_seven_day_plan(
+        user_id=USER_ID,
+        goal_id=GOAL_ID,
+        generation_interaction_id=INTERACTION_1,
+        start_date=START,
+        template=_template(ActionDifficulty.MEDIUM),
+    )
+    planner.persist_plan(first)
+    accepted = planner.record_feedback(
+        action_id=first.actions[0].action_id,
+        user_id=USER_ID,
+        response=FeedbackResponse.ACCEPTED,
+        created_at=datetime(2026, 7, 1, 20, tzinfo=UTC),
+    )
+
+    second = planner.build_seven_day_plan(
+        user_id=USER_ID,
+        goal_id=GOAL_ID,
+        generation_interaction_id=INTERACTION_2,
+        start_date=START + timedelta(days=7),
+        template=_template(ActionDifficulty.MEDIUM),
+    )
+
+    assert second.adaptation.direction is DifficultyDirection.MAINTAIN
+    assert second.adaptation.applied is False
+    assert "accepted_current_difficulty" in second.adaptation.reason_codes
+    assert second.adaptation.source_action_ids == (first.actions[0].action_id,)
+    assert second.adaptation.source_feedback_ids == (accepted.feedback_id,)
+    assert {action.difficulty for action in second.actions} == {ActionDifficulty.MEDIUM}
 
 
 def test_single_rejected_action_changes_next_plan(database_session: Session) -> None:

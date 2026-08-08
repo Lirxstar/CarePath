@@ -33,7 +33,12 @@ from backend.imports.fhir.parser import FHIRBundleImporter
 from backend.imports.json_importer import JSONHealthImporter
 from backend.imports.models import ImportReport
 from backend.imports.service import ImportService
-from backend.personalization.planner import InterventionPlanner
+from backend.personalization.plan_calendar import user_local_date
+from backend.personalization.planner import (
+    FeedbackSubmissionConflictError,
+    InterventionPlanner,
+    PlanFeedbackWindowError,
+)
 from backend.storage.database import get_session
 from backend.storage.models import (
     AuditEventTable,
@@ -344,16 +349,26 @@ def coach_message(
 @router.get(
     "/plans/current",
     response_model=CurrentPlanResponse,
-    summary="Return the latest active plan for a user",
+    summary="Return the latest active, in-window plan for a user",
 )
 def current_plan(
     user_id: UUID,
     session: SessionDependency,
     goal_id: UUID | None = None,
 ) -> CurrentPlanResponse:
+    try:
+        today = user_local_date(session, user_id)
+    except ValueError as exc:
+        raise CarePathError(
+            "profile_not_found",
+            "The requested user profile does not exist",
+            status_code=HTTPStatus.NOT_FOUND,
+        ) from exc
     statement = select(InterventionPlanTable).where(
         InterventionPlanTable.user_id == str(user_id),
         InterventionPlanTable.status == PlanStatus.ACTIVE.value,
+        InterventionPlanTable.start_date <= today,
+        InterventionPlanTable.end_date >= today,
     )
     if goal_id is not None:
         statement = statement.where(InterventionPlanTable.goal_id == str(goal_id))
@@ -367,7 +382,7 @@ def current_plan(
     if row is None:
         raise CarePathError(
             "plan_not_found",
-            "No active plan was found for this user",
+            "No active plan in the current date window was found for this user",
             status_code=HTTPStatus.NOT_FOUND,
         )
 
@@ -386,7 +401,7 @@ def current_plan(
     "/plans/{plan_id}/feedback",
     response_model=PlanFeedbackResponse,
     status_code=HTTPStatus.CREATED,
-    summary="Record structured feedback for an action in a plan",
+    summary="Record idempotent structured feedback for an active plan action",
 )
 def plan_feedback(
     plan_id: UUID,
@@ -408,13 +423,27 @@ def plan_feedback(
             status_code=HTTPStatus.NOT_FOUND,
         )
 
-    feedback = InterventionPlanner(session).record_feedback(
-        action_id=payload.action_id,
-        user_id=payload.user_id,
-        response=payload.response,
-        completion_ratio=payload.completion_ratio,
-        reason_text=payload.reason_text,
-    )
+    try:
+        feedback = InterventionPlanner(session).record_feedback(
+            action_id=payload.action_id,
+            user_id=payload.user_id,
+            response=payload.response,
+            completion_ratio=payload.completion_ratio,
+            reason_text=payload.reason_text,
+            submission_key=payload.submission_key,
+        )
+    except PlanFeedbackWindowError as exc:
+        raise CarePathError(
+            exc.code,
+            str(exc),
+            status_code=HTTPStatus.CONFLICT,
+        ) from exc
+    except FeedbackSubmissionConflictError as exc:
+        raise CarePathError(
+            "feedback_idempotency_conflict",
+            str(exc),
+            status_code=HTTPStatus.CONFLICT,
+        ) from exc
     session.commit()
     return PlanFeedbackResponse(plan_id=plan_id, feedback=feedback)
 

@@ -4,7 +4,9 @@ import { CarePathApiClient, type ApiRequestInit, type ApiResponse } from "../api
 import type { InterventionPlan, PlanAction } from "./apiTypes";
 import {
   comparePlanVersions,
+  explainPlanChanges,
   feedbackPayload,
+  feedbackSubmissionKey,
   lighterAlternative,
   PlanHistoryApi,
   type PlanHistoryItem,
@@ -90,13 +92,29 @@ describe("plan history feedback", () => {
     expect(feedbackPayload({ response: "not_completed" }).completion_ratio).toBe(0);
   });
 
+  test("builds stable opaque submission keys from canonical feedback", () => {
+    const payload = feedbackPayload({ response: "modified", reasonText: " shorter version " });
+    const first = feedbackSubmissionKey("plan-1", "action-1", payload);
+    const second = feedbackSubmissionKey("plan-1", "action-1", payload);
+    const changed = feedbackSubmissionKey(
+      "plan-1",
+      "action-1",
+      feedbackPayload({ response: "rejected", reasonText: "shorter version" }),
+    );
+
+    expect(first).toBe(second);
+    expect(first).toMatch(/^mobile-action-1-[0-9a-f]{8}$/);
+    expect(changed).not.toBe(first);
+    expect(first).not.toContain("shorter version");
+  });
+
   test("builds a visibly easier alternative", () => {
     expect(lighterAlternative(action())).toContain("medium-effort");
     expect(lighterAlternative(action({ difficulty: "medium" }))).toContain("low-effort");
     expect(lighterAlternative(action({ difficulty: "low" }))).toContain("easiest safe part");
   });
 
-  test("summarises differences between traceable plan versions", () => {
+  test("summarises and explains differences between traceable plan versions", () => {
     const previous = item([action()], { status: "superseded" });
     const current = item(
       [
@@ -105,6 +123,7 @@ describe("plan history feedback", () => {
           plan_id: "plan-2",
           description: "Walk for 8 minutes.",
           difficulty: "low",
+          rationale: "Recent feedback showed the previous action was too demanding.",
           status: "accepted",
         }),
       ],
@@ -115,6 +134,50 @@ describe("plan history feedback", () => {
       descriptionChanges: 1,
       statusChanges: 1,
     });
+    expect(explainPlanChanges(current, previous)).toEqual([
+      "Difficulty reduced: Recent feedback showed the previous action was too demanding.",
+      "Action status changed from proposed to accepted after recorded feedback.",
+    ]);
+  });
+
+  test("explains increased difficulty and same-difficulty wording changes", () => {
+    const previousLow = item([
+      action({ difficulty: "low", description: "Walk for 5 minutes.", rationale: "Start small." }),
+    ]);
+    const currentMedium = item(
+      [
+        action({
+          difficulty: "medium",
+          description: "Walk for 15 minutes.",
+          rationale: "Stable completion supports a cautious increase.",
+        }),
+      ],
+      { plan_id: "plan-2", version: 2 },
+    );
+    expect(explainPlanChanges(currentMedium, previousLow)).toEqual([
+      "Difficulty increased: Stable completion supports a cautious increase.",
+    ]);
+
+    const previousMedium = item([
+      action({
+        difficulty: "medium",
+        description: "Walk after lunch.",
+        rationale: "Use an existing routine cue.",
+      }),
+    ]);
+    const revisedMedium = item(
+      [
+        action({
+          difficulty: "medium",
+          description: "Walk after the first work block.",
+          rationale: "The recorded constraint makes this timing easier to use.",
+        }),
+      ],
+      { plan_id: "plan-3", version: 3 },
+    );
+    expect(explainPlanChanges(revisedMedium, previousMedium)).toEqual([
+      "Action changed while difficulty stayed medium: The recorded constraint makes this timing easier to use.",
+    ]);
   });
 
   test("covers unchanged, absent and added actions across versions", () => {
@@ -124,16 +187,25 @@ describe("plan history feedback", () => {
       descriptionChanges: 0,
       statusChanges: 0,
     });
+    expect(explainPlanChanges(previous, undefined)).toEqual([
+      "Earliest retained plan version; there is no earlier version to compare.",
+    ]);
     expect(comparePlanVersions(previous, item([action()]))).toEqual({
       difficultyChanges: 0,
       descriptionChanges: 0,
       statusChanges: 0,
     });
+    expect(explainPlanChanges(previous, item([action()]))).toEqual([
+      "No material action, difficulty or feedback-status change from the previous version.",
+    ]);
     expect(comparePlanVersions(item([], { version: 2 }), previous)).toEqual({
       difficultyChanges: 0,
       descriptionChanges: 1,
       statusChanges: 0,
     });
+    expect(explainPlanChanges(item([], { version: 2 }), previous)).toEqual([
+      "The number of retained actions changed between these plan versions.",
+    ]);
     expect(
       comparePlanVersions(
         item([action(), action({ action_id: "action-2" })], { version: 2 }),
@@ -189,12 +261,51 @@ describe("plan history feedback", () => {
       "http://carepath.test/plans/history?user_id=user-1&limit=50&offset=0",
     );
     expect(calls[2]?.url).toBe("http://carepath.test/plans/plan-1/feedback");
-    expect(JSON.parse(calls[2]?.init.body ?? "{}")).toEqual({
+    const body = JSON.parse(calls[2]?.init.body ?? "{}") as Record<string, unknown>;
+    expect(body).toMatchObject({
       user_id: "user-1",
       action_id: "action-1",
       response: "modified",
       completion_ratio: 0.5,
       reason_text: "Use a shorter action.",
     });
+    expect(body.submission_key).toMatch(/^mobile-action-1-[0-9a-f]{8}$/);
+  });
+
+  test("collapses rapid duplicates but permits a later retry after completion", async () => {
+    const calls: RecordedCall[] = [];
+    let resolveRequest: ((value: ApiResponse) => void) | undefined;
+    const pending = new Promise<ApiResponse>((resolve) => {
+      resolveRequest = resolve;
+    });
+    const feedback = {
+      plan_id: "plan-1",
+      feedback: {
+        feedback_id: "feedback-1",
+        action_id: "action-1",
+        user_id: "user-1",
+        response: "accepted",
+        completion_ratio: null,
+        reason_text: null,
+        created_at: "2026-08-01T08:00:00Z",
+      },
+    };
+    const client = new CarePathApiClient("http://carepath.test", (url, init) => {
+      calls.push({ url, init });
+      return pending;
+    });
+    const api = new PlanHistoryApi(client, "user-1");
+    const first = api.submitFeedback("plan-1", "action-1", { response: "accepted" });
+    const second = api.submitFeedback("plan-1", "action-1", { response: "accepted" });
+
+    expect(first).toBe(second);
+    expect(calls).toHaveLength(1);
+    resolveRequest?.(response(feedback, 201));
+    await expect(first).resolves.toMatchObject({ ok: true, data: feedback });
+
+    const later = api.submitFeedback("plan-1", "action-1", { response: "accepted" });
+    expect(later).not.toBe(first);
+    expect(calls).toHaveLength(2);
+    await expect(later).resolves.toMatchObject({ ok: true, data: feedback });
   });
 });

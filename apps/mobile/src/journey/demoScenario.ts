@@ -136,6 +136,13 @@ function isoDate(offset: number): string {
   return date.toISOString().slice(0, 10);
 }
 
+function activePlanDate(offset: number): string {
+  const date = new Date();
+  date.setUTCHours(0, 0, 0, 0);
+  date.setUTCDate(date.getUTCDate() + offset);
+  return date.toISOString().slice(0, 10);
+}
+
 function rounded(value: number, digits = 1): number {
   const factor = 10 ** digits;
   return Math.round(value * factor) / factor;
@@ -201,15 +208,8 @@ function buildScenario(persona: PersonaDefinition): DemoScenario {
   const goalId = demoUuid();
   const planId = demoUuid();
   const generationInteractionId = demoUuid();
-  const actionDates = [
-    "2026-07-30",
-    "2026-07-31",
-    "2026-08-01",
-    "2026-08-02",
-    "2026-08-03",
-    "2026-08-04",
-    "2026-08-05",
-  ] as const;
+  const planStartDate = activePlanDate(0);
+  const planEndDate = activePlanDate(6);
   const actions: DemoPlanAction[] = persona.actions.map((description, index) => ({
     action_id: demoUuid(),
     plan_id: planId,
@@ -220,7 +220,7 @@ function buildScenario(persona: PersonaDefinition): DemoScenario {
           ? "physical_activity"
           : "sleep",
     description,
-    frequency: `once on ${String(actionDates[index])}`,
+    frequency: `once on ${activePlanDate(index)}`,
     difficulty: "low",
     rationale:
       "A deliberately small behaviour-support action grounded in the selected synthetic demo context.",
@@ -281,8 +281,8 @@ function buildScenario(persona: PersonaDefinition): DemoScenario {
             user_id: userId,
             goal_id: goalId,
             version: 1,
-            start_date: "2026-07-30",
-            end_date: "2026-08-05",
+            start_date: planStartDate,
+            end_date: planEndDate,
             status: "active",
             generation_interaction_id: generationInteractionId,
           },

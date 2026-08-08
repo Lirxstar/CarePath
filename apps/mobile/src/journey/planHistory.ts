@@ -33,6 +33,12 @@ export interface PlanChangeSummary {
   statusChanges: number;
 }
 
+interface CanonicalFeedbackPayload {
+  response: PlanFeedbackKind;
+  completion_ratio: number | null;
+  reason_text: string | null;
+}
+
 export function lighterAlternative(action: PlanAction): string {
   if (action.difficulty === "high") {
     return `Lighter option: do a shorter, medium-effort version of “${action.description}”.`;
@@ -43,11 +49,7 @@ export function lighterAlternative(action: PlanAction): string {
   return `Lighter option: do only the easiest safe part of “${action.description}” today.`;
 }
 
-export function feedbackPayload(input: PlanFeedbackInput): {
-  response: PlanFeedbackKind;
-  completion_ratio: number | null;
-  reason_text: string | null;
-} {
+export function feedbackPayload(input: PlanFeedbackInput): CanonicalFeedbackPayload {
   const completionRatio =
     input.completionRatio ??
     (input.response === "completed"
@@ -67,6 +69,31 @@ export function feedbackPayload(input: PlanFeedbackInput): {
     completion_ratio: completionRatio,
     reason_text: reasonText,
   };
+}
+
+function stableHash(value: string): string {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
+}
+
+export function feedbackSubmissionKey(
+  planId: string,
+  actionId: string,
+  payload: CanonicalFeedbackPayload,
+): string {
+  const canonical = JSON.stringify({
+    planId,
+    actionId,
+    response: payload.response,
+    completionRatio: payload.completion_ratio,
+    reasonText: payload.reason_text,
+  });
+  const actionToken = actionId.replace(/[^A-Za-z0-9_-]/g, "").slice(0, 40);
+  return `mobile-${actionToken}-${stableHash(canonical)}`.slice(0, 64);
 }
 
 export function comparePlanVersions(
@@ -101,7 +128,59 @@ export function comparePlanVersions(
   return { difficultyChanges, descriptionChanges, statusChanges };
 }
 
+function difficultyRank(difficulty: PlanAction["difficulty"]): number {
+  if (difficulty === "low") {
+    return 0;
+  }
+  if (difficulty === "medium") {
+    return 1;
+  }
+  return 2;
+}
+
+export function explainPlanChanges(
+  current: PlanHistoryItem,
+  previous: PlanHistoryItem | undefined,
+): string[] {
+  if (previous === undefined) {
+    return ["Earliest retained plan version; there is no earlier version to compare."];
+  }
+
+  const explanations: string[] = [];
+  const comparableLength = Math.max(current.actions.length, previous.actions.length);
+  for (let index = 0; index < comparableLength; index += 1) {
+    const action = current.actions[index];
+    const prior = previous.actions[index];
+    if (action === undefined || prior === undefined) {
+      explanations.push("The number of retained actions changed between these plan versions.");
+      continue;
+    }
+    if (prior.difficulty !== action.difficulty) {
+      const direction =
+        difficultyRank(action.difficulty) < difficultyRank(prior.difficulty)
+          ? "reduced"
+          : "increased";
+      explanations.push(`Difficulty ${direction}: ${action.rationale}`);
+    } else if (prior.description !== action.description) {
+      explanations.push(
+        `Action changed while difficulty stayed ${action.difficulty}: ${action.rationale}`,
+      );
+    }
+    if (prior.status !== action.status) {
+      explanations.push(
+        `Action status changed from ${prior.status} to ${action.status} after recorded feedback.`,
+      );
+    }
+  }
+
+  return explanations.length > 0
+    ? [...new Set(explanations)]
+    : ["No material action, difficulty or feedback-status change from the previous version."];
+}
+
 export class PlanHistoryApi {
+  private readonly pendingFeedback = new Map<string, Promise<ApiResult<PlanFeedbackResponse>>>();
+
   constructor(
     private readonly client: CarePathApiClient,
     private readonly userId: string,
@@ -122,10 +201,23 @@ export class PlanHistoryApi {
     actionId: string,
     input: PlanFeedbackInput,
   ): Promise<ApiResult<PlanFeedbackResponse>> {
-    return this.client.post<PlanFeedbackResponse>(`/plans/${planId}/feedback`, {
+    const payload = feedbackPayload(input);
+    const submissionKey = feedbackSubmissionKey(planId, actionId, payload);
+    const existing = this.pendingFeedback.get(submissionKey);
+    if (existing !== undefined) {
+      return existing;
+    }
+
+    const request = this.client.post<PlanFeedbackResponse>(`/plans/${planId}/feedback`, {
       user_id: this.userId,
       action_id: actionId,
-      ...feedbackPayload(input),
+      submission_key: submissionKey,
+      ...payload,
     });
+    this.pendingFeedback.set(submissionKey, request);
+    void request.finally(() => {
+      this.pendingFeedback.delete(submissionKey);
+    });
+    return request;
   }
 }
