@@ -137,10 +137,11 @@ export function AuthProvider({ children, apiBaseUrl }: AuthProviderProps) {
 
   useEffect(() => {
     const controller = new AbortController();
+    const isCancelled = () => controller.signal.aborted;
     const initialise = async () => {
       const client = createRuntimeApiClient(apiBaseUrl, () => ({}));
       const configResult = await client.get<PublicRuntimeConfig>("/config/public");
-      if (controller.signal.aborted) {
+      if (isCancelled()) {
         return;
       }
       if (!configResult.ok) {
@@ -185,14 +186,14 @@ export function AuthProvider({ children, apiBaseUrl }: AuthProviderProps) {
         } catch (error) {
           saveSession(null);
           clearAccountRuntime();
-          if (!controller.signal.aborted) {
+          if (!isCancelled()) {
             setAuthStatus("anonymous");
             setAuthMessage(errorText(error));
           }
           return;
         }
       }
-      if (!controller.signal.aborted) {
+      if (!isCancelled()) {
         await loadAccount(restored);
       }
     };
