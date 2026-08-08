@@ -21,13 +21,14 @@ from backend.retrieval import (
     QdrantExternalEvidenceIndex,
 )
 from backend.retrieval.guidelines.models import GuidelineTopic
-from backend.storage.database import get_session
 
+from .access import ensure_user_access
 from .config import Settings
 from .errors import CarePathError
+from .session_scope import get_request_session
 
 router = APIRouter(prefix="/evidence", tags=["evidence"])
-SessionDependency = Annotated[Session, Depends(get_session)]
+SessionDependency = Annotated[Session, Depends(get_request_session)]
 
 
 def _external_index(request: Request) -> QdrantExternalEvidenceIndex:
@@ -101,6 +102,7 @@ def search_external_evidence(
     summary="Build user-scoped Patient Evidence with bounded time controls",
 )
 def search_patient_evidence(
+    request: Request,
     user_id: UUID,
     session: SessionDependency,
     window_days: Annotated[int | None, Query(ge=7, le=30)] = 7,
@@ -109,6 +111,7 @@ def search_patient_evidence(
     metric_types: Annotated[list[MetricType] | None, Query()] = None,
     keyword: Annotated[str | None, Query(min_length=1, max_length=200)] = None,
 ) -> PatientEvidenceResponse:
+    ensure_user_access(request, session, user_id)
     if window_days not in {None, 7, 30}:
         raise CarePathError(
             "invalid_patient_evidence_window",
