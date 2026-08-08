@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Annotated, cast
+from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request
@@ -45,7 +45,7 @@ class AuthMeResponse(BaseModel):
     summary="Return non-secret runtime configuration for the client",
 )
 def public_runtime_config(request: Request) -> PublicRuntimeConfig:
-    settings = cast(Settings, request.app.state.settings)
+    settings: Settings = request.app.state.settings
     key = settings.supabase_publishable_key
     auth_enabled = settings.supabase_url is not None and key is not None
     return PublicRuntimeConfig(
