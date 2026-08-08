@@ -2,6 +2,7 @@ import logging
 from functools import lru_cache
 from os import getenv
 from typing import Literal
+from urllib.parse import urlparse
 
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -9,6 +10,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 ENV_FILE_VARIABLE = "CAREPATH_ENV_FILE"
 EnvironmentName = Literal["development", "test", "production"]
 PrivacyMode = Literal["standard_demo", "local_strict"]
+LocalStructuredOutputMode = Literal["openai_json_schema", "vllm_json"]
 
 
 class Settings(BaseSettings):
@@ -30,6 +32,14 @@ class Settings(BaseSettings):
     request_id_max_length: int = Field(default=128, ge=16, le=256)
     llm_provider: str = "mock"
     llm_api_key: SecretStr | None = None
+
+    local_llm_base_url: str = "http://127.0.0.1:8000"
+    local_llm_model_id: str = Field(default="carepath-local", min_length=1)
+    local_llm_structured_output_mode: LocalStructuredOutputMode = "openai_json_schema"
+    local_llm_request_timeout_seconds: float = Field(default=120.0, gt=0, le=600)
+    local_llm_max_new_tokens: int = Field(default=512, ge=1, le=4096)
+    local_llm_temperature: float = Field(default=0.0, ge=0.0, le=2.0)
+
     database_url: str = Field(default="sqlite:///./carepath.db", min_length=1)
     evidence_index_path: str = Field(default="data/guidelines/qdrant", min_length=1)
     evidence_collection_name: str = Field(
@@ -62,12 +72,30 @@ class Settings(BaseSettings):
         "evidence_index_path",
         "evidence_collection_name",
         "evidence_embedding_model",
+        "local_llm_model_id",
     )
     @classmethod
     def strip_non_empty(cls, value: str) -> str:
         normalized = value.strip()
         if not normalized:
             raise ValueError("configuration value must not be empty")
+        return normalized
+
+    @field_validator("local_llm_base_url")
+    @classmethod
+    def validate_local_llm_base_url(cls, value: str) -> str:
+        normalized = value.strip().rstrip("/")
+        parsed = urlparse(normalized)
+        if (
+            parsed.scheme != "http"
+            or parsed.hostname not in {"127.0.0.1", "localhost", "::1"}
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.query
+            or parsed.fragment
+            or parsed.path not in {"", "/"}
+        ):
+            raise ValueError("local_llm_base_url must be a credential-free loopback HTTP origin")
         return normalized
 
     @field_validator("database_url")
