@@ -98,6 +98,7 @@ def _metric(metric: MetricType, mean: float) -> MetricWindowSummary:
 def _summary(
     *,
     completion: float | None,
+    accepted_count: int = 0,
     scored_feedback_count: int = 7,
     total_feedback_count: int = 7,
     reliability: ReliabilityLevel = ReliabilityLevel.HIGH,
@@ -106,6 +107,7 @@ def _summary(
     adherence = AdherenceContext(
         completion_rate=completion,
         recent_completion_rate=completion,
+        accepted_count=accepted_count,
         scored_feedback_count=scored_feedback_count,
         total_feedback_count=total_feedback_count,
         reliability=reliability,
@@ -174,9 +176,10 @@ def test_planner_v2_accept_feedback_maintains_scope_with_explanation() -> None:
     accepted = planner.plan(
         summary=_summary(
             completion=None,
+            accepted_count=1,
             scored_feedback_count=0,
             total_feedback_count=1,
-            reliability=ReliabilityLevel.HIGH,
+            reliability=ReliabilityLevel.LOW,
         ),
         evidence=EvidenceAggregator().build(external_hits=(_external_hit(),)),
         start_date=date(2026, 7, 31),
@@ -187,7 +190,7 @@ def test_planner_v2_accept_feedback_maintains_scope_with_explanation() -> None:
             completion=None,
             scored_feedback_count=0,
             total_feedback_count=0,
-            reliability=ReliabilityLevel.HIGH,
+            reliability=ReliabilityLevel.LOW,
         ),
         evidence=EvidenceAggregator().build(external_hits=(_external_hit(),)),
         start_date=date(2026, 7, 31),
