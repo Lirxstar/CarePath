@@ -78,19 +78,21 @@ The state source is [`diagrams/agent-state-flow.mmd`](diagrams/agent-state-flow.
 | --- | --- | --- | --- |
 | React Native / Expo | question, selected synthetic persona, import, feedback | API requests and rendered reviewer journey | no server secrets or hidden agent logic |
 | FastAPI | HTTP request | validated domain/service request or structured error | schema validation, request IDs, bounded error contract |
+| Bounded Agent Workflow | validated coaching request and workflow state | one bounded triage/tool/planning/verification/composition execution | finite state transitions and at most one rewrite |
 | Safety Triage | request plus minimal safety context | routine/caution/urgent disposition | deterministic; model cannot downgrade risk |
 | Context Builder | user-scoped repositories and request intent | 7/30-day task context with references | minimal task-specific reads only |
 | Tool Router | intent, context and allow-listed tools | typed bounded tool/retrieval calls | validates metric, date range, user ID and call count |
-| Time-series tools | selected observation references | deterministic trend/window/change/missingness/adherence summaries | no numerical guessing by the model |
+| Time-Series Tools | selected observation references | deterministic trend/window/change/missingness/adherence summaries | no numerical guessing by the model |
 | Personal Context Retriever | authorized user query | minimal personal facts/snippets plus stable refs | no cross-user retrieval |
 | External Evidence Retriever | curated evidence query | chunks, scores and source/provenance metadata | external text is data, never policy/tool authority |
 | Planner | bounded context, tool results, evidence, constraints | structured weekly draft | small feasible actions; no autonomous external action |
 | Verifier | draft plus evidence/user refs and safety constraints | pass, one rewrite, or safe fallback | blocks unsupported/safety-invalid output |
 | Composer | verified structure and disposition | user-facing response | cannot restore omitted sensitive context or override verifier |
-| Feedback service | explicit user feedback and plan/action refs | validated state update | adaptation requires explicit stored feedback |
 | ModelProvider | sanitized task-specific model request | normalized untrusted draft/structured output | no database access or secrets |
-| Persistence | validated user-scoped read/write | domain records | repository/service boundary; PostgreSQL deployment, SQLite development |
-| Audit/logging | IDs, component decisions, refs, status, latency | auditable metadata | raw journals, secrets and full prompts prohibited by default |
+| User Persistence | validated user-scoped read/write | domain records | repository/service boundary; PostgreSQL deployment, SQLite development |
+| External Evidence Ingestion | public document plus source/licence metadata | validated chunks with stable provenance | hostile text is data and cannot acquire instruction authority |
+| Audit Writer | workflow decision IDs, references and bounded summaries | schema-controlled audit event | excludes secrets and raw journal/prompt copies |
+| Operational Logger | request ID, route, status, latency and error class | metadata-only operational event | no raw user/model payload logging by default |
 
 ## Data and evidence boundaries
 
