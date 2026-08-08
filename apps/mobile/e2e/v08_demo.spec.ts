@@ -81,7 +81,11 @@ test("Private mode uses an isolated non-persistent workspace", async ({ page }) 
 
   await page.getByRole("button", { name: "Turn on Private mode" }).click();
   await expect(page.getByText("Public research demo · Private mode")).toBeVisible();
-  await expect(page.getByText(/not written to the persistent CarePath database/)).toBeVisible();
+  await expect(
+    page
+      .getByTestId("public-demo-notice")
+      .getByText(/not written to the persistent CarePath database/),
+  ).toBeVisible();
   await expect(page.getByText(/temporary server memory only/)).toBeVisible();
 
   await page.getByRole("button", { name: "Load demo" }).click();
