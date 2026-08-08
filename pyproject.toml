@@ -34,6 +34,7 @@ carepath-acceptance = "backend.evaluation.acceptance_cli:main"
 carepath-db = "backend.storage.cli:main"
 carepath-evaluate = "backend.evaluation.cli:main"
 carepath-evaluate-complete = "backend.evaluation.complete:main"
+carepath-evaluate-provider = "backend.evaluation.provider_suite:main"
 carepath-index = "backend.retrieval.vector_cli:main"
 carepath-privacy-egress = "backend.evaluation.privacy_egress:main"
 
