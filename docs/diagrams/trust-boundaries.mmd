@@ -21,7 +21,7 @@ flowchart TB
     end
 
     subgraph Endpoint["TB-4 · Model endpoint"]
-        MODEL["Cloud or Radeon endpoint\nno database credentials or direct access"]
+        MODEL["Approved local or remote endpoint\nno database credentials or direct access"]
     end
 
     subgraph Logging["TB-5 · Audit and operational logs"]
@@ -29,7 +29,7 @@ flowchart TB
         OPS[("Operations: IDs + route + status + latency")]
     end
 
-    USER -->|"HTTPS · authenticated/consented · schema validated"| APP
+    USER -->|"HTTPS · consented · schema validated"| APP
     APP -->|"response JSON · no hidden policy/secrets"| USER
 
     APP -->|"authorized user-scoped reads/writes"| STORE
