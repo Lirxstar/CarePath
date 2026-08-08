@@ -1,5 +1,12 @@
 import { useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 
 import { useAuth } from "./auth/AuthContext";
 import { useJourney } from "./journey/JourneyContext";
@@ -160,7 +167,12 @@ export function AccountPrivacyPanel() {
                     to make it available on later sign-ins.
                   </Text>
                 ) : null}
-                <PanelButton secondary label="Sign out" disabled={busy} onPress={() => void signOut()} />
+                <PanelButton
+                  secondary
+                  label="Sign out"
+                  disabled={busy}
+                  onPress={() => void signOut()}
+                />
               </View>
             ) : null}
           </View>
@@ -234,7 +246,11 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   buttonPrimary: { backgroundColor: "#285C5C" },
-  buttonSecondary: { backgroundColor: "#E8EFEF", borderColor: "#C7D7D7", borderWidth: 1 },
+  buttonSecondary: {
+    backgroundColor: "#E8EFEF",
+    borderColor: "#C7D7D7",
+    borderWidth: 1,
+  },
   buttonPrimaryText: { color: "#FFFFFF", fontSize: 12, fontWeight: "700" },
   buttonSecondaryText: { color: "#285C5C", fontSize: 12, fontWeight: "700" },
   disabled: { opacity: 0.45 },
