@@ -101,7 +101,7 @@ describe("custom import subject adoption", () => {
         "observation_id,user_id,observed_at",
         "incomplete",
         "a,,2026-08-01T08:00:00Z",
-        "b,\"66666666-6666-4666-8666-666666666666\",\"2026-08-05T08:00:00Z\"",
+        'b,"66666666-6666-4666-8666-666666666666","2026-08-05T08:00:00Z"',
       ].join("\n"),
     );
 
@@ -116,10 +116,7 @@ describe("custom import subject adoption", () => {
     expectSubjectNull("csv", "metric_type,observed_at\nsteps,2026-08-08");
     expectSubjectNull("csv", "user_id,metric_type\na,steps");
     expectSubjectNull("csv", "user_id,observed_at\n,2026-08-08T08:00:00Z");
-    expectSubjectNull(
-      "csv",
-      "user_id,observed_at\n77777777-7777-4777-8777-777777777777,invalid",
-    );
+    expectSubjectNull("csv", "user_id,observed_at\n77777777-7777-4777-8777-777777777777,invalid");
   });
 
   test("builds a reviewer-facing scenario using imported subject identifiers", () => {
