@@ -1,6 +1,6 @@
 from .local_openai import LocalOpenAIProvider, LocalProviderError
 from .mock import MockLLMProvider
-from .provider import JsonObject, LLMProvider
+from .provider import JsonObject, LLMProvider, ProviderMetadata
 
 __all__ = [
     "JsonObject",
@@ -8,4 +8,5 @@ __all__ = [
     "LocalOpenAIProvider",
     "LocalProviderError",
     "MockLLMProvider",
+    "ProviderMetadata",
 ]
