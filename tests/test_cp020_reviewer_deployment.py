@@ -56,7 +56,7 @@ def test_reviewer_web_configuration_fails_fast_without_index(tmp_path: Path) -> 
     reviewer = tmp_path / "empty-reviewer"
     reviewer.mkdir()
 
-    with pytest.raises(ValueError, match="reviewer_web_dir must contain an Expo Web index.html"):
+    with pytest.raises(ValueError, match=r"reviewer_web_dir must contain an Expo Web index\.html"):
         create_app(
             Settings(environment="test", llm_provider="mock", reviewer_web_dir=str(reviewer))
         )
