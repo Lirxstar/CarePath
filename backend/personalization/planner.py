@@ -23,6 +23,7 @@ from backend.domain.models import (
 )
 from backend.personalization.analysis import difficulty_signal, summarise_adherence
 from backend.personalization.models import DifficultyDirection
+from backend.personalization.plan_calendar import user_local_date
 from backend.storage.models import (
     GoalTable,
     InteractionTable,
@@ -230,17 +231,18 @@ class InterventionPlanner:
             effective_created_at = effective_created_at.replace(tzinfo=UTC)
         else:
             effective_created_at = effective_created_at.astimezone(UTC)
+        plan_date = user_local_date(self.session, user_id, instant=effective_created_at)
         if PlanStatus(plan.status) is not PlanStatus.ACTIVE:
             raise PlanFeedbackWindowError(
                 "plan_not_active",
                 "Feedback can only be recorded for the active plan version",
             )
-        if effective_created_at.date() < plan.start_date:
+        if plan_date < plan.start_date:
             raise PlanFeedbackWindowError(
                 "plan_not_started",
                 "Feedback cannot be recorded before the plan starts",
             )
-        if effective_created_at.date() > plan.end_date:
+        if plan_date > plan.end_date:
             raise PlanFeedbackWindowError(
                 "plan_expired",
                 "Feedback cannot be recorded after the plan has expired",
