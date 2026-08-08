@@ -40,13 +40,11 @@ def get_request_session(
     session_id = parse_private_session_id(raw_session_id)
     store: PrivateSessionStore = request.app.state.private_sessions
     try:
-        scoped_session = store.open(session_id)
+        with store.session(session_id) as scoped_session:
+            yield scoped_session
     except KeyError as exc:
         raise CarePathError(
             "private_session_not_found",
             "The private session has ended or expired",
             status_code=HTTPStatus.NOT_FOUND,
         ) from exc
-
-    with scoped_session:
-        yield scoped_session
