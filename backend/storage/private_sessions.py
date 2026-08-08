@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from threading import RLock
+from typing import Protocol
 from uuid import UUID, uuid4
 
 from sqlalchemy import Engine, create_engine, event
@@ -12,6 +13,16 @@ from sqlalchemy.pool import StaticPool
 from backend.storage import models as _storage_models  # noqa: F401
 
 from .database import Base
+
+
+class _DBAPICursor(Protocol):
+    def execute(self, statement: str) -> object: ...
+
+    def close(self) -> None: ...
+
+
+class _DBAPIConnection(Protocol):
+    def cursor(self) -> _DBAPICursor: ...
 
 
 @dataclass
@@ -111,8 +122,11 @@ class PrivateSessionStore:
         )
 
         @event.listens_for(engine, "connect")
-        def enable_sqlite_foreign_keys(dbapi_connection: object, _: object) -> None:
-            cursor = dbapi_connection.cursor()  # type: ignore[attr-defined]
+        def enable_sqlite_foreign_keys(
+            dbapi_connection: _DBAPIConnection,
+            _: object,
+        ) -> None:
+            cursor = dbapi_connection.cursor()
             try:
                 cursor.execute("PRAGMA foreign_keys=ON")
             finally:
