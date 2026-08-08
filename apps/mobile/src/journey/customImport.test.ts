@@ -76,6 +76,13 @@ describe("custom import subject adoption", () => {
         observations: [{ observed_at: "invalid" }],
       }),
     );
+    expectSubjectNull(
+      "json",
+      JSON.stringify({
+        profile: { user_id: "88888888-8888-4888-8888-888888888888" },
+        observations: { observed_at: "2026-08-08T08:00:00Z" },
+      }),
+    );
   });
 
   test("extracts user and latest observation date from standard CSV", () => {
