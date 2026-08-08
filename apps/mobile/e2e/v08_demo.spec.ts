@@ -63,4 +63,9 @@ test("real backend primary journey records a two-round feedback-adaptation flow"
   await expect(page.getByText(/Take an 8-minute comfortable walk/).first()).toBeVisible();
   await expect(page.getByText(/Take a 12-minute comfortable walk/)).toHaveCount(0);
   await captureEvidence(page, "coach-after-feedback");
+
+  await openTab(page, "tab-plan-history");
+  await expect(page.getByText("Current seven-day plan")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText("modified").first()).toBeVisible();
+  await captureEvidence(page, "plan-history-return");
 });
