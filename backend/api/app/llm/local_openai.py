@@ -7,7 +7,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request
 
 from ..config import Settings, get_settings
-from .provider import JsonObject, LLMProvider
+from .provider import JsonObject, LLMProvider, ProviderMetadata
 from .transport_security import assert_loopback_resolution, open_loopback
 
 
@@ -42,15 +42,18 @@ class LocalOpenAIProvider(LLMProvider):
         schema: JsonObject,
         **kwargs: Any,
     ) -> JsonObject:
+        result, _ = await self.generate_structured_with_metadata(prompt, schema, **kwargs)
+        return result
+
+    async def generate_structured_with_metadata(
+        self,
+        prompt: str,
+        schema: JsonObject,
+        **kwargs: Any,
+    ) -> tuple[JsonObject, ProviderMetadata]:
         response = await self._chat_completion(prompt, structured_schema=schema, **kwargs)
-        content = self._extract_content(response)
-        try:
-            parsed = json.loads(content)
-        except json.JSONDecodeError as exc:
-            raise LocalProviderError("Local LLM runtime returned invalid structured JSON") from exc
-        if not isinstance(parsed, dict):
-            raise LocalProviderError("Local LLM runtime returned a non-object structured result")
-        return cast(JsonObject, parsed)
+        result = self._parse_structured_content(response)
+        return result, self._safe_response_metadata(response)
 
     async def health_check(self) -> JsonObject:
         try:
@@ -163,6 +166,17 @@ class LocalOpenAIProvider(LLMProvider):
             raise LocalProviderError("Local LLM runtime returned a non-object response")
         return cast(JsonObject, decoded)
 
+    @classmethod
+    def _parse_structured_content(cls, payload: JsonObject) -> JsonObject:
+        content = cls._extract_content(payload)
+        try:
+            parsed = json.loads(content)
+        except json.JSONDecodeError as exc:
+            raise LocalProviderError("Local LLM runtime returned invalid structured JSON") from exc
+        if not isinstance(parsed, dict):
+            raise LocalProviderError("Local LLM runtime returned a non-object structured result")
+        return cast(JsonObject, parsed)
+
     @staticmethod
     def _extract_content(payload: JsonObject) -> str:
         choices = payload.get("choices")
@@ -178,6 +192,30 @@ class LocalOpenAIProvider(LLMProvider):
         if not isinstance(content, str) or not content.strip():
             raise LocalProviderError("Local LLM runtime returned empty message content")
         return content
+
+    @staticmethod
+    def _safe_response_metadata(payload: JsonObject) -> ProviderMetadata:
+        metadata: ProviderMetadata = {}
+        model = payload.get("model")
+        if isinstance(model, str):
+            metadata["model"] = model
+
+        choices = payload.get("choices")
+        if isinstance(choices, list) and choices and isinstance(choices[0], dict):
+            finish_reason = choices[0].get("finish_reason")
+            if isinstance(finish_reason, str):
+                metadata["finish_reason"] = finish_reason
+
+        usage = payload.get("usage")
+        if isinstance(usage, dict):
+            safe_usage: JsonObject = {}
+            for key in ("prompt_tokens", "completion_tokens", "total_tokens"):
+                value = usage.get(key)
+                if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+                    safe_usage[key] = value
+            if safe_usage:
+                metadata["usage"] = safe_usage
+        return metadata
 
     @staticmethod
     def _bounded_int(value: Any, *, name: str, minimum: int, maximum: int) -> int:
