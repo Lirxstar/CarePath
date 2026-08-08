@@ -1,3 +1,4 @@
+import pytest
 from fastapi.testclient import TestClient
 
 import backend.api.app.health as health_module
@@ -19,11 +20,11 @@ class RaisingProvider(MockLLMProvider):
         raise RuntimeError("provider-secret-must-not-escape")
 
 
-def test_liveness_does_not_require_dependencies(monkeypatch: object) -> None:
+def test_liveness_does_not_require_dependencies(monkeypatch: pytest.MonkeyPatch) -> None:
     def fail_database() -> None:
         raise RuntimeError("database unavailable")
 
-    monkeypatch.setattr(health_module, "database_health_check", fail_database)  # type: ignore[attr-defined]
+    monkeypatch.setattr(health_module, "database_health_check", fail_database)
     application = create_app(TEST_SETTINGS, RaisingProvider())
 
     with TestClient(application) as client:
@@ -33,12 +34,8 @@ def test_liveness_does_not_require_dependencies(monkeypatch: object) -> None:
     assert response.json() == {"status": "ok"}
 
 
-def test_readiness_reports_database_and_provider(monkeypatch: object) -> None:
-    monkeypatch.setattr(  # type: ignore[attr-defined]
-        health_module,
-        "database_health_check",
-        lambda: None,
-    )
+def test_readiness_reports_database_and_provider(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(health_module, "database_health_check", lambda: None)
     application = create_app(TEST_SETTINGS, MockLLMProvider())
 
     with TestClient(application) as client:
@@ -51,11 +48,11 @@ def test_readiness_reports_database_and_provider(monkeypatch: object) -> None:
     }
 
 
-def test_readiness_returns_503_for_database_failure(monkeypatch: object) -> None:
+def test_readiness_returns_503_for_database_failure(monkeypatch: pytest.MonkeyPatch) -> None:
     def fail_database() -> None:
         raise RuntimeError("database-secret-must-not-escape")
 
-    monkeypatch.setattr(health_module, "database_health_check", fail_database)  # type: ignore[attr-defined]
+    monkeypatch.setattr(health_module, "database_health_check", fail_database)
     application = create_app(TEST_SETTINGS, MockLLMProvider())
 
     with TestClient(application) as client:
@@ -69,12 +66,8 @@ def test_readiness_returns_503_for_database_failure(monkeypatch: object) -> None
     assert "database-secret" not in response.text
 
 
-def test_readiness_returns_503_for_provider_failure(monkeypatch: object) -> None:
-    monkeypatch.setattr(  # type: ignore[attr-defined]
-        health_module,
-        "database_health_check",
-        lambda: None,
-    )
+def test_readiness_returns_503_for_provider_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(health_module, "database_health_check", lambda: None)
     application = create_app(TEST_SETTINGS, UnreadyProvider())
 
     with TestClient(application) as client:
@@ -88,12 +81,8 @@ def test_readiness_returns_503_for_provider_failure(monkeypatch: object) -> None
     assert "must-not-escape" not in response.text
 
 
-def test_readiness_sanitizes_provider_exceptions(monkeypatch: object) -> None:
-    monkeypatch.setattr(  # type: ignore[attr-defined]
-        health_module,
-        "database_health_check",
-        lambda: None,
-    )
+def test_readiness_sanitizes_provider_exceptions(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(health_module, "database_health_check", lambda: None)
     application = create_app(TEST_SETTINGS, RaisingProvider())
 
     with TestClient(application) as client:
