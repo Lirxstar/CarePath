@@ -23,6 +23,8 @@ test("real backend primary journey records a two-round feedback-adaptation flow"
   page,
 }) => {
   await page.goto("/");
+  await expect(page.getByTestId("public-demo-notice")).toBeVisible();
+  await expect(page.getByText(/Submitted data may be retained on the demo server/)).toBeVisible();
   await expect(page.getByText("API connection")).toBeVisible();
   await expect(page.getByText(/Connected/)).toBeVisible({ timeout: 30_000 });
 
@@ -68,4 +70,25 @@ test("real backend primary journey records a two-round feedback-adaptation flow"
   await expect(page.getByText("Current seven-day plan")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText("modified").first()).toBeVisible();
   await captureEvidence(page, "plan-history-return");
+});
+
+test("desktop reviewer supports refresh and tab routing", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+  await expect(page.getByTestId("public-demo-notice")).toBeVisible();
+  await expect(page.getByText("API connection")).toBeVisible();
+  await expect(page.getByText(/Connected/)).toBeVisible({ timeout: 30_000 });
+
+  await openTab(page, "tab-health-data");
+  await expect(page.getByText("Raw longitudinal chart")).toBeVisible();
+  await openTab(page, "tab-coach");
+  await expect(page.getByText("Ask CarePath")).toBeVisible();
+  await openTab(page, "tab-plan-history");
+  await expect(page.getByRole("heading", { name: "Plan & History" })).toBeVisible();
+
+  await page.reload();
+  await expect(page.getByTestId("public-demo-notice")).toBeVisible();
+  await expect(page.getByText("API connection")).toBeVisible();
+  await openTab(page, "tab-health-data");
+  await expect(page.getByText("Raw longitudinal chart")).toBeVisible();
 });

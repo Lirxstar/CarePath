@@ -24,6 +24,7 @@ import type {
   RecordTrendsResponse,
   UserProfileResponse,
 } from "./apiTypes";
+import { buildCustomScenario } from "./customImport";
 import { buildDemoScenarios, type DemoPersonaKey, type DemoScenario } from "./demoScenario";
 import {
   PRIMARY_METRICS,
@@ -516,6 +517,7 @@ export function JourneyProvider({ children, apiBaseUrl }: JourneyProviderProps) 
   });
   const [scenario, setScenario] = useState(initial.scenario);
   const [question, setQuestion] = useState(initial.scenario.question);
+  const [customDataActive, setCustomDataActive] = useState(false);
   const mockMode = process.env.EXPO_PUBLIC_CAREPATH_MOCK_MODE === "true";
   const service = useMemo<JourneyService>(
     () =>
@@ -623,6 +625,7 @@ export function JourneyProvider({ children, apiBaseUrl }: JourneyProviderProps) 
   );
 
   const importDemo = useCallback(async () => {
+    setCustomDataActive(false);
     setImportState({ status: "loading" });
     setFeedbackState({ status: "idle" });
     const result = await service.importDemo();
@@ -634,11 +637,58 @@ export function JourneyProvider({ children, apiBaseUrl }: JourneyProviderProps) 
 
   const importCustom = useCallback(
     async (format: ImportFormat, content: string) => {
+      const nextScenario = buildCustomScenario(format, content, scenario);
+      if (nextScenario === null) {
+        setCustomImportState(
+          resultState(
+            failure<ImportReport>(
+              "custom_import_subject_missing",
+              "The import must include a user_id and at least one valid observed_at timestamp so CarePath can switch the demo to your data.",
+            ),
+          ),
+        );
+        return;
+      }
+
       setCustomImportState({ status: "loading" });
-      setCustomImportState(resultState(await service.importContent(format, content)));
+      const result = await service.importContent(format, content);
+      setCustomImportState(resultState(result));
+      if (result.ok && result.data.status !== "failed") {
+        setScenario(nextScenario);
+        setQuestion(nextScenario.question);
+        setImportState(resultState(result));
+        setCustomDataActive(true);
+        setProfileState({ status: "idle" });
+        setRecent7States(idleTrendStates());
+        setBaseline30States(idleTrendStates());
+        setSeriesStates(idleSeriesStates());
+        setCoachState({ status: "idle" });
+        setPatientEvidenceState({ status: "idle" });
+        setExternalEvidenceState({ status: "idle" });
+        setPlanState({ status: "idle" });
+        setFeedbackState({ status: "idle" });
+      }
     },
-    [service],
+    [scenario, service],
   );
+
+  useEffect(() => {
+    if (
+      !customDataActive ||
+      importState.status !== "success" ||
+      importState.data.status === "failed"
+    ) {
+      return;
+    }
+    void Promise.all([refreshDashboard(), refreshHealthData(healthRange)]);
+  }, [
+    customDataActive,
+    healthRange,
+    importState,
+    refreshDashboard,
+    refreshHealthData,
+    scenario.userId,
+  ]);
 
   const askQuestion = useCallback(async () => {
     setCoachState({ status: "loading" });
@@ -681,9 +731,10 @@ export function JourneyProvider({ children, apiBaseUrl }: JourneyProviderProps) 
   const selectPersona = useCallback(
     (key: DemoPersonaKey) => {
       const next = initial.scenarios.find((item) => item.key === key);
-      if (next === undefined || next.key === scenario.key) {
+      if (next === undefined || next.userId === scenario.userId) {
         return;
       }
+      setCustomDataActive(false);
       setScenario(next);
       setQuestion(next.question);
       setProfileState({ status: "idle" });
@@ -698,7 +749,7 @@ export function JourneyProvider({ children, apiBaseUrl }: JourneyProviderProps) 
       setPlanState({ status: "idle" });
       setFeedbackState({ status: "idle" });
     },
-    [initial.scenarios, scenario.key],
+    [initial.scenarios, scenario.userId],
   );
 
   const progress = useMemo<JourneyProgress>(
