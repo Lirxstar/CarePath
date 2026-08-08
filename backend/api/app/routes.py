@@ -33,6 +33,7 @@ from backend.imports.fhir.parser import FHIRBundleImporter
 from backend.imports.json_importer import JSONHealthImporter
 from backend.imports.models import ImportReport
 from backend.imports.service import ImportService
+from backend.personalization.plan_calendar import user_local_date
 from backend.personalization.planner import (
     FeedbackSubmissionConflictError,
     InterventionPlanner,
@@ -355,7 +356,14 @@ def current_plan(
     session: SessionDependency,
     goal_id: UUID | None = None,
 ) -> CurrentPlanResponse:
-    today = datetime.now(UTC).date()
+    try:
+        today = user_local_date(session, user_id)
+    except ValueError as exc:
+        raise CarePathError(
+            "profile_not_found",
+            "The requested user profile does not exist",
+            status_code=HTTPStatus.NOT_FOUND,
+        ) from exc
     statement = select(InterventionPlanTable).where(
         InterventionPlanTable.user_id == str(user_id),
         InterventionPlanTable.status == PlanStatus.ACTIVE.value,
