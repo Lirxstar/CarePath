@@ -1,4 +1,5 @@
-import type { ReactNode } from "react";
+import { useCallback, type ReactNode } from "react";
+import { useFocusEffect, useIsFocused } from "@react-navigation/native";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import type { ControlledApiError } from "./api/client";
@@ -85,6 +86,13 @@ function RouteFrame({
 
 export function TodayRoute() {
   const journey = useJourney();
+  useFocusEffect(
+    useCallback(() => {
+      if (journey.progress.imported) {
+        void Promise.all([journey.refreshHealthStatus(), journey.refreshDashboard()]);
+      }
+    }, [journey.progress.imported, journey.refreshDashboard, journey.refreshHealthStatus]),
+  );
   const trendStates = PRIMARY_METRICS.flatMap((metric) => [
     journey.recent7States[metric],
     journey.baseline30States[metric],
@@ -141,9 +149,10 @@ export function HealthDataRoute() {
 }
 
 export function PlanHistoryRoute() {
+  const focused = useIsFocused();
   return (
     <RouteFrame error={null} retry={() => undefined}>
-      <PlanHistoryV08Screen />
+      {focused ? <PlanHistoryV08Screen key="focused-plan-history" /> : null}
     </RouteFrame>
   );
 }
