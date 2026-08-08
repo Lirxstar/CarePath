@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from http import HTTPStatus
-from typing import Annotated, cast
+from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Header, Request
@@ -36,7 +36,7 @@ class PrivateSessionEndResponse(BaseModel):
     summary="Create an isolated in-memory data session",
 )
 def create_private_session(request: Request) -> PrivateSessionResponse:
-    store = cast(PrivateSessionStore, request.app.state.private_sessions)
+    store: PrivateSessionStore = request.app.state.private_sessions
     session_id = store.create()
     return PrivateSessionResponse(session_id=session_id, ttl_minutes=store.ttl_minutes)
 
@@ -57,5 +57,5 @@ def end_private_session(
             status_code=HTTPStatus.BAD_REQUEST,
         )
     session_id = parse_private_session_id(private_session)
-    store = cast(PrivateSessionStore, request.app.state.private_sessions)
+    store: PrivateSessionStore = request.app.state.private_sessions
     return PrivateSessionEndResponse(cleared=store.close(session_id))
