@@ -42,7 +42,10 @@ function jsonResponse(payload: unknown, status = 200): Response {
 
 function setFetch(handler: (url: string, init?: RequestInit) => Promise<Response>): void {
   globalThis.fetch = ((input: string | URL | Request, init?: RequestInit) =>
-    handler(typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url, init)) as typeof fetch;
+    handler(
+      typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url,
+      init,
+    )) as typeof fetch;
 }
 
 class MemoryStorage {
