@@ -101,7 +101,7 @@ describe("custom import subject adoption", () => {
         "observation_id,user_id,observed_at",
         "incomplete",
         "a,,2026-08-01T08:00:00Z",
-        'b,"66666666-6666-4666-8666-666666666666","2026-08-05T08:00:00Z"',
+        "b,\"66666666-6666-4666-8666-666666666666\",\"2026-08-05T08:00:00Z\"",
       ].join("\n"),
     );
 
