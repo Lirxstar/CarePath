@@ -1,5 +1,6 @@
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
+import { AccountPrivacyPanel } from "./src/AccountPrivacyPanel";
 import { AppNavigator } from "./src/AppNavigator";
 import { AuthProvider } from "./src/auth/AuthContext";
 import { JourneyProvider } from "./src/journey/JourneyContext";
@@ -11,6 +12,7 @@ export default function App() {
       <AuthProvider>
         <PublicDemoNotice />
         <JourneyProvider>
+          <AccountPrivacyPanel />
           <AppNavigator />
         </JourneyProvider>
       </AuthProvider>
