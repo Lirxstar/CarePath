@@ -5,7 +5,7 @@ from http import HTTPStatus
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -31,7 +31,6 @@ from backend.domain.models import (
     QualityFlag,
     SourceType,
 )
-from backend.storage.database import get_session
 from backend.storage.models import (
     GoalTable,
     InterventionPlanTable,
@@ -41,10 +40,12 @@ from backend.storage.models import (
     UserProfileTable,
 )
 
+from .access import ensure_user_access
 from .errors import CarePathError
+from .session_scope import get_request_session
 
 router = APIRouter()
-SessionDependency = Annotated[Session, Depends(get_session)]
+SessionDependency = Annotated[Session, Depends(get_request_session)]
 MAX_OBSERVATION_BATCH = 500
 MAX_OBSERVATION_PAGE = 100
 MAX_PLAN_HISTORY_PAGE = 100
@@ -177,7 +178,8 @@ def _validated_query_time(value: datetime) -> datetime:
     response_model=UserProfile,
     summary="Read a CarePath user profile",
 )
-def read_profile(user_id: UUID, session: SessionDependency) -> UserProfile:
+def read_profile(request: Request, user_id: UUID, session: SessionDependency) -> UserProfile:
+    ensure_user_access(request, session, user_id)
     return _profile_from_row(_require_profile(session, user_id))
 
 
@@ -188,6 +190,7 @@ def read_profile(user_id: UUID, session: SessionDependency) -> UserProfile:
     summary="Write a validated batch of canonical observations atomically",
 )
 def write_observations_batch(
+    request: Request,
     payload: ObservationBatchRequest,
     session: SessionDependency,
 ) -> ObservationBatchResponse:
@@ -200,6 +203,7 @@ def write_observations_batch(
         )
 
     for user_id in {item.user_id for item in payload.observations}:
+        ensure_user_access(request, session, user_id)
         _require_profile(session, user_id)
 
     existing_ids = set(
@@ -245,6 +249,7 @@ def write_observations_batch(
     summary="Read observations in a bounded date range",
 )
 def read_observations(
+    request: Request,
     user_id: UUID,
     start_at: datetime,
     end_at: datetime,
@@ -253,6 +258,7 @@ def read_observations(
     limit: Annotated[int, Query(ge=1, le=MAX_OBSERVATION_PAGE)] = 100,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> ObservationPage:
+    ensure_user_access(request, session, user_id)
     _require_profile(session, user_id)
     start = _validated_query_time(start_at)
     end = _validated_query_time(end_at)
@@ -299,7 +305,12 @@ def read_observations(
     status_code=HTTPStatus.CREATED,
     summary="Write one canonical journal entry",
 )
-def write_journal(entry: JournalEntry, session: SessionDependency) -> JournalEntry:
+def write_journal(
+    request: Request,
+    entry: JournalEntry,
+    session: SessionDependency,
+) -> JournalEntry:
+    ensure_user_access(request, session, entry.user_id)
     _require_profile(session, entry.user_id)
     if session.get(JournalEntryTable, str(entry.entry_id)) is not None:
         raise CarePathError(
@@ -327,7 +338,8 @@ def write_journal(entry: JournalEntry, session: SessionDependency) -> JournalEnt
     status_code=HTTPStatus.CREATED,
     summary="Create one canonical behavioural goal",
 )
-def create_goal(goal: Goal, session: SessionDependency) -> Goal:
+def create_goal(request: Request, goal: Goal, session: SessionDependency) -> Goal:
+    ensure_user_access(request, session, goal.user_id)
     _require_profile(session, goal.user_id)
     if session.get(GoalTable, str(goal.goal_id)) is not None:
         raise CarePathError(
@@ -356,12 +368,14 @@ def create_goal(goal: Goal, session: SessionDependency) -> Goal:
     summary="Read historical plan versions for a user",
 )
 def read_plan_history(
+    request: Request,
     user_id: UUID,
     session: SessionDependency,
     goal_id: UUID | None = None,
     limit: Annotated[int, Query(ge=1, le=MAX_PLAN_HISTORY_PAGE)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> PlanHistoryResponse:
+    ensure_user_access(request, session, user_id)
     _require_profile(session, user_id)
     statement = select(InterventionPlanTable).where(InterventionPlanTable.user_id == str(user_id))
     if goal_id is not None:

@@ -26,6 +26,7 @@ export interface ApiRequestInit {
 }
 
 export type ApiFetcher = (url: string, init: ApiRequestInit) => Promise<ApiResponse>;
+export type ApiHeaderProvider = () => Record<string, string>;
 
 const ACCEPT_HEADERS = { Accept: "application/json" } as const;
 
@@ -82,20 +83,33 @@ function normalisePath(path: string): string {
 export class CarePathApiClient {
   private readonly baseUrl: string;
   private readonly fetcher: ApiFetcher;
+  private readonly headerProvider: ApiHeaderProvider;
 
-  constructor(baseUrl: string, fetcher: ApiFetcher) {
+  constructor(
+    baseUrl: string,
+    fetcher: ApiFetcher,
+    headerProvider: ApiHeaderProvider = () => ({}),
+  ) {
     this.baseUrl = baseUrl.replace(/\/+$/, "");
     this.fetcher = fetcher;
+    this.headerProvider = headerProvider;
   }
 
   get<T>(path: string): Promise<ApiResult<T>> {
-    return this.request<T>(path, { method: "GET", headers: { ...ACCEPT_HEADERS } });
+    return this.request<T>(path, {
+      method: "GET",
+      headers: { ...ACCEPT_HEADERS, ...this.headerProvider() },
+    });
   }
 
   post<T>(path: string, body: unknown): Promise<ApiResult<T>> {
     return this.request<T>(path, {
       method: "POST",
-      headers: { ...ACCEPT_HEADERS, "Content-Type": "application/json" },
+      headers: {
+        ...ACCEPT_HEADERS,
+        ...this.headerProvider(),
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify(body),
     });
   }

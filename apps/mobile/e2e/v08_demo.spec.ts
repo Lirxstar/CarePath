@@ -72,6 +72,34 @@ test("real backend primary journey records a two-round feedback-adaptation flow"
   await captureEvidence(page, "plan-history-return");
 });
 
+test("Private mode uses an isolated non-persistent workspace", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByTestId("account-privacy-panel")).toBeVisible();
+  await page.getByRole("button", { name: "Manage" }).click();
+  await expect(page.getByText(/Signing in is never required/)).toBeVisible();
+  await expect(page.getByText(/Account sign-in is not configured/)).toBeVisible();
+
+  await page.getByRole("button", { name: "Turn on Private mode" }).click();
+  await expect(page.getByText("Public research demo · Private mode")).toBeVisible();
+  await expect(
+    page
+      .getByTestId("public-demo-notice")
+      .getByText(/not written to the persistent CarePath database/),
+  ).toBeVisible();
+  await expect(page.getByText(/temporary server memory only/)).toBeVisible();
+
+  await page.getByRole("button", { name: "Load demo" }).click();
+  await expect(page.getByText("Demo loaded")).toBeVisible({ timeout: 30_000 });
+  await openTab(page, "tab-health-data");
+  await expect(page.getByText("Raw longitudinal chart")).toBeVisible();
+  await captureEvidence(page, "private-mode-health-data");
+
+  await page.getByRole("button", { name: "Exit Private mode" }).click();
+  await expect(page.getByText("Public research demo")).toBeVisible();
+  await expect(page.getByText(/Submitted data may be retained on the demo server/)).toBeVisible();
+  await expect(page.getByText("Demo loaded")).toHaveCount(0);
+});
+
 test("desktop reviewer supports refresh and tab routing", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/");

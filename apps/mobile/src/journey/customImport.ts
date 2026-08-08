@@ -1,3 +1,4 @@
+import { runtimeAccountUserId, runtimePrivateMode } from "../auth/runtimeState";
 import type { DemoScenario } from "./demoScenario";
 
 export type CustomImportFormat = "csv" | "json";
@@ -102,6 +103,16 @@ export function extractCustomImportSubject(
   return format === "json" ? jsonSubject(content) : csvSubject(content);
 }
 
+function customImportDescription(): string {
+  if (runtimePrivateMode()) {
+    return "User-supplied health data loaded in Private mode. This workspace is held in temporary server memory and is not written to persistent storage.";
+  }
+  if (runtimeAccountUserId() !== null) {
+    return "User-supplied health data saved under your signed-in CarePath account.";
+  }
+  return "User-supplied health data loaded through the public demo. Submitted data may be retained on the demo server.";
+}
+
 export function buildCustomScenario(
   format: CustomImportFormat,
   content: string,
@@ -114,10 +125,9 @@ export function buildCustomScenario(
   return {
     ...base,
     displayName: "Your imported data",
-    description:
-      "User-supplied health data loaded through the public demo. Submitted data may be retained on the demo server.",
+    description: customImportDescription(),
     goalLabel: "Explore recent patterns and a realistic health-behaviour plan.",
-    userId: subject.userId,
+    userId: runtimeAccountUserId() ?? subject.userId,
     endDate: subject.endDate,
     question: "What patterns do you notice in my recent data, and what is realistic this week?",
   };

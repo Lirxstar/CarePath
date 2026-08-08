@@ -4,12 +4,14 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type PropsWithChildren,
 } from "react";
 
 import type { ApiLoadState, ApiResult, ControlledApiError } from "../api/client";
 import { createRuntimeApiClient } from "../api/runtime";
+import { useAuth } from "../auth/AuthContext";
 import type {
   ApiHealthResponse,
   CoachMessageResponse,
@@ -69,6 +71,7 @@ interface JourneyContextValue {
   feedbackState: ApiLoadState<PlanFeedbackResponse>;
   progress: JourneyProgress;
   selectPersona: (key: DemoPersonaKey) => void;
+  activateSavedData: (userId: string, latestObservationAt: string) => void;
   refreshHealthStatus: () => Promise<void>;
   importDemo: () => Promise<void>;
   importCustom: (format: ImportFormat, content: string) => Promise<void>;
@@ -507,6 +510,7 @@ function resultState<T>(result: ApiResult<T>): ApiLoadState<T> {
 }
 
 export function JourneyProvider({ children, apiBaseUrl }: JourneyProviderProps) {
+  const { privateMode } = useAuth();
   const [initial] = useState(() => {
     const scenarios = buildDemoScenarios();
     const scenario = scenarios[0];
@@ -518,6 +522,8 @@ export function JourneyProvider({ children, apiBaseUrl }: JourneyProviderProps) 
   const [scenario, setScenario] = useState(initial.scenario);
   const [question, setQuestion] = useState(initial.scenario.question);
   const [customDataActive, setCustomDataActive] = useState(false);
+  const [restoredDataActive, setRestoredDataActive] = useState(false);
+  const previousPrivateMode = useRef(privateMode);
   const mockMode = process.env.EXPO_PUBLIC_CAREPATH_MOCK_MODE === "true";
   const service = useMemo<JourneyService>(
     () =>
@@ -558,6 +564,36 @@ export function JourneyProvider({ children, apiBaseUrl }: JourneyProviderProps) 
   const [feedbackState, setFeedbackState] = useState<ApiLoadState<PlanFeedbackResponse>>({
     status: "idle",
   });
+
+  const resetJourneyStates = useCallback(() => {
+    setProfileState({ status: "idle" });
+    setImportState({ status: "idle" });
+    setCustomImportState({ status: "idle" });
+    setRecent7States(idleTrendStates());
+    setBaseline30States(idleTrendStates());
+    setSeriesStates(idleSeriesStates());
+    setCoachState({ status: "idle" });
+    setPatientEvidenceState({ status: "idle" });
+    setExternalEvidenceState({ status: "idle" });
+    setPlanState({ status: "idle" });
+    setFeedbackState({ status: "idle" });
+  }, []);
+
+  useEffect(() => {
+    if (previousPrivateMode.current === privateMode) {
+      return;
+    }
+    previousPrivateMode.current = privateMode;
+    const next = initial.scenarios[0];
+    if (next === undefined) {
+      return;
+    }
+    setCustomDataActive(false);
+    setRestoredDataActive(false);
+    setScenario(next);
+    setQuestion(next.question);
+    resetJourneyStates();
+  }, [initial.scenarios, privateMode, resetJourneyStates]);
 
   const refreshHealthStatus = useCallback(async () => {
     setHealthState({ status: "loading" });
@@ -626,6 +662,7 @@ export function JourneyProvider({ children, apiBaseUrl }: JourneyProviderProps) 
 
   const importDemo = useCallback(async () => {
     setCustomDataActive(false);
+    setRestoredDataActive(false);
     setImportState({ status: "loading" });
     setFeedbackState({ status: "idle" });
     const result = await service.importDemo();
@@ -658,6 +695,7 @@ export function JourneyProvider({ children, apiBaseUrl }: JourneyProviderProps) 
         setQuestion(nextScenario.question);
         setImportState(resultState(result));
         setCustomDataActive(true);
+        setRestoredDataActive(false);
         setProfileState({ status: "idle" });
         setRecent7States(idleTrendStates());
         setBaseline30States(idleTrendStates());
@@ -689,6 +727,15 @@ export function JourneyProvider({ children, apiBaseUrl }: JourneyProviderProps) 
     refreshHealthData,
     scenario.userId,
   ]);
+
+  useEffect(() => {
+    if (!restoredDataActive) {
+      return;
+    }
+    void Promise.all([refreshDashboard(), refreshHealthData(healthRange)]).finally(() => {
+      setRestoredDataActive(false);
+    });
+  }, [healthRange, refreshDashboard, refreshHealthData, restoredDataActive, scenario.userId]);
 
   const askQuestion = useCallback(async () => {
     setCoachState({ status: "loading" });
@@ -728,6 +775,27 @@ export function JourneyProvider({ children, apiBaseUrl }: JourneyProviderProps) 
     [planState, refreshPlan, service],
   );
 
+  const activateSavedData = useCallback(
+    (userId: string, latestObservationAt: string) => {
+      const endDate = new Date(latestObservationAt).toISOString().slice(0, 10);
+      const next: DemoScenario = {
+        ...scenario,
+        displayName: "Your saved data",
+        description: "Health data saved under your signed-in CarePath account.",
+        goalLabel: "Continue exploring your recent patterns and current health-behaviour plan.",
+        userId,
+        endDate,
+        question: "What patterns do you notice in my saved data, and what is realistic this week?",
+      };
+      setCustomDataActive(false);
+      setScenario(next);
+      setQuestion(next.question);
+      resetJourneyStates();
+      setRestoredDataActive(true);
+    },
+    [resetJourneyStates, scenario],
+  );
+
   const selectPersona = useCallback(
     (key: DemoPersonaKey) => {
       const next = initial.scenarios.find((item) => item.key === key);
@@ -735,21 +803,12 @@ export function JourneyProvider({ children, apiBaseUrl }: JourneyProviderProps) 
         return;
       }
       setCustomDataActive(false);
+      setRestoredDataActive(false);
       setScenario(next);
       setQuestion(next.question);
-      setProfileState({ status: "idle" });
-      setImportState({ status: "idle" });
-      setCustomImportState({ status: "idle" });
-      setRecent7States(idleTrendStates());
-      setBaseline30States(idleTrendStates());
-      setSeriesStates(idleSeriesStates());
-      setCoachState({ status: "idle" });
-      setPatientEvidenceState({ status: "idle" });
-      setExternalEvidenceState({ status: "idle" });
-      setPlanState({ status: "idle" });
-      setFeedbackState({ status: "idle" });
+      resetJourneyStates();
     },
-    [initial.scenarios, scenario.userId],
+    [initial.scenarios, resetJourneyStates, scenario.userId],
   );
 
   const progress = useMemo<JourneyProgress>(
@@ -802,6 +861,7 @@ export function JourneyProvider({ children, apiBaseUrl }: JourneyProviderProps) 
       feedbackState,
       progress,
       selectPersona,
+      activateSavedData,
       refreshHealthStatus,
       importDemo,
       importCustom,
@@ -812,6 +872,7 @@ export function JourneyProvider({ children, apiBaseUrl }: JourneyProviderProps) 
       submitFeedback,
     }),
     [
+      activateSavedData,
       askQuestion,
       baseline30States,
       coachState,
