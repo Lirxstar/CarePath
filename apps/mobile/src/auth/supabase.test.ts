@@ -40,7 +40,9 @@ function jsonResponse(payload: unknown, status = 200): Response {
   });
 }
 
-function setFetch(handler: (url: string, init?: RequestInit) => Response | Promise<Response>): void {
+function setFetch(
+  handler: (url: string, init?: RequestInit) => Response | Promise<Response>,
+): void {
   globalThis.fetch = (input, init) =>
     Promise.resolve(
       handler(
@@ -177,9 +179,7 @@ describe("Supabase auth REST client", () => {
     const relative = await signInWithPassword(CONFIG, "a@b.co", "password1");
     expect(relative.expiresAt).toBeGreaterThanOrEqual(now + 120);
 
-    setFetch(() =>
-      jsonResponse({ access_token: "a", refresh_token: "r", token_type: "bearer" }),
-    );
+    setFetch(() => jsonResponse({ access_token: "a", refresh_token: "r", token_type: "bearer" }));
     const fallback = await signInWithPassword(CONFIG, "a@b.co", "password1");
     expect(fallback.expiresAt).toBeGreaterThanOrEqual(now + 3599);
   });
