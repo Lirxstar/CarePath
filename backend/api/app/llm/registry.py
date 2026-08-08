@@ -1,10 +1,14 @@
 from collections.abc import Callable
 
+from .local_openai import LocalOpenAIProvider
 from .mock import MockLLMProvider
 from .provider import LLMProvider
 
 ProviderFactory = Callable[[], LLMProvider]
-_PROVIDERS: dict[str, ProviderFactory] = {"mock": MockLLMProvider}
+_PROVIDERS: dict[str, ProviderFactory] = {
+    "local_openai": LocalOpenAIProvider,
+    "mock": MockLLMProvider,
+}
 
 
 def register_provider(name: str, factory: ProviderFactory, *, replace: bool = False) -> None:
