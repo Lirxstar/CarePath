@@ -1,0 +1,36 @@
+name: Diagnostic mypy
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  mypy:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install quality dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements-dev.lock
+      - name: Capture mypy output
+        id: mypy
+        shell: bash
+        run: |
+          set +e
+          python -m mypy backend > /tmp/mypy.txt 2>&1
+          rc=$?
+          echo "$rc" > /tmp/mypy.rc
+          cat /tmp/mypy.txt
+          exit 0
+      - name: Upload mypy diagnostics
+        uses: actions/upload-artifact@v4
+        with:
+          name: mypy-diagnostics
+          path: |
+            /tmp/mypy.txt
+            /tmp/mypy.rc
