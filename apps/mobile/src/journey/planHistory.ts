@@ -163,7 +163,9 @@ export function explainPlanChanges(
           : "increased";
       explanations.push(`Difficulty ${direction}: ${action.rationale}`);
     } else if (prior.description !== action.description) {
-      explanations.push(`Action changed while difficulty stayed ${action.difficulty}: ${action.rationale}`);
+      explanations.push(
+        `Action changed while difficulty stayed ${action.difficulty}: ${action.rationale}`,
+      );
     }
     if (prior.status !== action.status) {
       explanations.push(
@@ -178,10 +180,7 @@ export function explainPlanChanges(
 }
 
 export class PlanHistoryApi {
-  private readonly pendingFeedback = new Map<
-    string,
-    Promise<ApiResult<PlanFeedbackResponse>>
-  >();
+  private readonly pendingFeedback = new Map<string, Promise<ApiResult<PlanFeedbackResponse>>>();
 
   constructor(
     private readonly client: CarePathApiClient,
