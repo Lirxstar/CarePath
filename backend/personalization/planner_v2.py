@@ -9,6 +9,7 @@ from typing import Literal, Self
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from backend.agents.context_builder import UserStateSummary
+from backend.analysis_quality import ReliabilityLevel
 from backend.domain.models import ActionDifficulty, Domain, MetricType
 from backend.retrieval.evidence import ClaimScope, EvidenceBundle
 
@@ -124,6 +125,10 @@ class PersonalizedInterventionPlanner:
             and not isinstance(profile_adherence, bool)
         ):
             completion = max(0.0, min(1.0, float(profile_adherence)))
+        accepted_feedback_present = (
+            summary.adherence.total_feedback_count > summary.adherence.scored_feedback_count
+            and summary.adherence.reliability is not ReliabilityLevel.LOW
+        )
 
         metric = summary.metric(_DOMAIN_METRIC[domain], 7)
         data_limited = metric is None or not metric.data_sufficient
@@ -151,7 +156,13 @@ class PersonalizedInterventionPlanner:
         description = self._description(
             domain, minutes, bool(summary.constraints.get("activity_constraints"))
         )
-        rationale = self._rationale(completion, data_limited, stressed, basis)
+        rationale = self._rationale(
+            completion,
+            data_limited,
+            stressed,
+            basis,
+            accepted_feedback_present=accepted_feedback_present,
+        )
         follow_up = (
             "Review completion and comfort after seven days; scale the next plan down "
             "if completion is low, and pause any action that conflicts with a professional "
@@ -277,6 +288,8 @@ class PersonalizedInterventionPlanner:
         data_limited: bool,
         stressed: bool,
         basis: GuidanceBasis,
+        *,
+        accepted_feedback_present: bool = False,
     ) -> str:
         reasons: list[str] = []
         if completion is not None and completion < 0.6:
@@ -285,6 +298,11 @@ class PersonalizedInterventionPlanner:
             reasons.append("recent stress data were high, so workload was kept small")
         if data_limited:
             reasons.append("recent data were incomplete, so the plan stays conservative")
+        if not reasons and accepted_feedback_present:
+            reasons.append(
+                "recent accepted feedback supports maintaining the current action size until "
+                "completion evidence is available"
+            )
         if not reasons:
             reasons.append(
                 "the action is scaled to the available user context and prior completion history"
