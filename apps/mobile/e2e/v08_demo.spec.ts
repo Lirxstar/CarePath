@@ -19,7 +19,7 @@ test.beforeAll(async () => {
   await mkdir(screenshots, { recursive: true });
 });
 
-test("real backend primary journey has four screenshots and one recorded flow", async ({
+test("real backend primary journey records a two-round feedback-adaptation flow", async ({
   page,
 }) => {
   await page.goto("/");
@@ -62,4 +62,5 @@ test("real backend primary journey has four screenshots and one recorded flow", 
   await expect(page.getByText("What I noticed")).toBeVisible({ timeout: 45_000 });
   await expect(page.getByText(/Take an 8-minute comfortable walk/).first()).toBeVisible();
   await expect(page.getByText(/Take a 12-minute comfortable walk/)).toHaveCount(0);
+  await captureEvidence(page, "coach-after-feedback");
 });
