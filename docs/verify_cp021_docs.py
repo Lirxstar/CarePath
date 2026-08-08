@@ -15,10 +15,7 @@ DIAGRAMS = (
     ROOT / "docs" / "diagrams" / "deployment-boundary.mmd",
 )
 
-QUICKSTART = (
-    "docker compose --env-file deployment/.env.compose.example "
-    "up -d --build --wait"
-)
+QUICKSTART = "docker compose --env-file deployment/.env.compose.example up -d --build --wait"
 PUBLIC_URL = "https://carepath-api-8edq.onrender.com"
 
 PUBLIC_DOC_FORBIDDEN_TERMS = (
@@ -64,7 +61,12 @@ def verify_first_screen(readme: str) -> None:
     if architecture_heading < 0:
         fail("README is missing the Architecture section")
     preamble = readme[:architecture_heading]
-    for marker in ("**Problem.**", "**System.**", "**Reference result.**", "**Run locally from a clean clone.**"):
+    for marker in (
+        "**Problem.**",
+        "**System.**",
+        "**Reference result.**",
+        "**Run locally from a clean clone.**",
+    ):
         if marker not in preamble:
             fail(f"README first screen is missing {marker}")
     if PUBLIC_URL not in preamble:
@@ -138,9 +140,7 @@ def main() -> None:
     verify_first_screen(readme)
     verify_limitations(readme)
     verify_architecture(architecture, diagram_texts)
-    verify_vendor_neutral_public_docs(
-        {README: readme, ARCHITECTURE: architecture, **diagram_texts}
-    )
+    verify_vendor_neutral_public_docs({README: readme, ARCHITECTURE: architecture, **diagram_texts})
     verify_local_links(README, readme)
     verify_local_links(ARCHITECTURE, architecture)
 
