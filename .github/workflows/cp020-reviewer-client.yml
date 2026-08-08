@@ -1,0 +1,148 @@
+name: CP-020 reviewer client
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+    paths:
+      - Dockerfile
+      - backend/api/app/config.py
+      - backend/api/app/main.py
+      - apps/mobile/**
+      - deployment/public_backend_url.txt
+      - tests/test_cp020_reviewer_deployment.py
+      - .github/workflows/cp020-reviewer-client.yml
+
+permissions:
+  contents: read
+
+jobs:
+  integrated-reviewer:
+    name: Integrated Docker reviewer journey
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Build and start deployment stack
+        run: >-
+          docker compose --env-file deployment/.env.compose.example
+          up -d --build --wait --wait-timeout 180
+
+      - name: Verify reviewer root and API readiness
+        run: |
+          python - <<'PY'
+          import json
+          import urllib.request
+
+          root_request = urllib.request.Request(
+              "http://127.0.0.1:8000/",
+              headers={"Accept": "text/html"},
+          )
+          with urllib.request.urlopen(root_request, timeout=15) as response:
+              body = response.read().decode("utf-8")
+              content_type = response.headers.get("Content-Type", "")
+          if "text/html" not in content_type or "<!DOCTYPE HTML" not in body.upper():
+              raise SystemExit("reviewer root is not the Expo Web document")
+
+          with urllib.request.urlopen("http://127.0.0.1:8000/health/ready", timeout=15) as response:
+              ready = json.load(response)
+          if ready.get("status") != "ready":
+              raise SystemExit(f"backend is not ready: {ready}")
+          PY
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: apps/mobile/.nvmrc
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+
+      - name: Install browser gate runtime
+        working-directory: apps/mobile
+        run: |
+          npm ci
+          npm install --no-save --package-lock=false @playwright/test@1.54.1
+          npx playwright install --with-deps chromium
+
+      - name: Run primary journey against integrated deployment
+        working-directory: apps/mobile
+        env:
+          CAREPATH_E2E_BASE_URL: http://127.0.0.1:8000
+        run: npx playwright test --config=e2e/playwright.v08.config.ts
+
+      - name: Show deployment logs on failure
+        if: failure()
+        run: docker compose --env-file deployment/.env.compose.example logs --no-color || true
+
+      - name: Upload integrated reviewer evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cp020-integrated-reviewer-${{ github.run_attempt }}
+          path: docs/evidence/v08/**
+          include-hidden-files: true
+          if-no-files-found: warn
+
+      - name: Tear down deployment stack
+        if: always()
+        run: docker compose --env-file deployment/.env.compose.example down -v --remove-orphans
+
+  public-reviewer:
+    name: Public reviewer journey
+    if: github.event_name == 'push'
+    needs: integrated-reviewer
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: apps/mobile/.nvmrc
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+
+      - name: Install public browser gate runtime
+        working-directory: apps/mobile
+        run: |
+          npm ci
+          npm install --no-save --package-lock=false @playwright/test@1.54.1
+          npx playwright install --with-deps chromium
+
+      - name: Wait for Render to publish the reviewer build
+        run: |
+          set -euo pipefail
+          public_url="$(tr -d '\r\n' < deployment/public_backend_url.txt)"
+          echo "CAREPATH_E2E_BASE_URL=${public_url}" >> "${GITHUB_ENV}"
+          for attempt in {1..80}; do
+            echo "Reviewer deployment probe ${attempt}/80"
+            if curl --fail --silent --show-error \
+              --header 'Accept: text/html' \
+              "${public_url}/" \
+              --output /tmp/carepath-reviewer.html \
+              && grep -qi '<!DOCTYPE html' /tmp/carepath-reviewer.html \
+              && python deployment/verify_backend.py "${public_url}"; then
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "Public reviewer build did not become ready within the acceptance window." >&2
+          exit 1
+
+      - name: Run primary journey against public deployment
+        working-directory: apps/mobile
+        run: npx playwright test --config=e2e/playwright.v08.config.ts
+
+      - name: Upload public reviewer evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cp020-public-reviewer-${{ github.run_attempt }}
+          path: docs/evidence/v08/**
+          include-hidden-files: true
+          if-no-files-found: warn

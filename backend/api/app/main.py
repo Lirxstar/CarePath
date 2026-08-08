@@ -5,11 +5,13 @@ import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from http import HTTPStatus
+from pathlib import Path
 from typing import cast
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .config import Settings, get_settings
@@ -41,6 +43,29 @@ def normalize_request_id(value: str | None, *, max_length: int) -> str:
 def route_template(request: Request) -> str:
     route = request.scope.get("route")
     return getattr(route, "path", "<unmatched>")
+
+
+def configure_reviewer_web(application: FastAPI, directory: str | None) -> None:
+    if directory is None:
+        return
+
+    reviewer_dir = Path(directory).expanduser().resolve()
+    index_path = reviewer_dir / "index.html"
+    if not reviewer_dir.is_dir() or not index_path.is_file():
+        raise ValueError("reviewer_web_dir must contain an Expo Web index.html")
+
+    @application.get("/", include_in_schema=False)
+    async def reviewer_root() -> FileResponse:
+        return FileResponse(index_path, media_type="text/html")
+
+    for url_prefix, child_name in (("/_expo", "_expo"), ("/assets", "assets")):
+        child_dir = reviewer_dir / child_name
+        if child_dir.is_dir():
+            application.mount(
+                url_prefix,
+                StaticFiles(directory=child_dir),
+                name=f"reviewer-{child_name}",
+            )
 
 
 def create_app(
@@ -129,6 +154,7 @@ def create_app(
         active_provider = cast(LLMProvider, request.app.state.provider)
         return await active_provider.health_check()
 
+    configure_reviewer_web(application, resolved_settings.reviewer_web_dir)
     return application
 
 

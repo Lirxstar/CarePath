@@ -50,6 +50,7 @@ class Settings(BaseSettings):
         default="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
         min_length=1,
     )
+    reviewer_web_dir: str | None = None
 
     @field_validator("log_level")
     @classmethod
@@ -80,6 +81,14 @@ class Settings(BaseSettings):
         if not normalized:
             raise ValueError("configuration value must not be empty")
         return normalized
+
+    @field_validator("reviewer_web_dir")
+    @classmethod
+    def normalize_optional_path(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        return normalized or None
 
     @field_validator("local_llm_base_url")
     @classmethod
