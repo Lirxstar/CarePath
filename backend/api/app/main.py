@@ -21,6 +21,7 @@ from .errors import (
     handle_validation_error,
 )
 from .evidence_routes import router as evidence_router
+from .health import router as health_router
 from .health_data_routes import router as health_data_router
 from .llm.provider import JsonObject, LLMProvider
 from .llm.registry import get_provider
@@ -121,6 +122,7 @@ def create_app(
     application.include_router(api_router)
     application.include_router(health_data_router)
     application.include_router(evidence_router)
+    application.include_router(health_router)
 
     @application.get("/health")
     async def health(request: Request) -> JsonObject:
