@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from .models import PreparedImport
+from backend.imports.models import PreparedImport
 
 
 _USER_SCOPED_GROUPS = (
