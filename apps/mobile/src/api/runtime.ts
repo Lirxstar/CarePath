@@ -1,3 +1,4 @@
+import { runtimeApiHeaders } from "../auth/runtimeState";
 import {
   CarePathApiClient,
   type ApiFetcher,
@@ -45,7 +46,7 @@ const expoFetch: RuntimeFetch = async (url, init) => {
 
 export function createRuntimeApiClient(
   baseUrl?: string,
-  headerProvider: ApiHeaderProvider = () => ({}),
+  headerProvider: ApiHeaderProvider = runtimeApiHeaders,
 ): CarePathApiClient {
   return new CarePathApiClient(
     baseUrl ?? resolveApiBaseUrl(process.env.EXPO_PUBLIC_CAREPATH_API_URL),
