@@ -128,11 +128,15 @@ export function comparePlanVersions(
   return { difficultyChanges, descriptionChanges, statusChanges };
 }
 
-const DIFFICULTY_RANK: Record<PlanAction["difficulty"], number> = {
-  low: 0,
-  medium: 1,
-  high: 2,
-};
+function difficultyRank(difficulty: PlanAction["difficulty"]): number {
+  if (difficulty === "low") {
+    return 0;
+  }
+  if (difficulty === "medium") {
+    return 1;
+  }
+  return 2;
+}
 
 export function explainPlanChanges(
   current: PlanHistoryItem,
@@ -153,7 +157,7 @@ export function explainPlanChanges(
     }
     if (prior.difficulty !== action.difficulty) {
       const direction =
-        DIFFICULTY_RANK[action.difficulty] < DIFFICULTY_RANK[prior.difficulty]
+        difficultyRank(action.difficulty) < difficultyRank(prior.difficulty)
           ? "reduced"
           : "increased";
       explanations.push(`Difficulty ${direction}: ${action.rationale}`);
