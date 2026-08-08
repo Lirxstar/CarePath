@@ -77,7 +77,7 @@ interface WebRuntime {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 function runtime(): WebRuntime {
-  return globalThis as typeof globalThis & WebRuntime;
+  return globalThis;
 }
 
 function errorText(error: unknown): string {
@@ -136,11 +136,11 @@ export function AuthProvider({ children, apiBaseUrl }: AuthProviderProps) {
   );
 
   useEffect(() => {
-    let cancelled = false;
+    const controller = new AbortController();
     const initialise = async () => {
       const client = createRuntimeApiClient(apiBaseUrl, () => ({}));
       const configResult = await client.get<PublicRuntimeConfig>("/config/public");
-      if (cancelled) {
+      if (controller.signal.aborted) {
         return;
       }
       if (!configResult.ok) {
@@ -185,20 +185,20 @@ export function AuthProvider({ children, apiBaseUrl }: AuthProviderProps) {
         } catch (error) {
           saveSession(null);
           clearAccountRuntime();
-          if (!cancelled) {
+          if (!controller.signal.aborted) {
             setAuthStatus("anonymous");
             setAuthMessage(errorText(error));
           }
           return;
         }
       }
-      if (!cancelled) {
+      if (!controller.signal.aborted) {
         await loadAccount(restored);
       }
     };
     void initialise();
     return () => {
-      cancelled = true;
+      controller.abort();
     };
   }, [apiBaseUrl, loadAccount]);
 
