@@ -37,7 +37,7 @@ flowchart LR
     LOGS[("Operational logs\nIDs · route · status · latency · error class")]
   end
 
-  UI -->|"HTTPS request / feedback"| API
+  UI -->|"authenticated + consented"| API
   API --> SAFE --> CTX --> ROUTER
   ROUTER --> TOOLS
   ROUTER --> PERSONAL
@@ -48,17 +48,19 @@ flowchart LR
   PLAN --> VERIFY --> COMPOSE --> API
   API -->|"structured response"| UI
 
-  CTX <-->|"authorized task-specific reads"| DB
-  TOOLS <-->|"typed user-scoped observation reads"| DB
-  PERSONAL <-->|"minimal snippets + stable refs"| PERSONAL_NS
+  CTX <-->|"user-scoped"| DB
+  TOOLS <-->|"selected observations only"| DB
+  PERSONAL <-->|"minimal personal context"| PERSONAL_NS
   API -->|"validated plan / feedback writes"| DB
 
-  SOURCE -->|"document + metadata"| INGEST --> CORPUS
+  SOURCE -->|"document + metadata"| INGEST
+  INGEST -->|"validated/sanitized chunks"| CORPUS
   EXTERNAL <-->|"eligible chunks + provenance"| CORPUS
 
   PLAN <-->|"sanitized ModelRequest / normalized draft"| PROVIDER
-  PROVIDER <-->|"allow-listed payload / untrusted completion"| ENDPOINT
+  PROVIDER -->|"no DB credentials/access"| ENDPOINT
+  ENDPOINT -->|"untrusted completion"| PROVIDER
 
-  API -->|"request/audit metadata"| AUDIT
+  API -->|"schema-controlled audit event"| AUDIT
   COMPOSE -->|"decision refs + disposition"| AUDIT
-  API -->|"metadata only"| LOGS
+  API -->|"status · latency · error class only"| LOGS
