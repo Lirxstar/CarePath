@@ -106,7 +106,10 @@ describe("Supabase auth REST client", () => {
       googleAuthorizeUrl({ ...CONFIG, supabase_url: null }, "https://carepath.example/"),
     ).toThrow("Account sign-in is not configured");
     expect(() =>
-      googleAuthorizeUrl({ ...CONFIG, supabase_publishable_key: null }, "https://carepath.example/"),
+      googleAuthorizeUrl(
+        { ...CONFIG, supabase_publishable_key: null },
+        "https://carepath.example/",
+      ),
     ).toThrow("Account sign-in is not configured");
   });
 
