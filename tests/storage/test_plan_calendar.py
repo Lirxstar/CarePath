@@ -31,7 +31,9 @@ def test_plan_calendar_uses_profile_timezone(database_session: Session) -> None:
     utc_user = _profile(database_session, "UTC")
     instant = datetime(2026, 8, 8, 16, 30, tzinfo=UTC)
 
-    assert user_local_date(database_session, tokyo_user, instant=instant).isoformat() == "2026-08-09"
+    assert (
+        user_local_date(database_session, tokyo_user, instant=instant).isoformat() == "2026-08-09"
+    )
     assert user_local_date(database_session, utc_user, instant=instant).isoformat() == "2026-08-08"
 
 
