@@ -52,6 +52,12 @@ class Settings(BaseSettings):
     )
     reviewer_web_dir: str | None = None
 
+    supabase_url: str | None = None
+    supabase_publishable_key: SecretStr | None = None
+    auth_request_timeout_seconds: float = Field(default=5.0, gt=0, le=30)
+    private_session_ttl_minutes: int = Field(default=60, ge=5, le=1440)
+    private_session_max_sessions: int = Field(default=128, ge=1, le=2048)
+
     @field_validator("log_level")
     @classmethod
     def validate_log_level(cls, value: str) -> str:
@@ -89,6 +95,35 @@ class Settings(BaseSettings):
             return None
         normalized = value.strip()
         return normalized or None
+
+    @field_validator("supabase_url")
+    @classmethod
+    def validate_supabase_url(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip().rstrip("/")
+        if not normalized:
+            return None
+        parsed = urlparse(normalized)
+        localhost = parsed.hostname in {"127.0.0.1", "localhost", "::1"}
+        if (
+            parsed.scheme not in ({"http", "https"} if localhost else {"https"})
+            or parsed.hostname is None
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.query
+            or parsed.fragment
+        ):
+            raise ValueError("supabase_url must be a credential-free HTTPS origin")
+        return normalized
+
+    @field_validator("supabase_publishable_key")
+    @classmethod
+    def normalize_supabase_publishable_key(cls, value: SecretStr | None) -> SecretStr | None:
+        if value is None:
+            return None
+        normalized = value.get_secret_value().strip()
+        return SecretStr(normalized) if normalized else None
 
     @field_validator("local_llm_base_url")
     @classmethod
