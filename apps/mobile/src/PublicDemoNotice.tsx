@@ -12,7 +12,11 @@ export function PublicDemoNotice() {
   }
 
   return (
-    <View accessibilityRole="summary" style={styles.notice} testID="public-demo-notice">
+    <View
+      accessibilityRole="summary"
+      style={styles.notice}
+      testID="public-demo-notice"
+    >
       <Text style={styles.title}>{PUBLIC_DEMO_NOTICE.title}</Text>
       <Text style={styles.body}>{PUBLIC_DEMO_NOTICE.body}</Text>
     </View>
