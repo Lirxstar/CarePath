@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -16,6 +16,7 @@ import type { CurrentPlanResponse, PlanAction, PlanFeedbackResponse } from "./jo
 import { useJourney } from "./journey/JourneyContext";
 import {
   comparePlanVersions,
+  explainPlanChanges,
   feedbackPayload,
   lighterAlternative,
   PlanHistoryApi,
@@ -205,6 +206,7 @@ function HistoryItem({
   previous: PlanHistoryItem | undefined;
 }) {
   const changes = comparePlanVersions(item, previous);
+  const explanations = explainPlanChanges(item, previous);
   return (
     <View style={styles.historyCard}>
       <View style={styles.rowBetween}>
@@ -227,10 +229,19 @@ function HistoryItem({
       ) : (
         <Text style={styles.helper}>Earliest retained plan version.</Text>
       )}
+      <View style={styles.explanationCard}>
+        <Text style={styles.cardTitle}>Why this version changed</Text>
+        {explanations.map((explanation) => (
+          <Text key={explanation} style={styles.helper}>
+            {explanation}
+          </Text>
+        ))}
+      </View>
       <View style={styles.historyActions}>
         {item.actions.map((action) => (
           <View key={action.action_id} style={styles.historyActionRow}>
             <Text style={styles.body}>{action.description}</Text>
+            <Text style={styles.helper}>Rationale: {action.rationale}</Text>
             <Text style={styles.meta}>
               {action.frequency} · {action.difficulty} · {action.status}
             </Text>
@@ -248,6 +259,8 @@ export function PlanHistoryV08Screen() {
     () => new PlanHistoryApi(createRuntimeApiClient(), scenario.userId),
     [scenario.userId],
   );
+  const loadGeneration = useRef(0);
+  const feedbackInFlight = useRef(false);
   const [currentState, setCurrentState] = useState<ApiLoadState<CurrentPlanResponse>>({
     status: "idle",
   });
@@ -259,6 +272,7 @@ export function PlanHistoryV08Screen() {
   });
 
   const loadAll = useCallback(async () => {
+    const generation = ++loadGeneration.current;
     if (!progress.imported) {
       setCurrentState({ status: "idle" });
       setHistoryState({ status: "idle" });
@@ -268,6 +282,9 @@ export function PlanHistoryV08Screen() {
     setHistoryState({ status: "loading" });
     if (mockMode) {
       const history = mockHistory(scenario);
+      if (generation !== loadGeneration.current) {
+        return;
+      }
       const first = history.items[0];
       if (first === undefined) {
         setCurrentState({
@@ -286,6 +303,9 @@ export function PlanHistoryV08Screen() {
       return;
     }
     const [current, history] = await Promise.all([api.loadCurrent(), api.loadHistory()]);
+    if (generation !== loadGeneration.current) {
+      return;
+    }
     setCurrentState(
       current.ok
         ? { status: "success", data: current.data }
@@ -300,69 +320,77 @@ export function PlanHistoryV08Screen() {
 
   useEffect(() => {
     void loadAll();
+    return () => {
+      loadGeneration.current += 1;
+    };
   }, [loadAll]);
 
   const submit = useCallback(
     async (action: PlanAction, input: PlanFeedbackInput) => {
-      if (currentState.status !== "success") {
+      if (currentState.status !== "success" || feedbackInFlight.current) {
         return;
       }
+      feedbackInFlight.current = true;
       setFeedbackState({ status: "loading" });
-      if (mockMode) {
-        const normalized = feedbackPayload(input);
-        const payload: PlanFeedbackResponse = {
-          plan_id: currentState.data.plan.plan_id,
-          feedback: {
-            feedback_id: `mock-feedback-${action.action_id}`,
-            action_id: action.action_id,
-            user_id: scenario.userId,
-            response: normalized.response,
-            completion_ratio: normalized.completion_ratio,
-            reason_text: normalized.reason_text,
-            created_at: new Date().toISOString(),
-          },
-        };
-        setFeedbackState({ status: "success", data: payload });
-        setCurrentState({
-          status: "success",
-          data: {
-            ...currentState.data,
-            actions: updateActionStatus(
-              currentState.data.actions,
-              action.action_id,
-              input.response,
-            ),
-          },
-        });
-        setHistoryState((state) => {
-          if (state.status !== "success") {
-            return state;
-          }
-          return {
-            status: "success",
-            data: {
-              ...state.data,
-              items: state.data.items.map((item) => ({
-                ...item,
-                actions: updateActionStatus(item.actions, action.action_id, input.response),
-              })),
+      try {
+        if (mockMode) {
+          const normalized = feedbackPayload(input);
+          const payload: PlanFeedbackResponse = {
+            plan_id: currentState.data.plan.plan_id,
+            feedback: {
+              feedback_id: `mock-feedback-${action.action_id}`,
+              action_id: action.action_id,
+              user_id: scenario.userId,
+              response: normalized.response,
+              completion_ratio: normalized.completion_ratio,
+              reason_text: normalized.reason_text,
+              created_at: new Date().toISOString(),
             },
           };
-        });
-        return;
-      }
-      const result = await api.submitFeedback(
-        currentState.data.plan.plan_id,
-        action.action_id,
-        input,
-      );
-      setFeedbackState(
-        result.ok
-          ? { status: "success", data: result.data }
-          : { status: "error", error: result.error },
-      );
-      if (result.ok) {
-        await Promise.all([loadAll(), refreshPlan()]);
+          setFeedbackState({ status: "success", data: payload });
+          setCurrentState({
+            status: "success",
+            data: {
+              ...currentState.data,
+              actions: updateActionStatus(
+                currentState.data.actions,
+                action.action_id,
+                input.response,
+              ),
+            },
+          });
+          setHistoryState((state) => {
+            if (state.status !== "success") {
+              return state;
+            }
+            return {
+              status: "success",
+              data: {
+                ...state.data,
+                items: state.data.items.map((item) => ({
+                  ...item,
+                  actions: updateActionStatus(item.actions, action.action_id, input.response),
+                })),
+              },
+            };
+          });
+          return;
+        }
+        const result = await api.submitFeedback(
+          currentState.data.plan.plan_id,
+          action.action_id,
+          input,
+        );
+        setFeedbackState(
+          result.ok
+            ? { status: "success", data: result.data }
+            : { status: "error", error: result.error },
+        );
+        if (result.ok) {
+          await Promise.all([loadAll(), refreshPlan()]);
+        }
+      } finally {
+        feedbackInFlight.current = false;
       }
     },
     [api, currentState, loadAll, mockMode, refreshPlan, scenario.userId],
@@ -452,7 +480,8 @@ export function PlanHistoryV08Screen() {
           <Text style={styles.sectionTitle}>Plan history and changes</Text>
           <Text style={styles.lead}>
             Versions are returned by the backend with stable plan IDs and supersession links. Action
-            status changes remain traceable after feedback.
+            status changes remain traceable after feedback, and each version explains why its action
+            difficulty or wording changed.
           </Text>
           {historyState.data.items.length === 0 ? (
             <Text style={styles.body}>{strings.common.empty}</Text>
@@ -518,6 +547,14 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     padding: 18,
     gap: 8,
+    borderWidth: 1,
+    borderColor: "#DCE5E5",
+  },
+  explanationCard: {
+    borderRadius: 12,
+    padding: 12,
+    gap: 5,
+    backgroundColor: "#F4F7F8",
     borderWidth: 1,
     borderColor: "#DCE5E5",
   },
