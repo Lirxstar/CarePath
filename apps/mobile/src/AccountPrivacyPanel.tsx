@@ -1,12 +1,5 @@
 import { useState } from "react";
-import {
-  ActivityIndicator,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { useAuth } from "./auth/AuthContext";
 import { useJourney } from "./journey/JourneyContext";
@@ -88,8 +81,8 @@ export function AccountPrivacyPanel() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Optional account</Text>
             <Text style={styles.body}>
-              Signing in is never required. An account lets CarePath associate imported data,
-              plans and feedback with the same user so they can be continued later.
+              Signing in is never required. An account lets CarePath associate imported data, plans
+              and feedback with the same user so they can be continued later.
             </Text>
             {authStatus === "loading" ? (
               <View style={styles.loadingRow}>
@@ -180,10 +173,10 @@ export function AccountPrivacyPanel() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Private mode</Text>
             <Text style={styles.body}>
-              Private mode creates an isolated temporary workspace in server memory. Health
-              records, journal content, plans, feedback and coaching interactions are not written
-              to the persistent CarePath database. Exiting Private mode destroys the workspace;
-              inactive sessions also expire after {String(privateTtlMinutes ?? 60)} minutes.
+              Private mode creates an isolated temporary workspace in server memory. Health records,
+              journal content, plans, feedback and coaching interactions are not written to the
+              persistent CarePath database. Exiting Private mode destroys the workspace; inactive
+              sessions also expire after {String(privateTtlMinutes ?? 60)} minutes.
             </Text>
             <Text style={styles.muted}>
               Turning Private mode on or off starts a clean journey. Load a built-in persona or
