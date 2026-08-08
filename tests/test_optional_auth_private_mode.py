@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from collections.abc import Generator
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from threading import Event
 from uuid import UUID, uuid4
 
 import pytest
@@ -245,6 +247,68 @@ def test_invalid_bearer_tokens_and_header_shapes_are_rejected(
     assert invalid.json()["error"]["code"] == "invalid_access_token"
 
 
+def test_private_session_store_serializes_same_workspace_operations() -> None:
+    store = PrivateSessionStore(ttl_minutes=5, max_sessions=2)
+    session_id = store.create()
+    first_entered = Event()
+    release_first = Event()
+    second_entered = Event()
+
+    def first_operation() -> None:
+        with store.session(session_id):
+            first_entered.set()
+            assert release_first.wait(timeout=2)
+
+    def second_operation() -> None:
+        assert first_entered.wait(timeout=2)
+        with store.session(session_id):
+            second_entered.set()
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        first = executor.submit(first_operation)
+        assert first_entered.wait(timeout=2)
+        second = executor.submit(second_operation)
+        assert not second_entered.wait(timeout=0.1)
+        release_first.set()
+        first.result(timeout=2)
+        second.result(timeout=2)
+
+    assert second_entered.is_set()
+    store.close_all()
+
+
+def test_private_session_close_waits_for_inflight_database_operation() -> None:
+    store = PrivateSessionStore(ttl_minutes=5, max_sessions=2)
+    session_id = store.create()
+    operation_entered = Event()
+    release_operation = Event()
+    close_finished = Event()
+
+    def operation() -> None:
+        with store.session(session_id):
+            operation_entered.set()
+            assert release_operation.wait(timeout=2)
+
+    def close_workspace() -> bool:
+        closed = store.close(session_id)
+        close_finished.set()
+        return closed
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        operation_future = executor.submit(operation)
+        assert operation_entered.wait(timeout=2)
+        close_future = executor.submit(close_workspace)
+        assert not close_finished.wait(timeout=0.1)
+        release_operation.set()
+        operation_future.result(timeout=2)
+        assert close_future.result(timeout=2) is True
+
+    assert close_finished.is_set()
+    with pytest.raises(KeyError):
+        with store.session(session_id):
+            pass
+
+
 def test_private_session_store_validates_capacity_and_evicts_oldest() -> None:
     with pytest.raises(ValueError, match="ttl_minutes"):
         PrivateSessionStore(ttl_minutes=0)
@@ -255,7 +319,8 @@ def test_private_session_store_validates_capacity_and_evicts_oldest() -> None:
     first = store.create()
     second = store.create()
     with pytest.raises(KeyError):
-        store.open(first)
-    with store.open(second) as session:
+        with store.session(first):
+            pass
+    with store.session(second) as session:
         assert session is not None
     store.close_all()
