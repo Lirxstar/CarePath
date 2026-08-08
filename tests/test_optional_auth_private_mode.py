@@ -111,7 +111,10 @@ def test_private_mode_is_isolated_and_never_writes_to_persistent_database(
 
     user_id = uuid4()
     private_headers = {"X-CarePath-Private-Session": first["session_id"]}
-    assert client.post("/profiles", json=profile_payload(user_id), headers=private_headers).status_code == 201
+    assert (
+        client.post("/profiles", json=profile_payload(user_id), headers=private_headers).status_code
+        == 201
+    )
     assert client.get(f"/profiles/{user_id}", headers=private_headers).status_code == 200
 
     other_headers = {"X-CarePath-Private-Session": second["session_id"]}
@@ -176,9 +179,7 @@ def test_authenticated_import_is_bound_to_stable_account_and_protected(
     assert anonymous.status_code == 401
     assert anonymous.json()["error"]["code"] == "authentication_required"
 
-    own = client.get(
-        f"/profiles/{account_user_id}", headers={"Authorization": "Bearer account-a"}
-    )
+    own = client.get(f"/profiles/{account_user_id}", headers={"Authorization": "Bearer account-a"})
     assert own.status_code == 200
 
     other = client.get(
@@ -200,9 +201,12 @@ def test_synthetic_personas_remain_public_even_when_loaded_while_signed_in(
     )
     assert imported.status_code == 200
     assert client.get(f"/profiles/{synthetic_id}").status_code == 200
-    assert client.get(
-        f"/profiles/{synthetic_id}", headers={"Authorization": "Bearer account-b"}
-    ).status_code == 200
+    assert (
+        client.get(
+            f"/profiles/{synthetic_id}", headers={"Authorization": "Bearer account-b"}
+        ).status_code
+        == 200
+    )
 
 
 def test_signed_in_private_import_uses_account_identity_without_persistence(
