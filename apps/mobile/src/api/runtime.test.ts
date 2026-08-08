@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, test } from "@jest/globals";
 
-import { createRuntimeApiClient, LOCAL_API_URL, resolveApiBaseUrl } from "./runtime";
+import {
+  createRuntimeApiClient,
+  LOCAL_API_URL,
+  resolveApiBaseUrl,
+  SAME_ORIGIN_API_URL,
+} from "./runtime";
 
 const originalFetch = globalThis.fetch;
 const originalConfiguredUrl = process.env.EXPO_PUBLIC_CAREPATH_API_URL;
@@ -25,8 +30,9 @@ afterEach(() => {
 });
 
 describe("Expo runtime API transport", () => {
-  test("resolves configured and local API base URLs", () => {
+  test("resolves configured, same-origin and local API base URLs", () => {
     expect(resolveApiBaseUrl("  https://carepath.example  ")).toBe("https://carepath.example");
+    expect(resolveApiBaseUrl(SAME_ORIGIN_API_URL)).toBe("");
     expect(resolveApiBaseUrl("   ")).toBe(LOCAL_API_URL);
     expect(resolveApiBaseUrl(undefined)).toBe(LOCAL_API_URL);
   });
@@ -69,5 +75,24 @@ describe("Expo runtime API transport", () => {
     await createRuntimeApiClient().get("/health");
 
     expect(requestedUrl).toBe("https://env.test/health");
+  });
+
+  test("uses relative requests for the integrated reviewer deployment", async () => {
+    process.env.EXPO_PUBLIC_CAREPATH_API_URL = SAME_ORIGIN_API_URL;
+    let requestedUrl = "";
+    const fakeFetch: typeof fetch = (input) => {
+      requestedUrl = inputUrl(input);
+      return Promise.resolve(
+        new Response(JSON.stringify({ status: "ok" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+    };
+    globalThis.fetch = fakeFetch;
+
+    await createRuntimeApiClient().get("/health/ready");
+
+    expect(requestedUrl).toBe("/health/ready");
   });
 });
