@@ -223,9 +223,10 @@ export function parseOAuthFragment(fragment: string): SupabaseSession | null {
     accessToken,
     refreshToken,
     tokenType,
-    expiresAt: Number.isFinite(expiresAtParam) && expiresAtParam > 0
-      ? expiresAtParam
-      : now + (Number.isFinite(expiresIn) && expiresIn > 0 ? expiresIn : 3600),
+    expiresAt:
+      Number.isFinite(expiresAtParam) && expiresAtParam > 0
+        ? expiresAtParam
+        : now + (Number.isFinite(expiresIn) && expiresIn > 0 ? expiresIn : 3600),
   };
 }
 
