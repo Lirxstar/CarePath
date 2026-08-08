@@ -1,7 +1,15 @@
 import { describe, expect, test } from "@jest/globals";
 
 import { buildDemoScenario } from "./demoScenario";
-import { buildCustomScenario, extractCustomImportSubject } from "./customImport";
+import {
+  buildCustomScenario,
+  extractCustomImportSubject,
+  type CustomImportFormat,
+} from "./customImport";
+
+function expectSubjectNull(format: CustomImportFormat, content: string): void {
+  expect(extractCustomImportSubject(format, content)).toBeNull();
+}
 
 describe("custom import subject adoption", () => {
   test("extracts user and latest observation date from JSON", () => {
@@ -22,7 +30,7 @@ describe("custom import subject adoption", () => {
     });
   });
 
-  test("falls back to an observation user and ignores unusable JSON observation entries", () => {
+  test("falls back to an observation user and ignores unusable JSON entries", () => {
     const subject = extractCustomImportSubject(
       "json",
       JSON.stringify({
@@ -46,32 +54,28 @@ describe("custom import subject adoption", () => {
   });
 
   test("rejects malformed and non-object JSON roots", () => {
-    expect(extractCustomImportSubject("json", "{")) .toBeNull();
-    expect(extractCustomImportSubject("json", "42")).toBeNull();
-    expect(extractCustomImportSubject("json", "null")).toBeNull();
-    expect(extractCustomImportSubject("json", "[]")).toBeNull();
+    expectSubjectNull("json", "{");
+    expectSubjectNull("json", "42");
+    expectSubjectNull("json", "null");
+    expectSubjectNull("json", "[]");
   });
 
   test("rejects JSON without a usable user or observation window", () => {
-    expect(extractCustomImportSubject("json", JSON.stringify({ observations: [] }))).toBeNull();
-    expect(
-      extractCustomImportSubject(
-        "json",
-        JSON.stringify({
-          profile: { user_id: "   " },
-          observations: [{ observed_at: "2026-08-08T08:00:00Z" }],
-        }),
-      ),
-    ).toBeNull();
-    expect(
-      extractCustomImportSubject(
-        "json",
-        JSON.stringify({
-          profile: { user_id: "55555555-5555-4555-8555-555555555555" },
-          observations: [{ observed_at: "invalid" }],
-        }),
-      ),
-    ).toBeNull();
+    expectSubjectNull("json", JSON.stringify({ observations: [] }));
+    expectSubjectNull(
+      "json",
+      JSON.stringify({
+        profile: { user_id: "   " },
+        observations: [{ observed_at: "2026-08-08T08:00:00Z" }],
+      }),
+    );
+    expectSubjectNull(
+      "json",
+      JSON.stringify({
+        profile: { user_id: "55555555-5555-4555-8555-555555555555" },
+        observations: [{ observed_at: "invalid" }],
+      }),
+    );
   });
 
   test("extracts user and latest observation date from standard CSV", () => {
@@ -108,21 +112,14 @@ describe("custom import subject adoption", () => {
   });
 
   test("rejects empty CSV, missing columns, missing users and missing dates", () => {
-    expect(extractCustomImportSubject("csv", "\n\r\n")).toBeNull();
-    expect(extractCustomImportSubject("csv", "metric_type,observed_at\nsteps,2026-08-08")).toBeNull();
-    expect(extractCustomImportSubject("csv", "user_id,metric_type\na,steps")).toBeNull();
-    expect(
-      extractCustomImportSubject(
-        "csv",
-        "user_id,observed_at\n,2026-08-08T08:00:00Z",
-      ),
-    ).toBeNull();
-    expect(
-      extractCustomImportSubject(
-        "csv",
-        "user_id,observed_at\n77777777-7777-4777-8777-777777777777,invalid",
-      ),
-    ).toBeNull();
+    expectSubjectNull("csv", "\n\r\n");
+    expectSubjectNull("csv", "metric_type,observed_at\nsteps,2026-08-08");
+    expectSubjectNull("csv", "user_id,metric_type\na,steps");
+    expectSubjectNull("csv", "user_id,observed_at\n,2026-08-08T08:00:00Z");
+    expectSubjectNull(
+      "csv",
+      "user_id,observed_at\n77777777-7777-4777-8777-777777777777,invalid",
+    );
   });
 
   test("builds a reviewer-facing scenario using imported subject identifiers", () => {
@@ -142,6 +139,11 @@ describe("custom import subject adoption", () => {
   });
 
   test("does not build a custom scenario when subject metadata is missing", () => {
-    expect(buildCustomScenario("json", JSON.stringify({ observations: [] }), buildDemoScenario())).toBeNull();
+    const scenario = buildCustomScenario(
+      "json",
+      JSON.stringify({ observations: [] }),
+      buildDemoScenario(),
+    );
+    expect(scenario).toBeNull();
   });
 });
