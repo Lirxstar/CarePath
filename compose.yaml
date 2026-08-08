@@ -1,0 +1,45 @@
+name: carepath
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${CAREPATH_POSTGRES_DB:-carepath}
+      POSTGRES_USER: ${CAREPATH_POSTGRES_USER:-carepath}
+      POSTGRES_PASSWORD: ${CAREPATH_POSTGRES_PASSWORD:?set CAREPATH_POSTGRES_PASSWORD in the compose env file}
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 5s
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      CAREPATH_APP_NAME: ${CAREPATH_APP_NAME:-CarePath API}
+      CAREPATH_ENVIRONMENT: ${CAREPATH_ENVIRONMENT:-development}
+      CAREPATH_PRIVACY_MODE: ${CAREPATH_PRIVACY_MODE:-standard_demo}
+      CAREPATH_LOG_LEVEL: ${CAREPATH_LOG_LEVEL:-INFO}
+      CAREPATH_LLM_PROVIDER: ${CAREPATH_LLM_PROVIDER:-mock}
+      CAREPATH_DATABASE_URL: postgresql+psycopg://${CAREPATH_POSTGRES_USER:-carepath}:${CAREPATH_POSTGRES_PASSWORD}@db:5432/${CAREPATH_POSTGRES_DB:-carepath}
+      CAREPATH_EVIDENCE_INDEX_PATH: /app/data/guidelines/qdrant
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - ${CAREPATH_API_PORT:-8000}:8000
+    volumes:
+      - evidence_index:/app/data/guidelines/qdrant
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  evidence_index:

@@ -1,0 +1,48 @@
+name: CP-019 deployment
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  compose-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate Compose configuration
+        run: docker compose --env-file deployment/.env.compose.example config --quiet
+
+      - name: Build production image
+        run: docker compose --env-file deployment/.env.compose.example build api
+
+      - name: Start PostgreSQL and API
+        run: >-
+          docker compose --env-file deployment/.env.compose.example
+          up -d --wait --wait-timeout 120
+
+      - name: Verify HTTP deployment probes
+        run: python deployment/verify_backend.py http://127.0.0.1:8000
+
+      - name: Verify database migration head
+        run: |
+          docker compose --env-file deployment/.env.compose.example exec -T api \
+            python -m alembic current | tee /tmp/alembic-current.txt
+          grep -F "(head)" /tmp/alembic-current.txt
+
+      - name: Show service state on failure
+        if: failure()
+        run: |
+          docker compose --env-file deployment/.env.compose.example ps || true
+          docker compose --env-file deployment/.env.compose.example logs --no-color || true
+
+      - name: Tear down deployment stack
+        if: always()
+        run: docker compose --env-file deployment/.env.compose.example down -v --remove-orphans

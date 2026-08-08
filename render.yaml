@@ -1,0 +1,25 @@
+databases:
+  - name: carepath-db
+    databaseName: carepath
+    user: carepath
+
+services:
+  - type: web
+    name: carepath-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health/ready
+    envVars:
+      - key: CAREPATH_ENVIRONMENT
+        value: production
+      - key: CAREPATH_PRIVACY_MODE
+        value: standard_demo
+      - key: CAREPATH_LOG_LEVEL
+        value: INFO
+      - key: CAREPATH_LLM_PROVIDER
+        value: mock
+      - key: CAREPATH_DATABASE_URL
+        fromDatabase:
+          name: carepath-db
+          property: connectionString
