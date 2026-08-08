@@ -84,7 +84,7 @@ test("desktop reviewer supports refresh and tab routing", async ({ page }) => {
   await openTab(page, "tab-coach");
   await expect(page.getByText("Ask CarePath")).toBeVisible();
   await openTab(page, "tab-plan-history");
-  await expect(page.getByText("Plan & History")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Plan & History" })).toBeVisible();
 
   await page.reload();
   await expect(page.getByTestId("public-demo-notice")).toBeVisible();
