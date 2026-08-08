@@ -1,6 +1,7 @@
 import { CarePathApiClient, type ApiFetcher, type ApiRequestInit } from "./client";
 
 export const LOCAL_API_URL = "http://127.0.0.1:8000";
+export const SAME_ORIGIN_API_URL = "__CAREPATH_SAME_ORIGIN__";
 
 export interface RuntimeFetchResponse {
   ok: boolean;
@@ -12,6 +13,9 @@ export type RuntimeFetch = (url: string, init: ApiRequestInit) => Promise<Runtim
 
 export function resolveApiBaseUrl(configuredUrl: string | undefined): string {
   const trimmed = configuredUrl?.trim();
+  if (trimmed === SAME_ORIGIN_API_URL) {
+    return "";
+  }
   if (trimmed === undefined || trimmed.length === 0) {
     return LOCAL_API_URL;
   }
