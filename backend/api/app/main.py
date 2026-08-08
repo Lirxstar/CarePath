@@ -14,6 +14,10 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from backend.storage.private_sessions import PrivateSessionStore
+
+from .auth import SupabaseAuthVerifier
+from .auth_routes import router as auth_router
 from .config import Settings, get_settings
 from .errors import (
     CarePathError,
@@ -28,6 +32,7 @@ from .health_data_routes import router as health_data_router
 from .llm.provider import JsonObject, LLMProvider
 from .llm.registry import get_provider
 from .logging import configure_logging, reset_request_id, set_request_id
+from .privacy_routes import router as privacy_router
 from .routes import router as api_router
 
 REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9._:-]+$")
@@ -75,6 +80,21 @@ def create_app(
     resolved_settings = settings or get_settings()
     configure_logging(resolved_settings.log_level)
 
+    private_sessions = PrivateSessionStore(
+        ttl_minutes=resolved_settings.private_session_ttl_minutes,
+        max_sessions=resolved_settings.private_session_max_sessions,
+    )
+    publishable_key = resolved_settings.supabase_publishable_key
+    auth_verifier = (
+        SupabaseAuthVerifier(
+            supabase_url=resolved_settings.supabase_url,
+            publishable_key=publishable_key.get_secret_value(),
+            timeout_seconds=resolved_settings.auth_request_timeout_seconds,
+        )
+        if resolved_settings.supabase_url is not None and publishable_key is not None
+        else None
+    )
+
     @asynccontextmanager
     async def lifespan(application: FastAPI) -> AsyncIterator[None]:
         resolved_provider = (
@@ -86,10 +106,13 @@ def create_app(
             application.state.provider = resolved_provider
             yield
         finally:
+            private_sessions.close_all()
             await resolved_provider.aclose()
 
     application = FastAPI(title=resolved_settings.app_name, lifespan=lifespan)
     application.state.settings = resolved_settings
+    application.state.private_sessions = private_sessions
+    application.state.auth_verifier = auth_verifier
     application.exception_handler(CarePathError)(handle_carepath_error)
     application.exception_handler(StarletteHTTPException)(handle_http_exception)
     application.exception_handler(RequestValidationError)(handle_validation_error)
@@ -147,6 +170,8 @@ def create_app(
     application.include_router(api_router)
     application.include_router(health_data_router)
     application.include_router(evidence_router)
+    application.include_router(auth_router)
+    application.include_router(privacy_router)
     application.include_router(health_router)
 
     @application.get("/health")
