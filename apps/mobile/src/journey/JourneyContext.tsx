@@ -735,13 +735,7 @@ export function JourneyProvider({ children, apiBaseUrl }: JourneyProviderProps) 
     void Promise.all([refreshDashboard(), refreshHealthData(healthRange)]).finally(() => {
       setRestoredDataActive(false);
     });
-  }, [
-    healthRange,
-    refreshDashboard,
-    refreshHealthData,
-    restoredDataActive,
-    scenario.userId,
-  ]);
+  }, [healthRange, refreshDashboard, refreshHealthData, restoredDataActive, scenario.userId]);
 
   const askQuestion = useCallback(async () => {
     setCoachState({ status: "loading" });
