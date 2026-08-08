@@ -1,6 +1,5 @@
 from pathlib import Path
 
-
 BLUEPRINT = Path("render.yaml")
 
 
