@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections.abc import Generator
+from contextlib import contextmanager
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from threading import RLock
 from typing import Protocol
@@ -31,6 +33,7 @@ class _PrivateSessionEntry:
     session_factory: sessionmaker[Session]
     expires_at: datetime
     last_accessed_at: datetime
+    operation_lock: RLock = field(default_factory=RLock)
 
 
 class PrivateSessionStore:
@@ -69,7 +72,10 @@ class PrivateSessionStore:
             )
             return session_id
 
-    def open(self, session_id: UUID) -> Session:
+    @contextmanager
+    def session(self, session_id: UUID) -> Generator[Session, None, None]:
+        """Open one serialized database operation for a private workspace."""
+
         with self._lock:
             now = datetime.now(UTC)
             self._prune_expired_locked(now)
@@ -78,22 +84,42 @@ class PrivateSessionStore:
                 raise KeyError(session_id)
             entry.last_accessed_at = now
             entry.expires_at = now + self._ttl
-            return entry.session_factory()
+            # StaticPool intentionally keeps one in-memory SQLite connection. SQLite cannot
+            # safely execute multiple transactions on that connection concurrently, so acquire
+            # the per-workspace lock before releasing the registry lock. This also prevents
+            # close() from disposing the engine between lookup and Session construction.
+            entry.operation_lock.acquire()
+
+        try:
+            with entry.session_factory() as scoped_session:
+                yield scoped_session
+        finally:
+            entry.operation_lock.release()
 
     def close(self, session_id: UUID) -> bool:
         with self._lock:
             entry = self._entries.pop(session_id, None)
-        if entry is None:
-            return False
-        entry.engine.dispose()
+            if entry is None:
+                return False
+            entry.operation_lock.acquire()
+        try:
+            entry.engine.dispose()
+        finally:
+            entry.operation_lock.release()
         return True
 
     def close_all(self) -> None:
         with self._lock:
             entries = list(self._entries.values())
             self._entries.clear()
-        for entry in entries:
-            entry.engine.dispose()
+            for entry in entries:
+                entry.operation_lock.acquire()
+        try:
+            for entry in entries:
+                entry.engine.dispose()
+        finally:
+            for entry in reversed(entries):
+                entry.operation_lock.release()
 
     def _prune_expired_locked(self, now: datetime) -> None:
         expired = [
@@ -101,7 +127,11 @@ class PrivateSessionStore:
         ]
         for session_id in expired:
             entry = self._entries.pop(session_id)
-            entry.engine.dispose()
+            entry.operation_lock.acquire()
+            try:
+                entry.engine.dispose()
+            finally:
+                entry.operation_lock.release()
 
     def _evict_oldest_locked(self) -> None:
         if not self._entries:
@@ -111,7 +141,11 @@ class PrivateSessionStore:
             key=lambda item: self._entries[item].last_accessed_at,
         )
         entry = self._entries.pop(session_id)
-        entry.engine.dispose()
+        entry.operation_lock.acquire()
+        try:
+            entry.engine.dispose()
+        finally:
+            entry.operation_lock.release()
 
     @staticmethod
     def _create_memory_engine() -> Engine:
