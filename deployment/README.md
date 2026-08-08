@@ -71,7 +71,9 @@ Do not commit real database passwords, API keys, tokens, or platform credentials
 
 ## Cloud deployment blueprint
 
-`render.yaml` defines a Docker-based web service and a managed PostgreSQL database. The backend uses the same `Dockerfile`, migration entrypoint, and `/health/ready` probe as local Compose. Render injects the managed database connection string into `CAREPATH_DATABASE_URL`; no database secret is stored in the repository.
+`render.yaml` defines a Docker-based web service and a managed PostgreSQL database. Both resources explicitly use Render's `free` instance type so a new Blueprint does not silently select a paid default. The backend uses the same `Dockerfile`, migration entrypoint, and `/health/ready` probe as local Compose. Render injects the managed database connection string into `CAREPATH_DATABASE_URL`; no database secret is stored in the repository.
+
+The free configuration is intended only for reviewer/demo use. Render's current free-tier documentation states that free web services can spin down when idle and that free Render Postgres databases expire 30 days after creation. Before confirming a Blueprint deployment, always review the Render dashboard and verify that both `carepath-api` and `carepath-db` are shown as Free / $0. Do not deploy if the dashboard shows a paid instance type.
 
 To create the cloud service, connect this repository as a Render Blueprint and deploy `render.yaml`. No project code change is required. A real cloud deployment requires a Render account/workspace and therefore cannot be created by repository CI alone.
 
