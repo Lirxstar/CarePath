@@ -1,4 +1,5 @@
 # ruff: noqa: RUF001
+# Full-width punctuation is intentional in user-facing Chinese and Japanese copy.
 from backend.domain.models import Domain, MetricType
 from backend.localization import (
     data_gap_text,
