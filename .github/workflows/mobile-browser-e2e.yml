@@ -1,0 +1,139 @@
+name: Mobile browser E2E
+
+on:
+  pull_request:
+    paths:
+      - Dockerfile
+      - compose.yaml
+      - pyproject.toml
+      - requirements*.lock
+      - alembic/**
+      - backend/**
+      - apps/mobile/**
+      - deployment/**
+      - .github/workflows/mobile-browser-e2e.yml
+  push:
+    branches:
+      - main
+    paths:
+      - Dockerfile
+      - compose.yaml
+      - pyproject.toml
+      - requirements*.lock
+      - alembic/**
+      - backend/**
+      - apps/mobile/**
+      - deployment/**
+      - .github/workflows/mobile-browser-e2e.yml
+
+permissions:
+  contents: read
+
+jobs:
+  integrated-mobile-browser:
+    name: Integrated mobile browser journey
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Build and start deployment stack
+        run: >-
+          docker compose --env-file deployment/.env.compose.example
+          up -d --build --wait --wait-timeout 180
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: apps/mobile/.nvmrc
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+
+      - name: Install browser gate runtime
+        working-directory: apps/mobile
+        run: |
+          npm ci
+          npm install --no-save --package-lock=false @playwright/test@1.54.1
+          npx playwright install --with-deps chromium
+
+      - name: Run mobile browser journey against integrated deployment
+        working-directory: apps/mobile
+        env:
+          CAREPATH_E2E_BASE_URL: http://127.0.0.1:8000
+        run: >-
+          npx playwright test --config=e2e/playwright.v08.config.ts
+          --grep "mobile browser supports the primary journey, tab routing and refresh"
+
+      - name: Show deployment logs on failure
+        if: failure()
+        run: docker compose --env-file deployment/.env.compose.example logs --no-color || true
+
+      - name: Upload mobile browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-browser-integrated-${{ github.run_attempt }}
+          path: docs/evidence/v08/screenshots/mobile-*.png
+          if-no-files-found: warn
+
+      - name: Tear down deployment stack
+        if: always()
+        run: docker compose --env-file deployment/.env.compose.example down -v --remove-orphans
+
+  public-mobile-browser:
+    name: Public mobile browser journey
+    if: github.event_name == 'push'
+    needs: integrated-mobile-browser
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: apps/mobile/.nvmrc
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+
+      - name: Install public browser gate runtime
+        working-directory: apps/mobile
+        run: |
+          npm ci
+          npm install --no-save --package-lock=false @playwright/test@1.54.1
+          npx playwright install --with-deps chromium
+
+      - name: Wait for public reviewer deployment
+        run: |
+          set -euo pipefail
+          public_url="$(tr -d '\r\n' < deployment/public_backend_url.txt)"
+          echo "CAREPATH_E2E_BASE_URL=${public_url}" >> "${GITHUB_ENV}"
+          for attempt in {1..80}; do
+            if curl --fail --silent --show-error \
+              --header 'Accept: text/html' \
+              "${public_url}/" \
+              --output /tmp/carepath-reviewer.html \
+              && grep -qi '<!DOCTYPE html' /tmp/carepath-reviewer.html \
+              && python deployment/verify_backend.py "${public_url}"; then
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "Public reviewer deployment did not become ready within the acceptance window." >&2
+          exit 1
+
+      - name: Run mobile browser journey against public deployment
+        working-directory: apps/mobile
+        run: >-
+          npx playwright test --config=e2e/playwright.v08.config.ts
+          --grep "mobile browser supports the primary journey, tab routing and refresh"
+
+      - name: Upload public mobile browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-browser-public-${{ github.run_attempt }}
+          path: docs/evidence/v08/screenshots/mobile-*.png
+          if-no-files-found: warn
