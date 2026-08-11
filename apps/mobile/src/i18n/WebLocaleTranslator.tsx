@@ -50,7 +50,9 @@ function translateSubtree(root: Node, locale: AppLocale): void {
     current = walker.nextNode();
   }
   if (root.nodeType === Node.ELEMENT_NODE) {
-    for (const element of (root as Element).querySelectorAll("[aria-label], [placeholder], [title]")) {
+    for (const element of (root as Element).querySelectorAll(
+      "[aria-label], [placeholder], [title]",
+    )) {
       translateElementAttributes(element, locale);
     }
   }
