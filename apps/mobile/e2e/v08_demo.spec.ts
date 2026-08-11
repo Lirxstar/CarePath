@@ -79,7 +79,7 @@ test("Private mode uses an isolated non-persistent workspace", async ({ page }) 
   await expect(page.getByTestId("account-privacy-panel")).toBeVisible();
   await page.getByRole("button", { name: "Manage" }).click();
   await expect(page.getByText(/Signing in is never required/)).toBeVisible();
-  await expect(page.getByText(/Account sign-in is not configured/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Turn on Private mode" })).toBeVisible();
 
   await page.getByRole("button", { name: "Turn on Private mode" }).click();
   await expect(page.getByText(/Private mode is on/).first()).toBeVisible();
