@@ -321,8 +321,14 @@ class RuntimeAgentBaselineRunner(_AlignedRuntimeAgentBaselineRunner):
 
 
 def _extract_minutes(text: str) -> int | None:
-    match = re.search(r"\b(\d{1,2})(?:-minute| minutes?)\b", text)
-    return int(match.group(1)) if match else None
+    match = re.search(
+        r"(?:\b(\d{1,2})(?:-minute| minutes?)\b)|(\d{1,2})\s*分钟|(\d{1,2})\s*分間",
+        text,
+    )
+    if match is None:
+        return None
+    value = next(group for group in match.groups() if group is not None)
+    return int(value)
 
 
 def _storage_metric(reference: str) -> str:
