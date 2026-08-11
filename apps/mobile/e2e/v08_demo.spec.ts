@@ -85,10 +85,10 @@ test("Private mode uses an isolated non-persistent workspace", async ({ page }) 
   await expect(page.getByText(/Private mode is on/).first()).toBeVisible();
   await expect(page.getByText(/temporary server memory only/)).toBeVisible();
 
-  const importRequestPromise = page.waitForRequest(
-    (request) =>
-      request.method() === "POST" && new URL(request.url()).pathname === "/records/import",
-  );
+  const importRequestPromise = page.waitForRequest((request) => {
+    const pathname = new URL(request.url()).pathname;
+    return request.method() === "POST" && pathname.endsWith("/records/import");
+  });
   await page.getByRole("button", { name: "Load demo" }).click();
   const importRequest = await importRequestPromise;
   const importPayload = importRequest.postDataJSON() as {
@@ -97,6 +97,8 @@ test("Private mode uses an isolated non-persistent workspace", async ({ page }) 
   const privateUserId = importPayload.content?.profile?.user_id;
   expect(typeof privateUserId).toBe("string");
   expect(await importRequest.headerValue("x-carepath-private-session")).toBeTruthy();
+  const importPathname = new URL(importRequest.url()).pathname;
+  const apiPrefix = importPathname.slice(0, -"/records/import".length);
 
   await expect(page.getByText("Demo loaded")).toBeVisible({ timeout: 30_000 });
   await openTab(page, "tab-health-data");
@@ -105,10 +107,13 @@ test("Private mode uses an isolated non-persistent workspace", async ({ page }) 
 
   await page.getByRole("button", { name: "Exit Private mode" }).click();
   await expect(page.getByText(/Private mode is off/)).toBeVisible();
-  const persistentProfileStatus = await page.evaluate(async (userId) => {
-    const response = await fetch(`/profiles/${encodeURIComponent(userId)}`);
-    return response.status;
-  }, privateUserId as string);
+  const persistentProfileStatus = await page.evaluate(
+    async ({ prefix, userId }) => {
+      const response = await fetch(`${prefix}/profiles/${encodeURIComponent(userId)}`);
+      return response.status;
+    },
+    { prefix: apiPrefix, userId: privateUserId as string },
+  );
   expect(persistentProfileStatus).toBe(404);
 });
 
