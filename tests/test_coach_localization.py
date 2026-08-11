@@ -11,14 +11,17 @@ from backend.localization import (
 
 
 def test_chinese_dynamic_coach_copy_is_localized() -> None:
-    assert trend_statement(
-        metric=MetricType.SLEEP_DURATION,
-        direction="decreased",
-        current_mean=6.38,
-        baseline_mean=7.60,
-        percentage_change=-16.0,
-        language="zh",
-    ) == "睡眠时长下降：近期平均值为 6.38，上一窗口为 7.60（-16.0%）。"
+    assert (
+        trend_statement(
+            metric=MetricType.SLEEP_DURATION,
+            direction="decreased",
+            current_mean=6.38,
+            baseline_mean=7.60,
+            percentage_change=-16.0,
+            language="zh",
+        )
+        == "睡眠时长下降：近期平均值为 6.38，上一窗口为 7.60（-16.0%）。"
+    )
     assert "计划睡觉前" in plan_action_description(
         domain=Domain.SLEEP, minutes=12, activity_limited=False, language="zh"
     )
