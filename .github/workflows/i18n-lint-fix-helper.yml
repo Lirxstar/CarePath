@@ -1,0 +1,111 @@
+name: i18n lint fix helper
+
+on:
+  push:
+    branches:
+      - agent/remove-demo-banner-full-i18n
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: agent/remove-demo-banner-full-i18n
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: apps/mobile/.nvmrc
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+      - working-directory: apps/mobile
+        run: npm ci
+      - name: Apply typed lint fixes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          translator = Path('apps/mobile/src/i18n/WebLocaleTranslator.tsx')
+          text = translator.read_text()
+          old = '''  if (root.nodeType === Node.ELEMENT_NODE) {
+            for (const element of (root as Element).querySelectorAll(
+              "[aria-label], [placeholder], [title]",
+            )) {
+              translateElementAttributes(element, locale);
+            }
+          }
+          '''
+          new = '''  if (root.nodeType === Node.ELEMENT_NODE) {
+            const elements = (root as Element).querySelectorAll<Element>(
+              "[aria-label], [placeholder], [title]",
+            );
+            for (let index = 0; index < elements.length; index += 1) {
+              translateElementAttributes(elements.item(index), locale);
+            }
+          }
+          '''
+          if old not in text:
+              raise SystemExit('translator querySelector block not found')
+          text = text.replace(old, new)
+          old = '''        for (const node of mutation.addedNodes) {
+                  translateSubtree(node, locale);
+                }
+          '''
+          new = '''        for (let index = 0; index < mutation.addedNodes.length; index += 1) {
+                  translateSubtree(mutation.addedNodes.item(index), locale);
+                }
+          '''
+          if old not in text:
+              raise SystemExit('translator addedNodes block not found')
+          translator.write_text(text.replace(old, new))
+
+          catalog = Path('apps/mobile/src/i18n/catalog.ts')
+          text = catalog.read_text()
+          text = text.replace('const leading = input.match(/^\\s*/)?.[0] ?? "";', 'const leading = /^\\s*/.exec(input)?.[0] ?? "";')
+          text = text.replace('const trailing = input.match(/\\s*$/)?.[0] ?? "";', 'const trailing = /\\s*$/.exec(input)?.[0] ?? "";')
+          text = text.replace('return translated === null || translated === undefined\n    ? input', 'return translated === null\n    ? input')
+          catalog.write_text(text)
+
+          test_file = Path('apps/mobile/src/i18n/catalog.test.ts')
+          text = test_file.read_text()
+          if '@jest/globals' not in text:
+              text = 'import { afterEach, describe, expect, it } from "@jest/globals";\n\n' + text
+          text = text.replace('''    const fetcher = async (_url: string, init: ApiRequestInit) => {
+              if (init.method === "POST" && init.body !== undefined) {
+                requestBodies.push(JSON.parse(init.body) as unknown);
+              }
+              return {
+                ok: true,
+                status: 200,
+                json: async () => ({}),
+              };
+            };''', '''    const fetcher = (_url: string, init: ApiRequestInit) => {
+              if (init.method === "POST" && init.body !== undefined) {
+                requestBodies.push(JSON.parse(init.body) as unknown);
+              }
+              return Promise.resolve({
+                ok: true,
+                status: 200,
+                json: () => Promise.resolve({}),
+              });
+            };''')
+          test_file.write_text(text)
+          PY
+      - name: Format and verify frontend
+        working-directory: apps/mobile
+        run: |
+          npx prettier --write src/i18n/catalog.ts src/i18n/catalog.test.ts src/i18n/WebLocaleTranslator.tsx
+          npm run lint
+          npm run typecheck
+          npx jest --runInBand src/i18n/catalog.test.ts
+      - name: Commit verified fixes and remove helper
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git rm .github/workflows/i18n-lint-fix-helper.yml
+          git add apps/mobile/src/i18n/catalog.ts apps/mobile/src/i18n/catalog.test.ts apps/mobile/src/i18n/WebLocaleTranslator.tsx
+          git commit -m "Fix typed i18n lint issues"
+          git push origin HEAD:agent/remove-demo-banner-full-i18n
