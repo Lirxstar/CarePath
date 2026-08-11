@@ -46,7 +46,7 @@ export const MOBILE_STRINGS: Record<AppLocale, MobileStrings> = {
     },
     safety: {
       title: "Behaviour support, not medical care",
-      body: "CarePath supports low-risk health behaviours. It does not diagnose conditions or change medication. Demo records are synthetic.",
+      body: "CarePath supports low-risk health behaviours. It does not diagnose conditions or change medication. Built-in demo records are synthetic.",
       urgent:
         "For urgent or severe symptoms, use local emergency services or seek prompt professional medical help.",
     },
@@ -70,7 +70,7 @@ export const MOBILE_STRINGS: Record<AppLocale, MobileStrings> = {
     },
     safety: {
       title: "健康行为支持，不替代医疗服务",
-      body: "CarePath 仅支持低风险健康行为，不进行疾病诊断，也不会调整药物。演示数据均为模拟数据。",
+      body: "CarePath 仅支持低风险健康行为，不进行疾病诊断，也不会调整药物。内置演示记录均为合成数据。",
       urgent: "如出现紧急或严重症状，请联系当地急救服务或尽快寻求专业医疗帮助。",
     },
   },
@@ -93,7 +93,7 @@ export const MOBILE_STRINGS: Record<AppLocale, MobileStrings> = {
     },
     safety: {
       title: "健康行動の支援であり、医療行為ではありません",
-      body: "CarePath は低リスクの健康行動を支援します。診断や薬の変更は行いません。デモ記録は合成データです。",
+      body: "CarePath は低リスクの健康行動を支援します。診断や薬の変更は行いません。組み込みデモ記録は合成データです。",
       urgent:
         "緊急または重い症状がある場合は、地域の救急サービスを利用するか、速やかに医療専門家へ相談してください。",
     },
