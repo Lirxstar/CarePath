@@ -611,15 +611,13 @@ export function translateStaticText(locale: AppLocale, input: string): string {
   if (input.length === 0) {
     return input;
   }
-  const leading = input.match(/^\s*/)?.[0] ?? "";
-  const trailing = input.match(/\s*$/)?.[0] ?? "";
+  const leading = /^\s*/.exec(input)?.[0] ?? "";
+  const trailing = /\s*$/.exec(input)?.[0] ?? "";
   const core = normalize(input);
   if (core.length === 0) {
     return input;
   }
   const exact = LOOKUP.get(core);
   const translated = exact?.[locale] ?? dynamicTranslation(locale, core);
-  return translated === null || translated === undefined
-    ? input
-    : `${leading}${translated}${trailing}`;
+  return translated === null ? input : `${leading}${translated}${trailing}`;
 }
