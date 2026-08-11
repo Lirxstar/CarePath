@@ -80,7 +80,10 @@ export function WebLocaleTranslator() {
           continue;
         }
         for (let index = 0; index < mutation.addedNodes.length; index += 1) {
-          translateSubtree(mutation.addedNodes.item(index), locale);
+          const node = mutation.addedNodes.item(index);
+          if (node !== null) {
+            translateSubtree(node, locale);
+          }
         }
       }
     });
