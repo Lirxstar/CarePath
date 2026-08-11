@@ -50,10 +50,11 @@ function translateSubtree(root: Node, locale: AppLocale): void {
     current = walker.nextNode();
   }
   if (root.nodeType === Node.ELEMENT_NODE) {
-    for (const element of (root as Element).querySelectorAll(
+    const elements = (root as Element).querySelectorAll<Element>(
       "[aria-label], [placeholder], [title]",
-    )) {
-      translateElementAttributes(element, locale);
+    );
+    for (let index = 0; index < elements.length; index += 1) {
+      translateElementAttributes(elements.item(index), locale);
     }
   }
 }
@@ -78,8 +79,8 @@ export function WebLocaleTranslator() {
           translateElementAttributes(mutation.target as Element, locale);
           continue;
         }
-        for (const node of mutation.addedNodes) {
-          translateSubtree(node, locale);
+        for (let index = 0; index < mutation.addedNodes.length; index += 1) {
+          translateSubtree(mutation.addedNodes.item(index), locale);
         }
       }
     });
