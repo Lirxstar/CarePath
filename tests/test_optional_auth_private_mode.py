@@ -277,6 +277,36 @@ def test_private_session_store_serializes_same_workspace_operations() -> None:
     store.close_all()
 
 
+def test_private_session_context_can_exit_on_different_worker_thread() -> None:
+    store = PrivateSessionStore(ttl_minutes=5, max_sessions=2)
+    session_id = store.create()
+    manager = store.session(session_id)
+    entered = Event()
+    release_enter_worker = Event()
+
+    def enter_and_hold_worker() -> Session:
+        session = manager.__enter__()
+        entered.set()
+        assert release_enter_worker.wait(timeout=2)
+        return session
+
+    def exit_on_other_worker() -> None:
+        assert entered.wait(timeout=2)
+        manager.__exit__(None, None, None)
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        enter_future = executor.submit(enter_and_hold_worker)
+        assert entered.wait(timeout=2)
+        exit_future = executor.submit(exit_on_other_worker)
+        try:
+            exit_future.result(timeout=2)
+        finally:
+            release_enter_worker.set()
+        assert enter_future.result(timeout=2) is not None
+
+    store.close_all()
+
+
 def test_private_session_close_waits_for_inflight_database_operation() -> None:
     store = PrivateSessionStore(ttl_minutes=5, max_sessions=2)
     session_id = store.create()
