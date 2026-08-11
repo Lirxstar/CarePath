@@ -1,3 +1,5 @@
+import { afterEach, describe, expect, it } from "@jest/globals";
+
 import { CarePathApiClient, type ApiRequestInit } from "../api/client";
 import { buildDemoScenario } from "../journey/demoScenario";
 import { PrimaryJourneyService } from "../journey/service";
@@ -26,15 +28,15 @@ describe("web locale catalog", () => {
 
   it("sends the selected locale to the real Coach API request", async () => {
     const requestBodies: unknown[] = [];
-    const fetcher = async (_url: string, init: ApiRequestInit) => {
+    const fetcher = (_url: string, init: ApiRequestInit) => {
       if (init.method === "POST" && init.body !== undefined) {
         requestBodies.push(JSON.parse(init.body) as unknown);
       }
-      return {
+      return Promise.resolve({
         ok: true,
         status: 200,
-        json: async () => ({}),
-      };
+        json: () => Promise.resolve({}),
+      });
     };
     const client = new CarePathApiClient("https://example.invalid", fetcher);
     const service = new PrimaryJourneyService(client, buildDemoScenario());
