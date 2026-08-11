@@ -61,7 +61,6 @@ jobs:
         env:
           EXPO_PUBLIC_CAREPATH_API_URL: http://127.0.0.1:4173/api
           EXPO_PUBLIC_CAREPATH_MOCK_MODE: "false"
-          EXPO_PUBLIC_CAREPATH_PUBLIC_DEMO: "true"
         run: npm --prefix apps/mobile run bundle:web
       - name: Install browser gate runtime
         working-directory: apps/mobile
