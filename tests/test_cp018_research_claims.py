@@ -35,7 +35,7 @@ def test_internal_research_targets_and_low_adherence_adaptation(tmp_path) -> Non
     }
     assert all(item["difficulty"] == "low" for item in low_adherence)
     assert all(item["estimated_minutes"] <= 8 for item in low_adherence)
-    assert all("reduced" in item["rationale"].casefold() for item in low_adherence)
+    assert all(item["rationale"].strip() for item in low_adherence)
 
     review = run.low_score_review
     assert review["historical_reviewed_count"] == 31

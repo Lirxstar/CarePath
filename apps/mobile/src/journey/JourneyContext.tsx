@@ -813,7 +813,9 @@ export function JourneyProvider({ children, apiBaseUrl }: JourneyProviderProps) 
 
   const progress = useMemo<JourneyProgress>(
     () => ({
-      imported: importState.status === "success" && importState.data.status !== "failed",
+      imported:
+        (importState.status === "success" && importState.data.status !== "failed") ||
+        profileState.status === "success",
       dashboard:
         profileState.status === "success" &&
         PRIMARY_METRICS.every((metric) => recent7States[metric].status === "success"),

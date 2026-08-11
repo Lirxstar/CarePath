@@ -242,6 +242,16 @@ const PHRASES: Translation[] = [
     zh: "此限定时间窗口内没有匹配的用户证据。",
     ja: "この限定期間に一致するユーザーエビデンスはありません。",
   },
+  {
+    en: "Patient Evidence is temporarily unavailable. The coaching answer above can still be used; this evidence panel will not block it.",
+    zh: "患者证据暂时不可用。上方的教练回答仍可使用；此证据面板不会阻止回答显示。",
+    ja: "患者エビデンスは一時的に利用できません。上のコーチ回答は引き続き利用でき、このエビデンスパネルの障害で回答全体は停止しません。",
+  },
+  {
+    en: "Add health data or load a demo persona first.",
+    zh: "请先添加健康数据或加载演示用户。",
+    ja: "健康データを追加するか、デモペルソナを読み込んでください。",
+  },
   { en: "External Evidence", zh: "外部证据", ja: "外部エビデンス" },
   {
     en: "Expand a result to inspect the exact guideline chunk, organisation, source date and retrieval date.",
@@ -257,6 +267,11 @@ const PHRASES: Translation[] = [
     en: "No external guideline chunk matched this question.",
     zh: "没有与此问题匹配的外部指南片段。",
     ja: "この質問に一致する外部ガイドラインのチャンクはありません。",
+  },
+  {
+    en: "External guideline evidence is temporarily unavailable. The coaching answer above remains limited to the evidence available to the verified workflow.",
+    zh: "外部指南证据暂时不可用。上方教练回答仍仅基于已验证工作流当前可用的证据。",
+    ja: "外部ガイドラインのエビデンスは一時的に利用できません。上のコーチ回答は、検証済みワークフローで利用可能なエビデンスの範囲に限定されています。",
   },
   { en: "Final response citation map", zh: "最终回答引用映射", ja: "最終回答の引用マップ" },
   { en: "Record/source IDs:", zh: "记录/来源 ID：", ja: "記録/ソース ID：" },

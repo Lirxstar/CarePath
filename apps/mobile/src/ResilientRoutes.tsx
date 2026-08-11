@@ -122,11 +122,7 @@ export function TodayRoute() {
 
 export function CoachRoute() {
   const journey = useJourney();
-  const error = firstError([
-    journey.coachState,
-    journey.patientEvidenceState,
-    journey.externalEvidenceState,
-  ]);
+  const error = firstError([journey.coachState]);
   return (
     <RouteFrame error={error} retry={() => void journey.askQuestion()}>
       <CoachScreen />

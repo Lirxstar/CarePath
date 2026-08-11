@@ -93,6 +93,12 @@ def search_external_evidence(
             str(exc),
             status_code=HTTPStatus.UNPROCESSABLE_ENTITY,
         ) from exc
+    except Exception as exc:
+        raise CarePathError(
+            "evidence_search_unavailable",
+            "External guideline evidence is temporarily unavailable",
+            status_code=HTTPStatus.SERVICE_UNAVAILABLE,
+        ) from exc
     return list(hits)
 
 

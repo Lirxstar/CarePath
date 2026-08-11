@@ -276,6 +276,7 @@ def build_runtime_workflow(
             evidence=evidence,
             start_date=summary.generated_at.date(),
             request_text=request_text,
+            language=language,
         )
         plan_ref["plan"] = weekly
         evidence_ref["bundle"] = evidence

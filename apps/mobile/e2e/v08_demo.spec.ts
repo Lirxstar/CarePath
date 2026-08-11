@@ -106,6 +106,8 @@ test("language selection translates the complete web interface", async ({ page }
   await expect(page.getByText("API 连接")).toBeVisible();
   await expect(page.getByText("账户与隐私")).toBeVisible();
   await expect(page.getByText("Today dashboard")).toHaveCount(0);
+  await page.getByRole("button", { name: "加载演示数据" }).click();
+  await expect(page.getByText("演示数据已加载")).toBeVisible({ timeout: 30_000 });
 
   await openTab(page, "tab-health-data");
   await expect(page.getByText("纵向记录")).toBeVisible();
@@ -115,6 +117,12 @@ test("language selection translates the complete web interface", async ({ page }
   await openTab(page, "tab-coach");
   await expect(page.getByText("基于证据的健康教练")).toBeVisible();
   await expect(page.getByText("询问 CarePath")).toBeVisible();
+  await page.getByRole("button", { name: "分析并回答" }).click();
+  await expect(page.getByText(/睡眠时长.*近期平均值/).first()).toBeVisible({ timeout: 45_000 });
+  await expect(page.getByText(/计划睡觉前.*分钟/).first()).toBeVisible();
+  await expect(page.getByText(/sleep_duration decreased/)).toHaveCount(0);
+  await expect(page.getByText(/Use 12 minutes for a consistent wind-down cue/)).toHaveCount(0);
+  await expect(page.getByText("Internal server error")).toHaveCount(0);
 
   await openTab(page, "tab-plan-history");
   await expect(page.getByText("长期自适应")).toBeVisible();
