@@ -3,7 +3,7 @@ import { DefaultTheme, NavigationContainer } from "@react-navigation/native";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { I18nProvider, useI18n } from "./i18n/I18nContext";
+import { useI18n } from "./i18n/I18nContext";
 import type { RootTabParamList } from "./navigation";
 import { CoachRoute, HealthDataRoute, PlanHistoryRoute, TodayRoute } from "./ResilientRoutes";
 
@@ -117,11 +117,7 @@ function NavigatorBody() {
 }
 
 export function AppNavigator() {
-  return (
-    <I18nProvider>
-      <NavigatorBody />
-    </I18nProvider>
-  );
+  return <NavigatorBody />;
 }
 
 const styles = StyleSheet.create({
