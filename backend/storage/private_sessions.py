@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+from _thread import LockType
 from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
-from threading import RLock
+from threading import Lock, RLock
 from typing import Protocol
 from uuid import UUID, uuid4
 
@@ -33,7 +34,7 @@ class _PrivateSessionEntry:
     session_factory: sessionmaker[Session]
     expires_at: datetime
     last_accessed_at: datetime
-    operation_lock: RLock = field(default_factory=RLock)
+    operation_lock: LockType = field(default_factory=Lock)
 
 
 class PrivateSessionStore:
@@ -86,8 +87,9 @@ class PrivateSessionStore:
             entry.expires_at = now + self._ttl
             # StaticPool intentionally keeps one in-memory SQLite connection. SQLite cannot
             # safely execute multiple transactions on that connection concurrently, so acquire
-            # the per-workspace lock before releasing the registry lock. This also prevents
-            # close() from disposing the engine between lookup and Session construction.
+            # the per-workspace lock before releasing the registry lock. FastAPI may enter and
+            # exit a synchronous generator dependency on different worker threads, so this must
+            # be a primitive Lock rather than a thread-owned RLock.
             entry.operation_lock.acquire()
 
         try:
