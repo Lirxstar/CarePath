@@ -1,3 +1,4 @@
+# ruff: noqa: RUF001
 from backend.domain.models import Domain, MetricType
 from backend.localization import (
     data_gap_text,
