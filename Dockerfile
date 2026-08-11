@@ -7,8 +7,7 @@ RUN npm ci
 
 COPY apps/mobile ./
 ENV EXPO_PUBLIC_CAREPATH_API_URL=__CAREPATH_SAME_ORIGIN__ \
-    EXPO_PUBLIC_CAREPATH_MOCK_MODE=false \
-    EXPO_PUBLIC_CAREPATH_PUBLIC_DEMO=true
+    EXPO_PUBLIC_CAREPATH_MOCK_MODE=false
 RUN npm run bundle:web
 
 FROM python:3.12-slim AS runtime
