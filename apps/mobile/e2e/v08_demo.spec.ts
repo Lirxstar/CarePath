@@ -86,7 +86,8 @@ test("Private mode uses an isolated non-persistent workspace", async ({ page }) 
   await expect(page.getByText(/temporary server memory only/)).toBeVisible();
 
   const importRequestPromise = page.waitForRequest(
-    (request) => request.method() === "POST" && new URL(request.url()).pathname === "/records/import",
+    (request) =>
+      request.method() === "POST" && new URL(request.url()).pathname === "/records/import",
   );
   await page.getByRole("button", { name: "Load demo" }).click();
   const importRequest = await importRequestPromise;
