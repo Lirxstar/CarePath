@@ -101,7 +101,7 @@ test("language selection translates the complete web interface", async ({ page }
   await expect(page.getByText("Today dashboard")).toBeVisible();
   await expect(page.getByText("Account & privacy")).toBeVisible();
 
-  await page.getByText("ZH", { exact: true }).click();
+  await page.getByRole("radio", { name: "Use zh interface safety text" }).click();
   await expect(page.getByText("今日仪表板")).toBeVisible();
   await expect(page.getByText("API 连接")).toBeVisible();
   await expect(page.getByText("账户与隐私")).toBeVisible();
@@ -120,7 +120,7 @@ test("language selection translates the complete web interface", async ({ page }
   await expect(page.getByText("长期自适应")).toBeVisible();
   await expect(page.getByText(/查看当前一周计划/)).toBeVisible();
 
-  await page.getByText("JA", { exact: true }).click();
+  await page.getByRole("radio", { name: "Use ja interface safety text" }).click();
   await expect(page.getByText("長期的な適応")).toBeVisible();
   await expect(page.getByText(/現在の1週間を確認/)).toBeVisible();
   await expect(page.getByText("アカウントとプライバシー")).toBeVisible();
