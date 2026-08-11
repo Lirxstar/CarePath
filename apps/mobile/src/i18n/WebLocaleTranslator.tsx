@@ -64,6 +64,8 @@ export function WebLocaleTranslator() {
     if (Platform.OS !== "web" || typeof document === "undefined") {
       return undefined;
     }
+    // React Native Web can add or replace text after the locale button is pressed, so keep
+    // newly rendered text and accessibility attributes synchronized with the chosen locale.
     const body = document.body;
     translateSubtree(body, locale);
 
