@@ -139,6 +139,52 @@ test("language selection translates the complete web interface", async ({ page }
   await expect(page.getByText("Today dashboard")).toHaveCount(0);
 });
 
+test.describe("mobile browser acceptance", () => {
+  test.use({
+    viewport: { width: 390, height: 844 },
+    screen: { width: 390, height: 844 },
+    isMobile: true,
+    hasTouch: true,
+    deviceScaleFactor: 3,
+  });
+
+  test("mobile browser supports the primary journey, tab routing and refresh", async ({ page }) => {
+    await page.goto("/");
+    expect(page.viewportSize()).toEqual({ width: 390, height: 844 });
+    expect(await page.evaluate(() => navigator.maxTouchPoints)).toBeGreaterThan(0);
+    await expect(page.getByText("API connection")).toBeVisible();
+    await expect(page.getByText(/Connected/)).toBeVisible({ timeout: 30_000 });
+
+    await page.getByRole("button", { name: "Load demo" }).click();
+    await expect(page.getByText("Demo loaded")).toBeVisible({ timeout: 30_000 });
+    await captureEvidence(page, "mobile-today");
+
+    await openTab(page, "tab-health-data");
+    await expect(page.getByText("Raw longitudinal chart")).toBeVisible();
+
+    await openTab(page, "tab-coach");
+    await expect(page.getByText("Ask CarePath")).toBeVisible();
+    await page.getByRole("button", { name: "Analyse and answer" }).click();
+    await expect(page.getByText("What I noticed")).toBeVisible({ timeout: 45_000 });
+
+    await openTab(page, "tab-plan-history");
+    await expect(page.getByText("Current seven-day plan")).toBeVisible({ timeout: 30_000 });
+    await captureEvidence(page, "mobile-primary-journey");
+
+    await page.reload();
+    expect(page.viewportSize()).toEqual({ width: 390, height: 844 });
+    expect(await page.evaluate(() => navigator.maxTouchPoints)).toBeGreaterThan(0);
+    await expect(page.getByText("API connection")).toBeVisible();
+    await expect(page.getByText(/Connected/)).toBeVisible({ timeout: 30_000 });
+
+    await openTab(page, "tab-health-data");
+    await expect(page.getByText("Raw longitudinal chart")).toBeVisible();
+    await openTab(page, "tab-today");
+    await expect(page.getByText("Today dashboard")).toBeVisible();
+    await captureEvidence(page, "mobile-after-refresh");
+  });
+});
+
 test("desktop reviewer supports refresh and tab routing", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/");
