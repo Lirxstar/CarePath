@@ -1,3 +1,4 @@
+# ruff: noqa: RUF001
 """Evidence-aware personalized seven-day behavioural planner."""
 
 from __future__ import annotations
