@@ -97,7 +97,7 @@ def data_gap_text(value: str, language: str) -> str:
         return f"{label}的近 {days} 天数据不足。"
     if key == "ja":
         return f"{label}の直近{days}日間のデータが不足しています。"
-    return f"Not enough {label} data are available for the recent {days}-day window."
+    return f"Available {label} data are limited for the recent {days}-day window."
 
 
 def recent_data_limited_text(language: str) -> str:
