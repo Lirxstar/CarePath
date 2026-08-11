@@ -7,10 +7,13 @@ on:
       - main
     paths:
       - Dockerfile
-      - backend/api/app/config.py
-      - backend/api/app/main.py
+      - compose.yaml
+      - pyproject.toml
+      - requirements*.lock
+      - alembic/**
+      - backend/**
       - apps/mobile/**
-      - deployment/public_backend_url.txt
+      - deployment/**
       - tests/test_cp020_reviewer_deployment.py
       - .github/workflows/cp020-reviewer-client.yml
 
