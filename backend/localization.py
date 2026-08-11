@@ -1,3 +1,4 @@
+# ruff: noqa: RUF001
 """Deterministic user-visible Coach copy for supported interface languages."""
 
 from __future__ import annotations
@@ -41,6 +42,10 @@ _DIRECTION_LABELS: dict[str, dict[str, str]] = {
     "decreased": {"en": "decreased", "zh": "下降", "ja": "減少"},
     "stable": {"en": "was stable", "zh": "保持稳定", "ja": "安定"},
 }
+
+
+def _minute_article(minutes: int) -> str:
+    return "an" if minutes in {8, 11, 18} else "a"
 
 
 def metric_label(metric: MetricType | str, language: str) -> str:
@@ -109,7 +114,10 @@ def no_external_evidence_statement(language: str) -> str:
     if key == "zh":
         return "未使用匹配的外部指南证据；该行动保持在一般低风险健康行为支持的边界内。"
     if key == "ja":
-        return "一致する外部ガイドラインのエビデンスは使用していません。この行動は一般的な低リスクの健康行動支援の範囲内です。"
+        return (
+            "一致する外部ガイドラインのエビデンスは使用していません。"
+            "この行動は一般的な低リスクの健康行動支援の範囲内です。"
+        )
     return (
         "No matching external guideline evidence was used; the action stays within the "
         "planner's general low-risk behaviour-support boundary."
@@ -117,9 +125,12 @@ def no_external_evidence_statement(language: str) -> str:
 
 
 def external_evidence_statement(content: str, language: str) -> str:
-    sentence = content.strip().split("\n", maxsplit=1)[0].strip()
-    if len(sentence) > 260:
-        sentence = f"{sentence[:257].rstrip()}..."
+    compact = " ".join(content.split())
+    sentence = compact.split(".", 1)[0].strip()
+    if not sentence:
+        sentence = compact
+    if len(sentence) > 220:
+        sentence = f"{sentence[:217].rstrip()}..."
     key = language_key(language)
     if key == "zh":
         return f"检索到的指南原文指出：“{sentence}”"
@@ -141,30 +152,48 @@ def plan_action_description(
             return f"在计划睡觉前，用 {minutes} 分钟完成一个固定的放松提示。"
         if key == "ja":
             return f"就寝予定時刻の前に、{minutes} 分間の一貫したクールダウン習慣を行います。"
-        return f"Use {minutes} minutes for a consistent wind-down cue before your intended sleep period."
+        return (
+            f"Use {minutes} minutes for a consistent wind-down cue before your intended "
+            "sleep period."
+        )
     if domain is Domain.PHYSICAL_ACTIVITY:
         if activity_limited:
             if key == "zh":
                 return f"在已说明的活动限制范围内，选择 {minutes} 分钟舒适的活动。"
             if key == "ja":
                 return f"申告済みの活動制限の範囲内で、{minutes} 分間の無理のない運動を選びます。"
-            return f"Choose {minutes} minutes of comfortable movement within your stated activity constraints."
+            return (
+                f"Choose {minutes} minutes of comfortable movement that stays within your "
+                "stated activity constraints."
+            )
         if key == "zh":
             return f"进行 {minutes} 分钟舒适步行，或进行等量的轻度活动。"
         if key == "ja":
             return f"{minutes} 分間の無理のない散歩、または同程度の軽い運動を行います。"
-        return f"Take a {minutes}-minute comfortable walk or equivalent light activity."
+        return (
+            f"Take {_minute_article(minutes)} {minutes}-minute comfortable walk "
+            "or equivalent light movement break."
+        )
     if domain is Domain.STRESS_MOOD:
         if key == "zh":
             return f"安排 {minutes} 分钟安静恢复时间，可使用节律呼吸或其他偏好的放松方式。"
         if key == "ja":
-            return f"{minutes} 分間の静かな回復時間を取り、ペース呼吸など好みの落ち着く方法を使います。"
-        return f"Set aside {minutes} minutes for quiet recovery, paced breathing, or another preferred calming routine."
+            return (
+                f"{minutes} 分間の静かな回復時間を取り、"
+                "ペース呼吸など好みの落ち着く方法を使います。"
+            )
+        return (
+            f"Take {_minute_article(minutes)} {minutes}-minute quiet recovery break using "
+            "paced breathing or another preferred calming routine."
+        )
     if key == "zh":
         return f"用 {minutes} 分钟检查一个常用行走区域，清除可避免的绊倒风险。"
     if key == "ja":
         return f"{minutes} 分かけて、普段歩く場所の避けられるつまずき要因を確認します。"
-    return f"Spend {minutes} minutes checking one regular walking area for avoidable trip hazards."
+    return (
+        f"Spend {minutes} minutes checking one commonly used walking area for avoidable "
+        "trip hazards."
+    )
 
 
 def plan_frequency(language: str, *, weekly: bool = False) -> str:
@@ -195,8 +224,9 @@ def plan_follow_up(language: str) -> str:
             "専門家からの制限と矛盾する、または安全でないと感じる行動は中止します。"
         )
     return (
-        "Review completion and comfort after seven days; reduce the next plan if adherence is low, "
-        "and stop any action that conflicts with professional restrictions or feels unsafe."
+        "Review completion and comfort after seven days; scale the next plan down "
+        "if completion is low, and pause any action that conflicts with a professional "
+        "restriction or feels unsafe."
     )
 
 
@@ -211,60 +241,82 @@ def plan_rationale(
 ) -> str:
     key = language_key(language)
     if key == "zh":
+        reasons: list[str] = []
         if low_completion:
-            basis = "近期结构化行动完成率较低，因此降低了行动强度"
-        elif high_stress:
-            basis = "近期压力数据较高，因此保持较小负担"
-        elif data_limited:
-            basis = "近期数据不完整，因此计划保持保守"
-        elif accepted_feedback:
-            basis = "近期已接受的反馈支持暂时保持当前行动规模，等待更多完成情况数据"
-        else:
-            basis = "行动规模根据现有用户背景和以往完成情况进行了调整"
+            reasons.append("近期结构化行动完成率较低，因此降低了行动强度")
+        if high_stress:
+            reasons.append("近期压力数据较高，因此保持较小负担")
+        if data_limited:
+            reasons.append("近期数据不完整，因此计划保持保守")
+        if not reasons and accepted_feedback:
+            reasons.append("近期已接受的反馈支持暂时保持当前行动规模，等待更多完成情况数据")
+        if not reasons:
+            reasons.append("行动规模根据现有用户背景和以往完成情况进行了调整")
         grounding = (
             "一般性指导得到检索到的外部证据支持"
             if evidence_grounded
             else "该建议明确标记为一般性的低风险健康行为指导"
         )
-        return f"{basis}；{grounding}。"
+        return f"{'；'.join(reasons)}；{grounding}。"
     if key == "ja":
+        reasons_ja: list[str] = []
         if low_completion:
-            basis = "最近の計画行動の実行率が低かったため、行動量を減らしました"
-        elif high_stress:
-            basis = "最近のストレスデータが高かったため、負担を小さくしました"
-        elif data_limited:
-            basis = "最近のデータが不十分なため、プランを保守的にしました"
-        elif accepted_feedback:
-            basis = "最近受け入れられたフィードバックを踏まえ、実行データが増えるまでは現在の行動量を維持します"
-        else:
-            basis = "利用可能なユーザー状況とこれまでの実行履歴に合わせて行動量を調整しました"
-        grounding = (
+            reasons_ja.append("最近の計画行動の実行率が低かったため、行動量を減らしました")
+        if high_stress:
+            reasons_ja.append("最近のストレスデータが高かったため、負担を小さくしました")
+        if data_limited:
+            reasons_ja.append("最近のデータが不十分なため、プランを保守的にしました")
+        if not reasons_ja and accepted_feedback:
+            reasons_ja.append(
+                "最近受け入れられたフィードバックを踏まえ、"
+                "実行データが増えるまでは現在の行動量を維持します"
+            )
+        if not reasons_ja:
+            reasons_ja.append(
+                "利用可能なユーザー状況とこれまでの実行履歴に合わせて行動量を調整しました"
+            )
+        grounding_ja = (
             "一般的なガイダンスは取得した外部エビデンスで支持されています"
             if evidence_grounded
             else "この提案は一般的な低リスクの健康行動ガイダンスとして明示されています"
         )
-        return f"{basis}。{grounding}。"
+        return f"{'。'.join(reasons_ja)}。{grounding_ja}。"
+
+    reasons_en: list[str] = []
     if low_completion:
-        basis = "recent structured action completion was low, so the action was scaled down"
-    elif high_stress:
-        basis = "recent stress data were elevated, so the burden was kept small"
-    elif data_limited:
-        basis = "recent data were incomplete, so the plan remains conservative"
-    elif accepted_feedback:
-        basis = "recent accepted feedback supports holding the current action size while more completion data accumulate"
-    else:
-        basis = "the action is scaled to the available user context and prior completion history"
-    grounding = (
-        "the general guidance is supported by retrieved external evidence"
+        reasons_en.append("recent structured completion was low, so the action was reduced")
+    if high_stress:
+        reasons_en.append("recent stress data were high, so workload was kept small")
+    if data_limited:
+        reasons_en.append("recent data were incomplete, so the plan stays conservative")
+    if not reasons_en and accepted_feedback:
+        reasons_en.append(
+            "recent accepted feedback supports maintaining the current action size until "
+            "completion evidence is available"
+        )
+    if not reasons_en:
+        reasons_en.append(
+            "the action is scaled to the available user context and prior completion history"
+        )
+    grounding_en = (
+        "general guidance is supported by retrieved external evidence"
         if evidence_grounded
         else "the suggestion is explicitly marked as general low-risk behavioural guidance"
     )
-    return f"{basis}; {grounding}."
+    return f"{' ; '.join(reasons_en)}; {grounding_en}."
 
 
 def fallback_goal(domain: Domain, language: str) -> str:
     key = language_key(language)
-    label = domain.value.replace("_", " ")
+    if domain is Domain.SLEEP:
+        labels = {"en": "sleep", "zh": "睡眠", "ja": "睡眠"}
+    elif domain is Domain.PHYSICAL_ACTIVITY:
+        labels = {"en": "physical activity", "zh": "身体活动", "ja": "身体活動"}
+    elif domain is Domain.STRESS_MOOD:
+        labels = {"en": "stress mood", "zh": "压力与情绪", "ja": "ストレスと気分"}
+    else:
+        labels = {"en": "fall safety", "zh": "跌倒预防", "ja": "転倒予防"}
+    label = labels[key]
     if key == "zh":
         return f"建立可持续的{label}习惯"
     if key == "ja":
