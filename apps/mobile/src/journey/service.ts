@@ -1,4 +1,5 @@
 import type { ApiResult, CarePathApiClient, ControlledApiError } from "../api/client";
+import { getRuntimeLocale } from "../i18n/runtimeLocale";
 import type {
   ApiHealthResponse,
   CoachMessageResponse,
@@ -156,7 +157,7 @@ export class PrimaryJourneyService implements JourneyService {
     return this.client.post<CoachMessageResponse>("/coach/message", {
       user_id: this.scenario.userId,
       message,
-      language: "en",
+      language: getRuntimeLocale(),
     });
   }
 
