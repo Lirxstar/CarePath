@@ -9,29 +9,17 @@ permissions:
   contents: write
 
 jobs:
-  format:
+  cleanup:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
         with:
           ref: agent/remove-demo-banner-full-i18n
-      - uses: actions/setup-node@v6
-        with:
-          node-version-file: apps/mobile/.nvmrc
-          cache: npm
-          cache-dependency-path: apps/mobile/package-lock.json
-      - working-directory: apps/mobile
-        run: npm ci
-      - working-directory: apps/mobile
-        run: npx prettier --write src/i18n/catalog.ts src/i18n/WebLocaleTranslator.tsx
-      - name: Commit formatted files
+      - name: Remove helper from the feature branch
         run: |
-          if git diff --quiet -- apps/mobile/src/i18n/catalog.ts apps/mobile/src/i18n/WebLocaleTranslator.tsx; then
-            exit 0
-          fi
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add apps/mobile/src/i18n/catalog.ts apps/mobile/src/i18n/WebLocaleTranslator.tsx
-          git commit -m "Format i18n sources"
+          git rm .github/workflows/i18n-format-helper.yml
+          git commit -m "Remove temporary i18n format helper"
           git push origin HEAD:agent/remove-demo-banner-full-i18n
