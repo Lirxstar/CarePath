@@ -85,7 +85,18 @@ test("Private mode uses an isolated non-persistent workspace", async ({ page }) 
   await expect(page.getByText(/Private mode is on/).first()).toBeVisible();
   await expect(page.getByText(/temporary server memory only/)).toBeVisible();
 
+  const importRequestPromise = page.waitForRequest(
+    (request) => request.method() === "POST" && new URL(request.url()).pathname === "/records/import",
+  );
   await page.getByRole("button", { name: "Load demo" }).click();
+  const importRequest = await importRequestPromise;
+  const importPayload = importRequest.postDataJSON() as {
+    content?: { profile?: { user_id?: unknown } };
+  };
+  const privateUserId = importPayload.content?.profile?.user_id;
+  expect(typeof privateUserId).toBe("string");
+  expect(await importRequest.headerValue("x-carepath-private-session")).toBeTruthy();
+
   await expect(page.getByText("Demo loaded")).toBeVisible({ timeout: 30_000 });
   await openTab(page, "tab-health-data");
   await expect(page.getByText("Raw longitudinal chart")).toBeVisible();
@@ -93,7 +104,11 @@ test("Private mode uses an isolated non-persistent workspace", async ({ page }) 
 
   await page.getByRole("button", { name: "Exit Private mode" }).click();
   await expect(page.getByText(/Private mode is off/)).toBeVisible();
-  await expect(page.getByText("Demo loaded")).toHaveCount(0);
+  const persistentProfileStatus = await page.evaluate(async (userId) => {
+    const response = await fetch(`/profiles/${encodeURIComponent(userId)}`);
+    return response.status;
+  }, privateUserId as string);
+  expect(persistentProfileStatus).toBe(404);
 });
 
 test("language selection translates the complete web interface", async ({ page }) => {
