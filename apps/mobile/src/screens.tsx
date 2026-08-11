@@ -797,7 +797,7 @@ export function CoachScreen() {
           onPress={() => void askQuestion()}
         />
         {!progress.imported ? (
-          <Text style={styles.helperText}>Load the selected synthetic persona first.</Text>
+          <Text style={styles.helperText}>Add health data or load a demo persona first.</Text>
         ) : null}
         {coachState.status === "error" ? <ErrorPanel error={coachState.error} /> : null}
       </View>
@@ -881,7 +881,10 @@ export function CoachScreen() {
           <LoadingLine label="Retrieving Patient Evidence…" />
         ) : null}
         {patientEvidenceState.status === "error" ? (
-          <ErrorPanel error={patientEvidenceState.error} />
+          <Text style={styles.helperText}>
+            Patient Evidence is temporarily unavailable. The coaching answer above can still be
+            used; this evidence panel will not block it.
+          </Text>
         ) : null}
         {patientEvidenceState.status === "success" &&
         patientEvidenceState.data.items.length === 0 ? (
@@ -904,7 +907,10 @@ export function CoachScreen() {
           <LoadingLine label="Retrieving guideline evidence…" />
         ) : null}
         {externalEvidenceState.status === "error" ? (
-          <ErrorPanel error={externalEvidenceState.error} />
+          <Text style={styles.helperText}>
+            External guideline evidence is temporarily unavailable. The coaching answer above
+            remains limited to the evidence available to the verified workflow.
+          </Text>
         ) : null}
         {externalEvidenceState.status === "success" && externalEvidenceState.data.length === 0 ? (
           <Text style={styles.mutedText}>No external guideline chunk matched this question.</Text>

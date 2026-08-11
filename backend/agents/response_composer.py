@@ -14,6 +14,13 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from backend.agents.context_builder import UserStateSummary
 from backend.domain.models import RiskLevel
+from backend.localization import (
+    data_gap_text,
+    external_evidence_statement,
+    no_external_evidence_statement,
+    recent_data_limited_text,
+    trend_statement,
+)
 from backend.personalization.planner_v2 import PersonalizedWeeklyPlan
 from backend.retrieval.evidence import EvidenceBundle, EvidenceType, GroupedEvidenceItem
 
@@ -207,7 +214,7 @@ class ResponseComposer:
         prompt_injection_detected: bool = False,
     ) -> StructuredCoachResponse:
         noticed, user_sources = self._noticed(summary, language)
-        evidence_statements, external_sources = self._evidence(plan, evidence)
+        evidence_statements, external_sources = self._evidence(plan, evidence, language)
         source_map = {item.citation_id: item for item in (*user_sources, *external_sources)}
         actions: list[ResponsePlanAction] = []
         support_updates: dict[str, set[str]] = {
@@ -248,9 +255,9 @@ class ResponseComposer:
             item.model_copy(update={"supports": tuple(sorted(support_updates[item.citation_id]))})
             for item in source_map.values()
         )
-        uncertainties = list(summary.data_insufficient)
+        uncertainties = [data_gap_text(item, language) for item in summary.data_insufficient]
         if plan.data_limited and not uncertainties:
-            uncertainties.append("recent_data_limited")
+            uncertainties.append(recent_data_limited_text(language))
         if not evidence.external_evidence:
             uncertainties.append(_fixed(language, "no_external"))
         uncertainties.append(_fixed(language, "not_diagnosis"))
@@ -283,11 +290,13 @@ class ResponseComposer:
             statements.append(
                 ResponseStatement(
                     statement_id=statement_id,
-                    text=(
-                        f"{trend.metric_type.value} {trend.direction}: recent mean "
-                        f"{trend.current_mean:.2f} versus "
-                        f"{trend.baseline_mean:.2f} in the previous window "
-                        f"({trend.percentage_change:+.1f}%)."
+                    text=trend_statement(
+                        metric=trend.metric_type,
+                        direction=trend.direction,
+                        current_mean=trend.current_mean,
+                        baseline_mean=trend.baseline_mean,
+                        percentage_change=trend.percentage_change,
+                        language=language,
                     ),
                     citation_ids=(citation_id,),
                 )
@@ -311,7 +320,7 @@ class ResponseComposer:
         return tuple(statements), tuple(citations)
 
     def _evidence(
-        self, plan: PersonalizedWeeklyPlan, evidence: EvidenceBundle
+        self, plan: PersonalizedWeeklyPlan, evidence: EvidenceBundle, language: str
     ) -> tuple[tuple[ResponseStatement, ...], tuple[ResponseCitation, ...]]:
         statements: list[ResponseStatement] = []
         citations: list[ResponseCitation] = []
@@ -323,7 +332,7 @@ class ResponseComposer:
             statements.append(
                 ResponseStatement(
                     statement_id=statement_id,
-                    text=self._bounded_evidence_summary(item.content),
+                    text=external_evidence_statement(item.content, language),
                     citation_ids=(citation_id,),
                 )
             )
@@ -333,11 +342,7 @@ class ResponseComposer:
             statements.append(
                 ResponseStatement(
                     statement_id="evidence-1",
-                    text=(
-                        "No matching external guideline evidence was used; the action "
-                        "stays within the planner's general low-risk behaviour-support "
-                        "boundary."
-                    ),
+                    text=no_external_evidence_statement(language),
                 )
             )
         return tuple(statements), tuple(citations)

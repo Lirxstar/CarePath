@@ -48,7 +48,7 @@ def metric_label(metric: MetricType | str, language: str) -> str:
         resolved = metric if isinstance(metric, MetricType) else MetricType(metric)
     except ValueError:
         return str(metric).replace("_", " ")
-    return _METRIC_LABELS.get(resolved, {"en": resolved.value}) .get(
+    return _METRIC_LABELS.get(resolved, {"en": resolved.value}).get(
         language_key(language), resolved.value
     )
 

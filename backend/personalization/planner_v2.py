@@ -10,6 +10,14 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from backend.agents.context_builder import UserStateSummary
 from backend.domain.models import ActionDifficulty, Domain, MetricType
+from backend.localization import (
+    fallback_goal,
+    language_key,
+    plan_action_description,
+    plan_follow_up,
+    plan_frequency,
+    plan_rationale,
+)
 from backend.retrieval.evidence import ClaimScope, EvidenceBundle
 
 
@@ -112,6 +120,7 @@ class PersonalizedInterventionPlanner:
         evidence: EvidenceBundle,
         start_date: date,
         request_text: str,
+        language: str = "en",
     ) -> PersonalizedWeeklyPlan:
         domain = self._domain(summary, request_text)
         completion = summary.adherence.recent_completion_rate
@@ -150,7 +159,10 @@ class PersonalizedInterventionPlanner:
         evidence_ids = tuple(dict.fromkeys((*external_ids, *patient_ids)))
         basis = GuidanceBasis.EVIDENCE_GROUNDED if external_ids else GuidanceBasis.GENERAL_LOW_RISK
         description = self._description(
-            domain, minutes, bool(summary.constraints.get("activity_constraints"))
+            domain,
+            minutes,
+            bool(summary.constraints.get("activity_constraints")),
+            language,
         )
         rationale = self._rationale(
             completion,
@@ -158,18 +170,15 @@ class PersonalizedInterventionPlanner:
             stressed,
             basis,
             accepted_feedback_present=accepted_feedback_present,
+            language=language,
         )
-        follow_up = (
-            "Review completion and comfort after seven days; scale the next plan down "
-            "if completion is low, and pause any action that conflicts with a professional "
-            "restriction or feels unsafe."
-        )
-        alternatives = self._alternatives(domain, minutes)
+        follow_up = plan_follow_up(language)
+        alternatives = self._alternatives(domain, minutes, language)
         actions = tuple(
             PersonalizedAction(
                 scheduled_date=start_date + timedelta(days=index),
                 description=description,
-                frequency="once that day",
+                frequency=plan_frequency(language),
                 difficulty=difficulty,
                 rationale=rationale,
                 evidence_ids=evidence_ids,
@@ -179,11 +188,11 @@ class PersonalizedInterventionPlanner:
             )
             for index in range(7)
         )
-        goal = self._goal(summary, domain)
+        goal = self._goal(summary, domain, language)
         return PersonalizedWeeklyPlan(
             goal=goal,
             actions=actions,
-            frequency="one small action daily for seven days",
+            frequency=plan_frequency(language, weekly=True),
             difficulty=difficulty,
             rationale=rationale,
             evidence_ids=evidence_ids,
@@ -208,12 +217,12 @@ class PersonalizedInterventionPlanner:
         return Domain.SLEEP
 
     @staticmethod
-    def _goal(summary: UserStateSummary, domain: Domain) -> str:
+    def _goal(summary: UserStateSummary, domain: Domain, language: str = "en") -> str:
         prefix = f"{domain.value}:"
-        return next(
-            (goal for goal in summary.goals if goal.startswith(prefix)),
-            f"Build a sustainable {domain.value} routine",
-        )
+        existing = next((goal for goal in summary.goals if goal.startswith(prefix)), None)
+        if existing is not None and language_key(language) == "en":
+            return existing
+        return fallback_goal(domain, language)
 
     @staticmethod
     def _high_recent_stress(summary: UserStateSummary) -> bool:
@@ -251,31 +260,17 @@ class PersonalizedInterventionPlanner:
         return ActionDifficulty.LOW, max(5, min(12, available_minutes))
 
     @staticmethod
-    def _description(domain: Domain, minutes: int, activity_limited: bool) -> str:
-        if domain is Domain.SLEEP:
-            return (
-                f"Use {minutes} minutes for a consistent wind-down cue before your intended "
-                "sleep period."
-            )
-        if domain is Domain.PHYSICAL_ACTIVITY:
-            if activity_limited:
-                return (
-                    f"Choose {minutes} minutes of comfortable movement that stays within your "
-                    "stated activity constraints."
-                )
-            return (
-                f"Take {_minute_article(minutes)} {minutes}-minute comfortable walk "
-                "or equivalent light movement break."
-            )
-        if domain is Domain.STRESS_MOOD:
-            return (
-                f"Take {_minute_article(minutes)} {minutes}-minute quiet recovery break using "
-                "paced breathing or another "
-                "preferred calming routine."
-            )
-        return (
-            f"Spend {minutes} minutes checking one commonly used walking area for avoidable "
-            "trip hazards."
+    def _description(
+        domain: Domain,
+        minutes: int,
+        activity_limited: bool,
+        language: str = "en",
+    ) -> str:
+        return plan_action_description(
+            domain=domain,
+            minutes=minutes,
+            activity_limited=activity_limited,
+            language=language,
         )
 
     @staticmethod
@@ -286,33 +281,55 @@ class PersonalizedInterventionPlanner:
         basis: GuidanceBasis,
         *,
         accepted_feedback_present: bool = False,
+        language: str = "en",
     ) -> str:
-        reasons: list[str] = []
-        if completion is not None and completion < 0.6:
-            reasons.append("recent structured completion was low, so the action was reduced")
-        if stressed:
-            reasons.append("recent stress data were high, so workload was kept small")
-        if data_limited:
-            reasons.append("recent data were incomplete, so the plan stays conservative")
-        if not reasons and accepted_feedback_present:
-            reasons.append(
-                "recent accepted feedback supports maintaining the current action size until "
-                "completion evidence is available"
-            )
-        if not reasons:
-            reasons.append(
-                "the action is scaled to the available user context and prior completion history"
-            )
-        grounding = (
-            "general guidance is supported by retrieved external evidence"
-            if basis is GuidanceBasis.EVIDENCE_GROUNDED
-            else "the suggestion is explicitly marked as general low-risk behavioural guidance"
+        return plan_rationale(
+            low_completion=completion is not None and completion < 0.6,
+            high_stress=stressed,
+            data_limited=data_limited,
+            accepted_feedback=accepted_feedback_present,
+            evidence_grounded=basis is GuidanceBasis.EVIDENCE_GROUNDED,
+            language=language,
         )
-        return f"{' ; '.join(reasons)}; {grounding}."
 
     @staticmethod
-    def _alternatives(domain: Domain, minutes: int) -> tuple[PlanAlternative, ...]:
+    def _alternatives(
+        domain: Domain, minutes: int, language: str = "en"
+    ) -> tuple[PlanAlternative, ...]:
         shorter = max(2, minutes // 2)
+        key = language_key(language)
+        if key == "zh":
+            if domain is Domain.SLEEP:
+                other = "改为整理睡眠环境，并保持相同的起床时间提示。"
+            elif domain is Domain.PHYSICAL_ACTIVITY:
+                other = "把活动拆成两次短时间、舒适的活动。"
+            elif domain is Domain.STRESS_MOOD:
+                other = "改为短暂离开屏幕安静休息，或进行简短书面反思。"
+            else:
+                other = "检查照明，并清理一小段常用行走路径。"
+            return (
+                PlanAlternative(
+                    description=f"将同一行动缩短为 {shorter} 分钟。",
+                    reason="时间或精力有限时采用更省力的备选方案",
+                ),
+                PlanAlternative(description=other, reason="以另一种低风险方式实现同一目标"),
+            )
+        if key == "ja":
+            if domain is Domain.SLEEP:
+                other = "代わりに睡眠環境を整え、同じ起床時刻の合図を保ちます。"
+            elif domain is Domain.PHYSICAL_ACTIVITY:
+                other = "運動を2回の短く無理のないセッションに分けます。"
+            elif domain is Domain.STRESS_MOOD:
+                other = "画面から離れて静かに休むか、短い書き出しを行います。"
+            else:
+                other = "照明を確認し、小さな歩行経路を1か所片づけます。"
+            return (
+                PlanAlternative(
+                    description=f"同じ行動を {shorter} 分間の短い版にします。",
+                    reason="時間やエネルギーが限られるときの負担の少ない代替案",
+                ),
+                PlanAlternative(description=other, reason="同じ目標に向けた別の低リスクな方法"),
+            )
         if domain is Domain.SLEEP:
             other = "Prepare the sleep environment and keep the same wake-time cue instead."
         elif domain is Domain.PHYSICAL_ACTIVITY:
