@@ -1,0 +1,31 @@
+name: i18n format helper
+
+on:
+  push:
+    branches:
+      - agent/remove-demo-banner-full-i18n
+
+permissions:
+  contents: read
+
+jobs:
+  format:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: apps/mobile/.nvmrc
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+      - working-directory: apps/mobile
+        run: npm ci
+      - working-directory: apps/mobile
+        run: npx prettier --write src/i18n/catalog.ts src/i18n/WebLocaleTranslator.tsx
+      - uses: actions/upload-artifact@v4
+        with:
+          name: formatted-i18n
+          path: |
+            apps/mobile/src/i18n/catalog.ts
+            apps/mobile/src/i18n/WebLocaleTranslator.tsx
+          if-no-files-found: error
