@@ -266,9 +266,7 @@ def _matches_filters(resource: TokyoResource, filters: TokyoResourceFilters) -> 
         return False
     if filters.require_website and not _present(resource.website):
         return False
-    if filters.allowed_freshness and resource.freshness not in filters.allowed_freshness:
-        return False
-    return True
+    return not filters.allowed_freshness or resource.freshness in filters.allowed_freshness
 
 
 def _hard_constraint_names(request: TokyoResourceSearchRequest) -> list[str]:
