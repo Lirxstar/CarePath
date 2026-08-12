@@ -1,3 +1,4 @@
+# ruff: noqa: E501, RUF001
 """Deterministic CP-205 safety and privacy boundary for CarePath Tokyo.
 
 Safety classification runs before resource lookup or model use. Emergency and
