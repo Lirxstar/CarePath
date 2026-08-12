@@ -129,12 +129,14 @@ def _matches_filters(entry: BundledEvidenceEntry, filters: ExternalEvidenceFilte
         actual = " ".join(entry.organisation.casefold().split())
         if actual != expected:
             return False
-    if filters.updated_from is not None:
-        if entry.updated_at is None or entry.updated_at < filters.updated_from:
-            return False
-    if filters.updated_to is not None:
-        if entry.updated_at is None or entry.updated_at > filters.updated_to:
-            return False
+    if filters.updated_from is not None and (
+        entry.updated_at is None or entry.updated_at < filters.updated_from
+    ):
+        return False
+    if filters.updated_to is not None and (
+        entry.updated_at is None or entry.updated_at > filters.updated_to
+    ):
+        return False
     return True
 
 
