@@ -1,0 +1,125 @@
+name: CP-204 Tokyo agent
+
+on:
+  pull_request:
+    paths:
+      - "backend/tokyo/agent.py"
+      - "backend/tokyo/search.py"
+      - "backend/tokyo/journeys.py"
+      - "backend/tokyo/models.py"
+      - "backend/tokyo/__init__.py"
+      - "backend/api/app/tokyo_routes.py"
+      - "backend/api/app/llm/**"
+      - "backend/api/app/main.py"
+      - "backend/api/app/config.py"
+      - "tests/test_cp204_tokyo_agent.py"
+      - "docs/cp204_tokyo_intent_agent.md"
+      - ".env.example"
+      - ".github/workflows/cp204-tokyo-agent.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  agent-contract:
+    name: Validate bounded multilingual Tokyo agent
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version-file: .python-version
+          cache: pip
+          cache-dependency-path: |
+            pyproject.toml
+            requirements-dev.lock
+      - name: Install dependencies
+        run: python -m pip install -c requirements-dev.lock -e '.[dev]'
+      - name: Check CP-204 formatting and lint
+        run: |
+          python -m ruff format --check backend/tokyo/agent.py backend/api/app/tokyo_routes.py tests/test_cp204_tokyo_agent.py
+          python -m ruff check backend/tokyo/agent.py backend/api/app/tokyo_routes.py tests/test_cp204_tokyo_agent.py
+      - name: Type-check CP-204 implementation
+        run: python -m mypy backend/tokyo/agent.py backend/api/app/tokyo_routes.py
+      - name: Run CP-202 through CP-204 contract tests
+        run: |
+          python -m pytest \
+            tests/test_cp202_tokyo_journeys.py \
+            tests/test_cp203_tokyo_search.py \
+            tests/test_cp204_tokyo_agent.py \
+            --no-cov
+      - name: Rebuild current official Tokyo corpus
+        run: |
+          carepath-tokyo-data refresh \
+            --output /tmp/tokyo-resources.jsonl \
+            --report /tmp/tokyo-build-report.json \
+            --raw-dir /tmp/tokyo-raw
+      - name: Exercise bounded agent on rebuilt corpus without credentials
+        run: |
+          python - <<'PY'
+          import asyncio
+          from pathlib import Path
+
+          from backend.api.app.llm.mock import MockLLMProvider
+          from backend.tokyo.agent import TokyoAgentRequest, TokyoGroundedResourceAgent
+          from backend.tokyo.journeys import InterfaceLanguage
+          from backend.tokyo.models import TokyoResourceCategory
+          from backend.tokyo.search import CoordinateLocation, TokyoResourceRepository
+
+          repository = TokyoResourceRepository.from_jsonl(Path('/tmp/tokyo-resources.jsonl'))
+          allowed_queries = {
+              TokyoResourceCategory.HEALTHCARE: 'Find a nearby clinic.',
+              TokyoResourceCategory.COOLING_SHELTER: 'Find a nearby cooling shelter.',
+              TokyoResourceCategory.FAMILY_SUPPORT: 'Find nearby family support.',
+              TokyoResourceCategory.MENTAL_HEALTH_SUPPORT: 'Find nearby mental health support.',
+          }
+          candidate = next(
+              (
+                  resource
+                  for resource in repository._resources
+                  if resource.category in allowed_queries
+                  and resource.latitude is not None
+                  and resource.longitude is not None
+              ),
+              None,
+          )
+          assert candidate is not None
+          agent = TokyoGroundedResourceAgent(repository, MockLLMProvider())
+          response = asyncio.run(
+              agent.assist(
+                  TokyoAgentRequest(
+                      query=allowed_queries[candidate.category],
+                      interface_language=InterfaceLanguage.EN,
+                      location=CoordinateLocation(
+                          latitude=candidate.latitude,
+                          longitude=candidate.longitude,
+                      ),
+                      radius_km=1.0,
+                      limit=10,
+                  )
+              )
+          )
+          assert response.status == 'ok'
+          assert response.search is not None and response.search.results
+          assert all(item.resource.provenance for item in response.search.results)
+          assert all(item.resource.category is candidate.category for item in response.search.results)
+          assert response.explanations == []
+          print(
+              {
+                  'corpus_resources': len(repository),
+                  'result_count': response.search.count,
+                  'category': candidate.category.value,
+                  'intent_source': response.intent_source.value,
+                  'explanation_model_status': response.explanation_model_status.value,
+              }
+          )
+          PY
+      - name: Upload rebuild evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cp204-tokyo-agent-${{ github.run_attempt }}
+          path: /tmp/tokyo-build-report.json
+          if-no-files-found: warn
