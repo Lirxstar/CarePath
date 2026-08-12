@@ -402,7 +402,7 @@ def _row_fingerprint(name: str, address: str) -> str:
 
 def _identity_text(value: str) -> str:
     value = unicodedata.normalize("NFKC", value).casefold()
-    return re.sub(r"[\s\-‐‑‒–—―・,，.。()（）]", "", value)
+    return re.sub(r"[\s\-\u2010\u2011\u2012\u2013\u2014\u2015・,。()]", "", value)
 
 
 def _header(value: str) -> str:
