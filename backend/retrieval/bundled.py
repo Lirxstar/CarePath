@@ -133,11 +133,10 @@ def _matches_filters(entry: BundledEvidenceEntry, filters: ExternalEvidenceFilte
         entry.updated_at is None or entry.updated_at < filters.updated_from
     ):
         return False
-    if filters.updated_to is not None and (
-        entry.updated_at is None or entry.updated_at > filters.updated_to
-    ):
-        return False
-    return True
+    return not (
+        filters.updated_to is not None
+        and (entry.updated_at is None or entry.updated_at > filters.updated_to)
+    )
 
 
 def _hit(entry: BundledEvidenceEntry, score: float) -> ExternalEvidenceHit:
