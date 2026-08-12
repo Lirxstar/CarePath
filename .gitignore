@@ -66,6 +66,11 @@ artifacts/private-health-data/
 data/guidelines/inputs/
 data/guidelines/generated/
 
+# CP-201 official Tokyo source snapshots and rebuild artifacts.
+# Source registry, adapters, tests, and provenance documentation remain version controlled.
+data/tokyo/raw/
+data/tokyo/generated/
+
 # Model checkpoints, weights, and large generated model artifacts
 *.pt
 *.pth
