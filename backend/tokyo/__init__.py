@@ -42,17 +42,17 @@ from backend.tokyo.search import (
 )
 
 __all__ = [
-    "AdapterKind",
-    "CoordinateLocation",
     "DEFAULT_SEARCH_RADIUS_KM",
     "DEFAULT_SEARCH_RESULTS",
+    "MAX_SEARCH_RADIUS_KM",
+    "MAX_SEARCH_RESULTS",
+    "AdapterKind",
+    "CoordinateLocation",
     "FactOrigin",
     "Freshness",
     "InterfaceLanguage",
     "LanguageConstraint",
     "LocationMode",
-    "MAX_SEARCH_RADIUS_KM",
-    "MAX_SEARCH_RESULTS",
     "MunicipalityLocation",
     "NoMatchDetail",
     "PrimaryTokyoJourney",
