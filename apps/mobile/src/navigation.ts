@@ -8,12 +8,7 @@ export type RootTabParamList = {
   "Plan & History": undefined;
 };
 
-export const NAVIGATION_TABS = [
-  "Tokyo",
-  "Today",
-  "Coach",
-  "Health Data",
-  "Plan & History",
-] as const;
+export const CORE_NAVIGATION_TABS = ["Today", "Coach", "Health Data", "Plan & History"] as const;
+export const NAVIGATION_TABS = ["Tokyo", ...CORE_NAVIGATION_TABS] as const;
 
 export type NavigationTab = (typeof NAVIGATION_TABS)[number];
