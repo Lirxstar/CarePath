@@ -1,0 +1,167 @@
+name: CP-206 municipality fix once
+
+on:
+  pull_request:
+    paths:
+      - "backend/tokyo/ingest.py"
+      - "tests/test_tokyo_data.py"
+      - ".github/workflows/cp206-municipality-fix-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.head_ref }}
+      - uses: actions/setup-python@v6
+        with:
+          python-version-file: .python-version
+          cache: pip
+          cache-dependency-path: |
+            pyproject.toml
+            requirements-dev.lock
+      - name: Install dependencies
+        run: python -m pip install -c requirements-dev.lock -e '.[dev]'
+      - name: Apply source-backed municipality derivation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          ingest = Path("backend/tokyo/ingest.py")
+          text = ingest.read_text(encoding="utf-8")
+          marker = 'municipality_derived_from_address'
+          if marker not in text:
+              old = '''    resource_id = _stable_resource_id(source.category, name, address)
+              if not languages:
+          '''
+              new = '''    resource_id = _stable_resource_id(source.category, name, address)
+              if municipality is None:
+                  municipality = _municipality_from_tokyo_address(address)
+                  if municipality is not None:
+                      flags.append("municipality_derived_from_address")
+              if not languages:
+          '''
+              if old not in text:
+                  raise SystemExit("_resource insertion anchor not found")
+              text = text.replace(old, new, 1)
+
+              helper_anchor = '''
+          def _first(row: Mapping[str, str], aliases: tuple[str, ...]) -> str | None:
+          '''
+              helper = '''
+          def _municipality_from_tokyo_address(address: str) -> str | None:
+              """Extract a municipality only from a source-backed Tokyo address string."""
+
+              normalized = _display_text(address)
+              normalized = re.sub(r"^〒?\\d{3}-?\\d{4}\\s*", "", normalized)
+              if normalized.startswith("東京都"):
+                  normalized = normalized[len("東京都") :]
+              match = re.match(r"([^0-9０-９\\s,，]+?(?:区|市|町|村))", normalized)
+              if match is None:
+                  return None
+              municipality = match.group(1)
+              if "郡" in municipality and municipality.endswith(("町", "村")):
+                  municipality = municipality.split("郡", 1)[1]
+              return municipality or None
+
+
+          def _first(row: Mapping[str, str], aliases: tuple[str, ...]) -> str | None:
+          '''
+              if helper_anchor not in text:
+                  raise SystemExit("_first helper anchor not found")
+              text = text.replace(helper_anchor, "\n" + helper, 1)
+              ingest.write_text(text, encoding="utf-8")
+
+          tests = Path("tests/test_tokyo_data.py")
+          test_text = tests.read_text(encoding="utf-8")
+          test_name = "test_missing_municipality_is_derived_only_from_source_backed_tokyo_address"
+          if test_name not in test_text:
+              anchor = '''
+          def test_invalid_or_partial_coordinates_are_not_presented_as_valid() -> None:
+          '''
+              addition = '''
+          def test_missing_municipality_is_derived_only_from_source_backed_tokyo_address() -> None:
+              source = _source()
+              payload = (
+                  "名称,住所\\n"
+                  "Shelter A,東京都江東区2-2\\n"
+                  "Shelter B,〒100-0005 東京都千代田区丸の内1-1\\n"
+              ).encode()
+              resources, _ = ingest_source(source, payload, source.download_url or "")
+              assert [resource.municipality for resource in resources] == ["江東区", "千代田区"]
+              assert all(
+                  "municipality_derived_from_address" in resource.data_quality_flags
+                  for resource in resources
+              )
+
+
+          def test_explicit_municipality_is_preserved_without_derived_flag() -> None:
+              source = _source()
+              payload = "名称,住所,市区町村\\nShelter A,東京都江東区2-2,江東区\\n".encode()
+              resources, _ = ingest_source(source, payload, source.download_url or "")
+              resource = resources[0]
+              assert resource.municipality == "江東区"
+              assert "municipality_derived_from_address" not in resource.data_quality_flags
+
+
+          def test_invalid_or_partial_coordinates_are_not_presented_as_valid() -> None:
+          '''
+              if anchor not in test_text:
+                  raise SystemExit("Tokyo data test insertion anchor not found")
+              tests.write_text(test_text.replace(anchor, "\n" + addition, 1), encoding="utf-8")
+          PY
+      - name: Format, lint and run unit regressions
+        run: |
+          python -m ruff format backend/tokyo/ingest.py tests/test_tokyo_data.py
+          python -m ruff check backend/tokyo/ingest.py tests/test_tokyo_data.py
+          python -m pytest tests/test_tokyo_data.py tests/test_cp203_tokyo_search.py --no-cov
+      - name: Refresh live sources and prove Koto manual search
+        run: |
+          carepath-tokyo-data refresh --output /tmp/tokyo.jsonl --report /tmp/tokyo-report.json
+          python - <<'PY'
+          from pathlib import Path
+          from backend.tokyo.models import TokyoResourceCategory
+          from backend.tokyo.search import (
+              MunicipalityLocation,
+              TokyoResourceFilters,
+              TokyoResourceRepository,
+              TokyoResourceSearchRequest,
+          )
+
+          repo = TokyoResourceRepository.from_jsonl(Path('/tmp/tokyo.jsonl'))
+          response = repo.search(
+              TokyoResourceSearchRequest(
+                  location=MunicipalityLocation(municipality='江東区'),
+                  filters=TokyoResourceFilters(category=TokyoResourceCategory.COOLING_SHELTER),
+                  limit=5,
+              )
+          )
+          print({
+              'status': response.status,
+              'count': response.count,
+              'names': [item.resource.name for item in response.results],
+              'municipalities': [item.resource.municipality for item in response.results],
+          })
+          assert response.status == 'ok'
+          assert response.count > 0
+          assert all(item.resource.municipality == '江東区' for item in response.results)
+          PY
+      - name: Commit source-backed fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- backend/tokyo/ingest.py tests/test_tokyo_data.py; then
+            echo "Municipality derivation already applied."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add backend/tokyo/ingest.py tests/test_tokyo_data.py
+          git commit -m "Derive Tokyo municipality from source address"
+          git push origin "HEAD:${GITHUB_HEAD_REF}"
