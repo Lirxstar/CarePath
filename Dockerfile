@@ -26,6 +26,7 @@ RUN addgroup --system carepath \
 COPY pyproject.toml alembic.ini ./
 COPY alembic ./alembic
 COPY backend ./backend
+COPY data/guidelines/public_evidence_bundle.json ./data/guidelines/public_evidence_bundle.json
 COPY deployment/entrypoint.sh ./deployment/entrypoint.sh
 COPY --from=reviewer-web /web/dist/web-smoke ./reviewer_web
 
