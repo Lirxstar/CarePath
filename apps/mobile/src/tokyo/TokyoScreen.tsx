@@ -109,7 +109,7 @@ function ResourceCard({
   const provenance = resource.provenance[0];
   const explanation = explanationFor(response, resource.resource_id);
   const directions = directionsUrl(result);
-  const sourceUrl = provenance?.source_url || provenance?.catalog_url || null;
+  const sourceUrl = provenance?.source_url ?? provenance?.catalog_url ?? null;
   const sourceDate = provenance?.source_as_of ?? provenance?.retrieved_at ?? null;
   const category = copy.category[resource.category] ?? resource.category;
 
@@ -172,28 +172,36 @@ function ResourceCard({
         {directions !== null ? (
           <ActionButton
             label={copy.directions}
-            onPress={() => openExternal(directions)}
+            onPress={() => {
+              openExternal(directions);
+            }}
             testID={`tokyo-directions-${resource.resource_id}`}
           />
         ) : null}
         {resource.website !== null ? (
           <ActionButton
             label={copy.officialPage}
-            onPress={() => openExternal(resource.website ?? "")}
+            onPress={() => {
+              openExternal(resource.website ?? "");
+            }}
             testID={`tokyo-website-${resource.resource_id}`}
           />
         ) : null}
         {resource.phone !== null ? (
           <ActionButton
             label={copy.call}
-            onPress={() => openExternal(`tel:${resource.phone ?? ""}`)}
+            onPress={() => {
+              openExternal(`tel:${resource.phone ?? ""}`);
+            }}
             testID={`tokyo-call-${resource.resource_id}`}
           />
         ) : null}
         {sourceUrl !== null ? (
           <ActionButton
             label={copy.officialSource}
-            onPress={() => openExternal(sourceUrl)}
+            onPress={() => {
+              openExternal(sourceUrl);
+            }}
             testID={`tokyo-source-${resource.resource_id}`}
           />
         ) : null}
@@ -221,7 +229,9 @@ function SafetyReferenceButton({
   return (
     <ActionButton
       label={`${label}: ${reference.publisher}`}
-      onPress={() => openExternal(reference.canonical_url)}
+      onPress={() => {
+        openExternal(reference.canonical_url);
+      }}
       testID={`tokyo-safety-source-${reference.source_id}`}
     />
   );
@@ -234,7 +244,7 @@ function LanguageSelector({
   locale: AppLocale;
   setLocale: (locale: AppLocale) => void;
 }) {
-  const options: Array<{ locale: AppLocale; label: string }> = [
+  const options: { locale: AppLocale; label: string }[] = [
     { locale: "en", label: "English" },
     { locale: "ja", label: "日本語" },
     { locale: "zh", label: "中文" },
@@ -249,7 +259,9 @@ function LanguageSelector({
             accessibilityLabel={`Tokyo ${option.label}`}
             accessibilityRole="radio"
             accessibilityState={{ checked: selected }}
-            onPress={() => setLocale(option.locale)}
+            onPress={() => {
+              setLocale(option.locale);
+            }}
             style={({ pressed }) => [
               styles.languageButton,
               selected ? styles.languageButtonSelected : null,
@@ -406,7 +418,9 @@ export function TokyoScreen() {
               <Pressable
                 key={example.id}
                 accessibilityRole="button"
-                onPress={() => chooseExample(example)}
+                onPress={() => {
+                  chooseExample(example);
+                }}
                 style={({ pressed }) => [styles.exampleButton, pressed ? styles.pressed : null]}
                 testID={`tokyo-example-${example.id}`}
               >
