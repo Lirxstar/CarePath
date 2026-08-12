@@ -24,94 +24,22 @@ jobs:
           cache-dependency-path: apps/mobile/package-lock.json
       - working-directory: apps/mobile
         run: npm ci
-      - name: Localize remaining Tokyo microcopy
+      - name: Format and validate CP-206 unit coverage changes
         working-directory: apps/mobile
         run: |
-          python - <<'PY'
-          from pathlib import Path
-
-          path = Path("src/tokyo/TokyoScreen.tsx")
-          text = path.read_text(encoding="utf-8")
-          anchor = '''function browserGeolocation(): BrowserGeolocation | null {
-            const target = globalThis as unknown as {
-              navigator?: { geolocation?: BrowserGeolocation };
-            };
-            return target.navigator?.geolocation ?? null;
-          }
-          '''
-          insert = anchor + '''
-          const MICRO_COPY: Record<
-            AppLocale,
-            { badge: string; resultSingular: string; resultPlural: string; disclaimer: string }
-          > = {
-            en: {
-              badge: "Open data · no account required",
-              resultSingular: "result",
-              resultPlural: "results",
-              disclaimer: "CarePath Tokyo is a public-resource navigation prototype, not diagnosis or treatment.",
-            },
-            ja: {
-              badge: "オープンデータ · アカウント不要",
-              resultSingular: "件",
-              resultPlural: "件",
-              disclaimer: "CarePath Tokyo は公共リソース案内のプロトタイプであり、診断や治療を行うものではありません。",
-            },
-            zh: {
-              badge: "开放数据 · 无需账户",
-              resultSingular: "个结果",
-              resultPlural: "个结果",
-              disclaimer: "CarePath Tokyo 是公共资源导航原型，不提供诊断或治疗。",
-            },
-          };
-          '''
-          if anchor not in text:
-              raise SystemExit("browserGeolocation anchor not found")
-          text = text.replace(anchor, insert, 1)
-          component_anchor = '''  const copy = TOKYO_COPY[locale];
-          '''
-          if component_anchor not in text:
-              raise SystemExit("component copy anchor not found")
-          text = text.replace(component_anchor, component_anchor + '''  const microCopy = MICRO_COPY[locale];
-          ''', 1)
-          text = text.replace(
-              '''<Text style={styles.privacyBadge}>Open data · no account required</Text>''',
-              '''<Text style={styles.privacyBadge}>{microCopy.badge}</Text>''',
-              1,
-          )
-          old_count = '''<Text style={styles.resultsCount}>{`${String(response.search.count)} result${
-                            response.search.count === 1 ? "" : "s"
-                          }`}</Text>'''
-          new_count = '''<Text style={styles.resultsCount}>{`${String(response.search.count)} ${
-                            response.search.count === 1 ? microCopy.resultSingular : microCopy.resultPlural
-                          }`}</Text>'''
-          if old_count not in text:
-              raise SystemExit("result count anchor not found")
-          text = text.replace(old_count, new_count, 1)
-          old_disclaimer = '''<Text style={styles.helperText}>
-                    CarePath Tokyo is a public-resource navigation prototype, not diagnosis or treatment.
-                  </Text>'''
-          new_disclaimer = '''<Text style={styles.helperText}>{microCopy.disclaimer}</Text>'''
-          if old_disclaimer not in text:
-              raise SystemExit("disclaimer anchor not found")
-          text = text.replace(old_disclaimer, new_disclaimer, 1)
-          path.write_text(text, encoding="utf-8")
-          PY
-      - name: Format and validate changed frontend files
-        working-directory: apps/mobile
-        run: |
-          npx prettier --write src/tokyo/TokyoScreen.tsx src/tokyo/api.test.ts src/navigation.ts src/navigation.test.ts jest.config.cjs
-          npx eslint src/tokyo/TokyoScreen.tsx src/tokyo/api.test.ts src/navigation.ts src/navigation.test.ts --max-warnings=0
+          npx prettier --write src/tokyo/api.test.ts src/navigation.ts src/navigation.test.ts jest.config.cjs
+          npx eslint src/tokyo/api.test.ts src/navigation.ts src/navigation.test.ts --max-warnings=0
           npx tsc --noEmit
-      - name: Commit polish output
+      - name: Commit formatter output
         shell: bash
         run: |
           set -euo pipefail
           if git diff --quiet -- apps/mobile; then
-            echo "No polish changes needed."
+            echo "No formatter changes needed."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add apps/mobile
-          git commit -m "Polish CP-206 multilingual frontend"
+          git commit -m "Format CP-206 coverage tests"
           git push origin "HEAD:${GITHUB_HEAD_REF}"
