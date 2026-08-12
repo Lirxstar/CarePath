@@ -58,11 +58,11 @@ jobs:
           def _municipality_from_tokyo_address(address: str) -> str | None:
               """Extract a municipality only from a source-backed Tokyo address string."""
 
-              normalized = _display_text(address)
+              normalized = " ".join(unicodedata.normalize("NFKC", address).strip().split())
               normalized = re.sub(r"^〒?\\d{3}-?\\d{4}\\s*", "", normalized)
               if normalized.startswith("東京都"):
                   normalized = normalized[len("東京都") :]
-              match = re.match(r"([^0-9０-９\\s,，]+?(?:区|市|町|村))", normalized)
+              match = re.match(r"([^0-9\\s,]+?(?:区|市|町|村))", normalized)
               if match is None:
                   return None
               municipality = match.group(1)
