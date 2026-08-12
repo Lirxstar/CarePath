@@ -265,7 +265,10 @@ def test_api_search_returns_provenance_and_validates_bounds() -> None:
         assert missing.json()["error"]["code"] == "tokyo_resource_not_found"
 
         invalid_payloads = [
-            {**valid_payload, "location": {"mode": "coordinates", "latitude": 91, "longitude": 139}},
+            {
+                **valid_payload,
+                "location": {"mode": "coordinates", "latitude": 91, "longitude": 139},
+            },
             {**valid_payload, "radius_km": MAX_SEARCH_RADIUS_KM + 0.1},
             {**valid_payload, "limit": MAX_SEARCH_RESULTS + 1},
             {**valid_payload, "filters": {"category": "healthcare", "unsupported": True}},
