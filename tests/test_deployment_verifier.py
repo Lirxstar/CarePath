@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -129,3 +130,21 @@ def test_stable_verification_rejects_invalid_confirmation_settings() -> None:
             "https://carepath.example",
             confirmation_interval=-0.1,
         )
+
+
+@pytest.mark.parametrize(
+    "workflow_path",
+    (
+        ".github/workflows/cp019-public-deployment.yml",
+        ".github/workflows/cp020-reviewer-client.yml",
+        ".github/workflows/mobile-browser-e2e.yml",
+    ),
+)
+def test_public_deployment_workflows_pin_main_e2e_to_exact_stable_commit(
+    workflow_path: str,
+) -> None:
+    workflow = Path(workflow_path).read_text(encoding="utf-8")
+
+    assert '--expected-commit "${GITHUB_SHA}"' in workflow
+    assert "--confirmations 3" in workflow
+    assert "--confirmation-interval 5" in workflow
