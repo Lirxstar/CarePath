@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import os
 from http import HTTPStatus
 from typing import cast
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Response
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
@@ -21,11 +22,29 @@ def database_health_check() -> None:
         connection.execute(text("SELECT 1"))
 
 
+def deployed_git_commit() -> str | None:
+    """Return the immutable git identity supplied by the operator or deployment platform."""
+
+    for variable in ("CAREPATH_BUILD_COMMIT", "RENDER_GIT_COMMIT"):
+        value = os.getenv(variable)
+        if value is not None and value.strip():
+            return value.strip()
+    return None
+
+
 @router.get("/health/live")
 async def liveness() -> dict[str, str]:
     """Process-level liveness probe with no external dependency checks."""
 
     return {"status": "ok"}
+
+
+@router.get("/health/build")
+async def build_identity(response: Response) -> dict[str, str | None]:
+    """Expose only the public git identity needed to verify an exact deployment."""
+
+    response.headers["Cache-Control"] = "no-store"
+    return {"status": "ok", "git_commit": deployed_git_commit()}
 
 
 @router.get("/health/ready", response_model=None)
