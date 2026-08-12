@@ -8,6 +8,7 @@ import {
   responseHasPartialResourceData,
   searchTokyoAgent,
 } from "./api";
+import type { TokyoAgentResponse } from "./types";
 
 const provenance = {
   source_id: "tokyo-official",
@@ -21,7 +22,7 @@ const provenance = {
   content_sha256: "0".repeat(64),
 };
 
-function successfulResponse() {
+function successfulResponse(): TokyoAgentResponse {
   return {
     status: "ok",
     intent: {
