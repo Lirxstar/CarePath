@@ -37,6 +37,7 @@ carepath-evaluate-complete = "backend.evaluation.complete:main"
 carepath-evaluate-provider = "backend.evaluation.provider_suite:main"
 carepath-index = "backend.retrieval.vector_cli:main"
 carepath-privacy-egress = "backend.evaluation.privacy_egress:main"
+carepath-tokyo-data = "backend.tokyo.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["backend*"]
