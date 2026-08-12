@@ -50,7 +50,7 @@ def get_external_evidence_index(request: Request) -> ExternalEvidenceSearchIndex
             return cast(ExternalEvidenceSearchIndex, cached)
 
         settings = cast(Settings, request.app.state.settings)
-        index = _load_qdrant_index(settings)
+        index: ExternalEvidenceSearchIndex | None = _load_qdrant_index(settings)
         backend = "qdrant"
         if index is None:
             index = _load_bundled_index(settings)
