@@ -59,7 +59,10 @@ def test_tokyo_spa_entry_does_not_shadow_tokyo_api_routes(tmp_path: Path) -> Non
         search = client.post(
             "/tokyo/agent/search",
             json={
-                "query": "It is extremely hot. I need a nearby designated place where I can cool down.",
+                "query": (
+                    "It is extremely hot. I need a nearby designated place "
+                    "where I can cool down."
+                ),
                 "interface_language": "en",
                 "location": {"mode": "municipality", "municipality": "江東区"},
                 "radius_km": 10,
