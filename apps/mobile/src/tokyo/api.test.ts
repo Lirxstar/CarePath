@@ -331,25 +331,25 @@ describe("CP-206 Tokyo API boundary", () => {
     expect(responseHasPartialResourceData(complete)).toBe(false);
 
     const missingAddress = structuredClone(complete);
-    if (missingAddress.search !== null && missingAddress.search.results[0] !== undefined) {
+    if (missingAddress.search?.results[0] !== undefined) {
       missingAddress.search.results[0].resource.address = null;
     }
     expect(responseHasPartialResourceData(missingAddress)).toBe(true);
 
     const missingLanguages = structuredClone(complete);
-    if (missingLanguages.search !== null && missingLanguages.search.results[0] !== undefined) {
+    if (missingLanguages.search?.results[0] !== undefined) {
       missingLanguages.search.results[0].resource.languages = [];
     }
     expect(responseHasPartialResourceData(missingLanguages)).toBe(true);
 
     const missingHours = structuredClone(complete);
-    if (missingHours.search !== null && missingHours.search.results[0] !== undefined) {
+    if (missingHours.search?.results[0] !== undefined) {
       missingHours.search.results[0].resource.opening_hours = null;
     }
     expect(responseHasPartialResourceData(missingHours)).toBe(true);
 
     const unknownFreshness = structuredClone(complete);
-    if (unknownFreshness.search !== null && unknownFreshness.search.results[0] !== undefined) {
+    if (unknownFreshness.search?.results[0] !== undefined) {
       unknownFreshness.search.results[0].resource.freshness = "unknown";
     }
     expect(responseHasPartialResourceData(unknownFreshness)).toBe(true);
@@ -406,7 +406,8 @@ describe("CP-206 Tokyo API boundary", () => {
 
     const nonArray = structuredClone(invalidArray);
     if (nonArray.search?.no_match !== null && nonArray.search?.no_match !== undefined) {
-      (nonArray.search.no_match as unknown as { hard_constraints: unknown }).hard_constraints = "bad";
+      (nonArray.search.no_match as unknown as { hard_constraints: unknown }).hard_constraints =
+        "bad";
     }
     expect(hardConstraintSummary(nonArray)).toEqual([]);
   });
