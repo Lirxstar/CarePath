@@ -15,6 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from backend.storage.private_sessions import PrivateSessionStore
+from backend.tokyo.search import TokyoResourceRepository
 
 from .auth import SupabaseAuthVerifier
 from .auth_routes import router as auth_router
@@ -34,6 +35,7 @@ from .llm.registry import get_provider
 from .logging import configure_logging, reset_request_id, set_request_id
 from .privacy_routes import router as privacy_router
 from .routes import router as api_router
+from .tokyo_routes import router as tokyo_router
 
 REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9._:-]+$")
 logger = logging.getLogger("carepath.api")
@@ -76,6 +78,7 @@ def configure_reviewer_web(application: FastAPI, directory: str | None) -> None:
 def create_app(
     settings: Settings | None = None,
     provider: LLMProvider | None = None,
+    tokyo_repository: TokyoResourceRepository | None = None,
 ) -> FastAPI:
     resolved_settings = settings or get_settings()
     configure_logging(resolved_settings.log_level)
@@ -94,6 +97,10 @@ def create_app(
         if resolved_settings.supabase_url is not None and publishable_key is not None
         else None
     )
+    resource_path = Path(resolved_settings.tokyo_resource_path).expanduser()
+    resolved_tokyo_repository = tokyo_repository
+    if resolved_tokyo_repository is None and resource_path.is_file():
+        resolved_tokyo_repository = TokyoResourceRepository.from_jsonl(resource_path)
 
     @asynccontextmanager
     async def lifespan(application: FastAPI) -> AsyncIterator[None]:
@@ -113,6 +120,7 @@ def create_app(
     application.state.settings = resolved_settings
     application.state.private_sessions = private_sessions
     application.state.auth_verifier = auth_verifier
+    application.state.tokyo_resource_repository = resolved_tokyo_repository
     application.exception_handler(CarePathError)(handle_carepath_error)
     application.exception_handler(StarletteHTTPException)(handle_http_exception)
     application.exception_handler(RequestValidationError)(handle_validation_error)
@@ -173,6 +181,7 @@ def create_app(
     application.include_router(auth_router)
     application.include_router(privacy_router)
     application.include_router(health_router)
+    application.include_router(tokyo_router)
 
     @application.get("/health")
     async def health(request: Request) -> JsonObject:

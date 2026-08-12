@@ -1,0 +1,120 @@
+name: CP-203 Tokyo search
+
+on:
+  pull_request:
+    paths:
+      - "backend/tokyo/search.py"
+      - "backend/tokyo/__init__.py"
+      - "backend/api/app/tokyo_routes.py"
+      - "backend/api/app/main.py"
+      - "backend/api/app/config.py"
+      - "tests/test_cp203_tokyo_search.py"
+      - "docs/cp203_tokyo_search.md"
+      - ".env.example"
+      - ".github/workflows/cp203-tokyo-search.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  search-contract:
+    name: Validate deterministic Tokyo search
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version-file: .python-version
+          cache: pip
+          cache-dependency-path: |
+            pyproject.toml
+            requirements-dev.lock
+      - name: Install dependencies
+        run: python -m pip install -c requirements-dev.lock -e '.[dev]'
+      - name: Check CP-203 formatting and lint
+        run: |
+          python -m ruff format --check backend/tokyo/search.py backend/api/app/tokyo_routes.py tests/test_cp203_tokyo_search.py
+          python -m ruff check backend/tokyo/search.py backend/api/app/tokyo_routes.py tests/test_cp203_tokyo_search.py
+      - name: Type-check CP-203 implementation
+        run: python -m mypy backend/tokyo/search.py backend/api/app/tokyo_routes.py
+      - name: Run CP-203 unit and API tests
+        run: python -m pytest tests/test_cp203_tokyo_search.py --no-cov
+      - name: Rebuild current official Tokyo corpus
+        run: |
+          carepath-tokyo-data refresh \
+            --output /tmp/tokyo-resources.jsonl \
+            --report /tmp/tokyo-build-report.json \
+            --raw-dir /tmp/tokyo-raw
+      - name: Exercise deterministic search on rebuilt corpus
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          from backend.tokyo.models import TokyoResource
+          from backend.tokyo.search import (
+              CoordinateLocation,
+              MunicipalityLocation,
+              TokyoResourceFilters,
+              TokyoResourceRepository,
+              TokyoResourceSearchRequest,
+          )
+
+          path = Path('/tmp/tokyo-resources.jsonl')
+          resources = [
+              TokyoResource.model_validate_json(line)
+              for line in path.read_text(encoding='utf-8').splitlines()
+              if line.strip()
+          ]
+          repository = TokyoResourceRepository.from_jsonl(path)
+          assert len(repository) == len(resources) > 0
+
+          candidate = next(
+              (
+                  item
+                  for item in resources
+                  if item.latitude is not None and item.longitude is not None
+              ),
+              None,
+          )
+          if candidate is not None:
+              request = TokyoResourceSearchRequest(
+                  location=CoordinateLocation(
+                      latitude=candidate.latitude,
+                      longitude=candidate.longitude,
+                  ),
+                  filters=TokyoResourceFilters(category=candidate.category),
+                  radius_km=1.0,
+                  limit=10,
+              )
+          else:
+              candidate = next((item for item in resources if item.municipality), None)
+              assert candidate is not None
+              request = TokyoResourceSearchRequest(
+                  location=MunicipalityLocation(municipality=candidate.municipality or ''),
+                  filters=TokyoResourceFilters(category=candidate.category),
+                  limit=10,
+              )
+
+          response = repository.search(request)
+          assert response.status == 'ok'
+          assert response.results
+          assert all(item.resource.provenance for item in response.results)
+          assert all(item.resource.category is candidate.category for item in response.results)
+          print(
+              {
+                  'corpus_resources': len(repository),
+                  'result_count': response.count,
+                  'location_mode': request.location.mode,
+                  'category': candidate.category.value,
+              }
+          )
+          PY
+      - name: Upload rebuild evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cp203-tokyo-search-${{ github.run_attempt }}
+          path: /tmp/tokyo-build-report.json
+          if-no-files-found: warn

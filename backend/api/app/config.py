@@ -50,6 +50,10 @@ class Settings(BaseSettings):
         default="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
         min_length=1,
     )
+    tokyo_resource_path: str = Field(
+        default="data/tokyo/generated/resources.jsonl",
+        min_length=1,
+    )
     reviewer_web_dir: str | None = None
 
     supabase_url: str | None = None
@@ -79,6 +83,7 @@ class Settings(BaseSettings):
         "evidence_index_path",
         "evidence_collection_name",
         "evidence_embedding_model",
+        "tokyo_resource_path",
         "local_llm_model_id",
     )
     @classmethod

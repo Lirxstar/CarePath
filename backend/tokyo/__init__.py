@@ -1,4 +1,4 @@
-"""Bounded Tokyo public-resource layer (CP-201/CP-202)."""
+"""Bounded Tokyo public-resource layer (CP-201 through CP-203)."""
 
 from backend.tokyo.journeys import (
     FactOrigin,
@@ -25,14 +25,36 @@ from backend.tokyo.models import (
 )
 from backend.tokyo.pipeline import build_resources, fetch_payloads, write_artifacts
 from backend.tokyo.registry import load_registry, resolve_download_url
+from backend.tokyo.search import (
+    DEFAULT_SEARCH_RADIUS_KM,
+    DEFAULT_SEARCH_RESULTS,
+    MAX_SEARCH_RADIUS_KM,
+    MAX_SEARCH_RESULTS,
+    CoordinateLocation,
+    MunicipalityLocation,
+    NoMatchDetail,
+    TokyoResourceFilters,
+    TokyoResourceRepository,
+    TokyoResourceSearchRequest,
+    TokyoResourceSearchResponse,
+    TokyoResourceSearchResult,
+    haversine_distance_km,
+)
 
 __all__ = [
+    "DEFAULT_SEARCH_RADIUS_KM",
+    "DEFAULT_SEARCH_RESULTS",
+    "MAX_SEARCH_RADIUS_KM",
+    "MAX_SEARCH_RESULTS",
     "AdapterKind",
+    "CoordinateLocation",
     "FactOrigin",
     "Freshness",
     "InterfaceLanguage",
     "LanguageConstraint",
     "LocationMode",
+    "MunicipalityLocation",
+    "NoMatchDetail",
     "PrimaryTokyoJourney",
     "SafetyDisposition",
     "SourceFormat",
@@ -43,9 +65,15 @@ __all__ = [
     "TokyoJourneyCatalog",
     "TokyoResource",
     "TokyoResourceCategory",
+    "TokyoResourceFilters",
+    "TokyoResourceRepository",
+    "TokyoResourceSearchRequest",
+    "TokyoResourceSearchResponse",
+    "TokyoResourceSearchResult",
     "build_resources",
     "export_acceptance_cases",
     "fetch_payloads",
+    "haversine_distance_km",
     "iter_primary_variants",
     "load_journey_catalog",
     "load_registry",
