@@ -382,9 +382,7 @@ def test_valid_grounded_explanation_uses_only_allow_listed_codes_and_provenance(
     agent = TokyoGroundedResourceAgent(TokyoResourceRepository([resource]), provider)
 
     response = __import__("asyncio").run(
-        agent.assist(
-            _request("I need a clinic with English support and published opening hours.")
-        )
+        agent.assist(_request("I need a clinic with English support and published opening hours."))
     )
 
     assert response.explanation_model_status is ModelStatus.USED
@@ -405,9 +403,7 @@ def test_ambiguous_and_unsupported_requests_stop_before_model_and_search() -> No
     ambiguous = __import__("asyncio").run(
         agent.assist(_request("I need a clinic or family support; I am not sure which."))
     )
-    unsupported = __import__("asyncio").run(
-        agent.assist(_request("Find a nearby pharmacy."))
-    )
+    unsupported = __import__("asyncio").run(agent.assist(_request("Find a nearby pharmacy.")))
 
     assert ambiguous.status == "clarification_required"
     assert ambiguous.intent.clarification_reason is ClarificationReason.MULTIPLE_SERVICES
@@ -458,9 +454,7 @@ def test_agent_api_passes_only_validated_hard_constraints_to_cp203() -> None:
         "require_website": False,
         "allowed_freshness": [],
     }
-    assert [item["resource"]["resource_id"] for item in body["search"]["results"]] == [
-        "english"
-    ]
+    assert [item["resource"]["resource_id"] for item in body["search"]["results"]] == ["english"]
     assert body["search"]["results"][0]["resource"]["provenance"][0]["source_id"] == (
         "official-tokyo-source"
     )
