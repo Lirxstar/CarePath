@@ -2,67 +2,39 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from http import HTTPStatus
-from pathlib import Path
 from typing import Annotated, Literal, cast
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request
-from qdrant_client import QdrantClient
 from sqlalchemy.orm import Session
 
 from backend.domain.models import Language, MetricType
 from backend.retrieval import (
     ExternalEvidenceFilters,
     ExternalEvidenceHit,
-    FastEmbedMultilingualModel,
     PatientEvidenceQuery,
     PatientEvidenceResponse,
     PatientEvidenceService,
-    QdrantExternalEvidenceIndex,
 )
 from backend.retrieval.guidelines.models import GuidelineTopic
 
 from .access import ensure_user_access
-from .config import Settings
 from .errors import CarePathError
+from .evidence_runtime import ExternalEvidenceSearchIndex, get_external_evidence_index
 from .session_scope import get_request_session
 
 router = APIRouter(prefix="/evidence", tags=["evidence"])
 SessionDependency = Annotated[Session, Depends(get_request_session)]
 
 
-def _external_index(request: Request) -> QdrantExternalEvidenceIndex:
-    cached = getattr(request.app.state, "external_evidence_index", None)
-    if isinstance(cached, QdrantExternalEvidenceIndex):
-        return cached
-
-    settings = cast(Settings, request.app.state.settings)
-    index_path = Path(settings.evidence_index_path)
-    if not index_path.exists():
-        raise CarePathError(
-            "evidence_index_unavailable",
-            "The external evidence index has not been built",
-            status_code=HTTPStatus.SERVICE_UNAVAILABLE,
-        )
-    index = QdrantExternalEvidenceIndex(
-        QdrantClient(path=str(index_path)),
-        FastEmbedMultilingualModel(model_name=settings.evidence_embedding_model),
-        collection_name=settings.evidence_collection_name,
-    )
-    if not index.client.collection_exists(index.collection_name):
-        raise CarePathError(
-            "evidence_index_unavailable",
-            "The configured external evidence collection does not exist",
-            status_code=HTTPStatus.SERVICE_UNAVAILABLE,
-        )
-    request.app.state.external_evidence_index = index
-    return index
+def _external_index(request: Request) -> ExternalEvidenceSearchIndex:
+    return get_external_evidence_index(request)
 
 
 @router.get(
     "/external/search",
     response_model=list[ExternalEvidenceHit],
-    summary="Search the versioned external guideline vector index",
+    summary="Search the versioned external guideline evidence index",
 )
 def search_external_evidence(
     request: Request,
