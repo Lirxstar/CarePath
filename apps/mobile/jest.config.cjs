@@ -6,6 +6,10 @@ module.exports = {
     "!src/journey/apiTypes.ts",
     // The translation catalog is presentation data with dynamic DOM coverage in the Web E2E gate.
     "!src/i18n/catalog.ts",
+    // Tokyo locale copy is presentation data exercised through the CP-206 EN/JA/ZH Web E2E gate.
+    "!src/tokyo/copy.ts",
+    // Tokyo API/domain contracts are type-only and contain no runtime behaviour.
+    "!src/tokyo/types.ts",
   ],
   coverageDirectory: "coverage",
   coverageProvider: "v8",
