@@ -40,17 +40,18 @@
       "title": "クーリングシェルター(指定暑熱避難施設)一覧",
       "publisher": "江東区",
       "catalog_url": "https://catalog.data.metro.tokyo.lg.jp/dataset/t131083d3100000016",
-      "download_url": "https://www.city.koto.lg.jp/012107/documents/131083_cooling_shelter.csv",
+      "ckan_dataset_id": "t131083d3100000016",
+      "ckan_resource_name": "クーリングシェルター(指定暑熱避難施設)一覧",
       "format": "csv",
       "adapter": "tokyo_ods",
       "category": "cooling_shelter",
       "licence": "Creative Commons Attribution (CC BY)",
       "licence_url": "https://creativecommons.org/licenses/by/4.0/",
-      "source_as_of": null,
+      "source_as_of": "2026-02-06",
       "retrieved_at": "2026-08-12",
-      "max_age_days": 180,
+      "max_age_days": 365,
       "region": "Koto City, Tokyo",
-      "notes": "Official designated heat shelter list. Source does not imply live capacity or current opening unless explicitly present in a row."
+      "notes": "Official designated heat shelter list. The current CSV URL is resolved from the Tokyo Open Data Catalog instead of pinning a mutable city-file URL; source does not imply live capacity or current opening unless explicitly present in a row."
     },
     {
       "source_id": "tokyo-child-family-support-centres-202510",

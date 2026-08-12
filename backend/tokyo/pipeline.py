@@ -82,6 +82,7 @@ def write_artifacts(
     ]
     output_path.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
     report_path.write_text(
-        json.dumps(report.model_dump(mode="json"), ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        json.dumps(report.model_dump(mode="json"), ensure_ascii=False, indent=2, sort_keys=True)
+        + "\n",
         encoding="utf-8",
     )

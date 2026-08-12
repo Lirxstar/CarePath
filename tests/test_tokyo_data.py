@@ -172,11 +172,7 @@ def test_ckan_resolution_requires_exact_named_csv() -> None:
 def test_build_and_serialisation_are_deterministic(tmp_path) -> None:
     source = _source()
     registry = SourceRegistry(schema_version="cp201-v1", sources=[source])
-    payload = (
-        "名称,住所\n"
-        "B Shelter,東京都江東区2-2\n"
-        "A Shelter,東京都江東区1-1\n"
-    ).encode()
+    payload = ("名称,住所\nB Shelter,東京都江東区2-2\nA Shelter,東京都江東区1-1\n").encode()
     resources, report = build_resources(
         registry,
         {source.source_id: payload},

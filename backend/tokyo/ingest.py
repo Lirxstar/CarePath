@@ -63,7 +63,9 @@ def read_csv_rows(payload: bytes, source_format: str) -> list[dict[str, str]]:
         raise ValueError("CSV has no header")
     rows: list[dict[str, str]] = []
     for raw_row in reader:
-        row = {str(key): str(value or "").strip() for key, value in raw_row.items() if key is not None}
+        row = {
+            str(key): str(value or "").strip() for key, value in raw_row.items() if key is not None
+        }
         if any(row.values()):
             rows.append(row)
     return rows
@@ -352,7 +354,9 @@ def _extract_languages(row: Mapping[str, str]) -> list[str]:
         for source_name, code in _LANGUAGE_HEADERS.items():
             if source_name in header and _positive_indicator(value):
                 found.add(code)
-            if ("外国語" in header or "対応言語" in header or header.endswith("言語")) and source_name in value:
+            if (
+                "外国語" in header or "対応言語" in header or header.endswith("言語")
+            ) and source_name in value:
                 found.add(code)
     return sorted(found)
 
@@ -362,7 +366,9 @@ def _positive_indicator(value: str) -> bool:
     negative_values = {_identity_text(item) for item in _NEGATIVE_VALUES}
     if normalized in negative_values:
         return False
-    return any(token in normalized for token in ("可", "可能", "対応", "あり", "有", "○", "1", "yes")) or bool(normalized)
+    return any(
+        token in normalized for token in ("可", "可能", "対応", "あり", "有", "○", "1", "yes")
+    ) or bool(normalized)
 
 
 def _freshness(source: SourceRegistryEntry) -> Freshness:
@@ -388,7 +394,9 @@ def _stable_resource_id(category: TokyoResourceCategory, name: str, address: str
 
 
 def _row_fingerprint(name: str, address: str) -> str:
-    digest = hashlib.sha256(f"{_identity_text(name)}|{_identity_text(address)}".encode()).hexdigest()
+    digest = hashlib.sha256(
+        f"{_identity_text(name)}|{_identity_text(address)}".encode()
+    ).hexdigest()
     return f"row-{digest[:20]}"
 
 
