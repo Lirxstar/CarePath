@@ -42,6 +42,10 @@ class Settings(BaseSettings):
 
     database_url: str = Field(default="sqlite:///./carepath.db", min_length=1)
     evidence_index_path: str = Field(default="data/guidelines/qdrant", min_length=1)
+    evidence_bundle_path: str = Field(
+        default="data/guidelines/public_evidence_bundle.json",
+        min_length=1,
+    )
     evidence_collection_name: str = Field(
         default="carepath_guidelines_cp007_v1",
         min_length=1,
@@ -81,6 +85,7 @@ class Settings(BaseSettings):
     @field_validator(
         "database_url",
         "evidence_index_path",
+        "evidence_bundle_path",
         "evidence_collection_name",
         "evidence_embedding_model",
         "tokyo_resource_path",
