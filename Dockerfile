@@ -27,11 +27,18 @@ COPY pyproject.toml alembic.ini ./
 COPY alembic ./alembic
 COPY backend ./backend
 COPY data/guidelines/public_evidence_bundle.json ./data/guidelines/public_evidence_bundle.json
+COPY data/tokyo ./data/tokyo
 COPY deployment/entrypoint.sh ./deployment/entrypoint.sh
 COPY --from=reviewer-web /web/dist/web-smoke ./reviewer_web
 
 RUN python -m pip install --upgrade pip \
     && python -m pip install . \
+    && carepath-tokyo-data validate-registry \
+    && mkdir -p /app/data/tokyo/generated \
+    && carepath-tokyo-data refresh \
+      --output /app/data/tokyo/generated/resources.jsonl \
+      --report /app/data/tokyo/generated/build_report.json \
+    && test -s /app/data/tokyo/generated/resources.jsonl \
     && chmod +x /app/deployment/entrypoint.sh \
     && mkdir -p /app/data/guidelines/qdrant \
     && chown -R carepath:carepath /app /home/carepath
