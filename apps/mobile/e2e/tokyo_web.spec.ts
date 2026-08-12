@@ -1,9 +1,5 @@
 import { expect, test } from "@playwright/test";
 
-async function expectTokyoResult(page: Parameters<typeof test>[0] extends never ? never : never) {
-  void page;
-}
-
 test("Tokyo desktop journey is account-free, grounded, multilingual and links back to Core", async ({
   page,
 }) => {
