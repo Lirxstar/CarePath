@@ -11,7 +11,14 @@ import unicodedata
 from enum import StrEnum
 from typing import Any, Protocol, Self
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 
 from backend.tokyo.journeys import InterfaceLanguage, LanguageConstraint, LocationMode
 from backend.tokyo.models import SourceProvenance, TokyoResource, TokyoResourceCategory
@@ -64,6 +71,13 @@ class IntentResolution(StrEnum):
     UNSUPPORTED = "unsupported"
 
 
+class AgentStatus(StrEnum):
+    OK = "ok"
+    NO_MATCH = "no_match"
+    CLARIFICATION_REQUIRED = "clarification_required"
+    UNSUPPORTED = "unsupported"
+
+
 class IntentSource(StrEnum):
     DETERMINISTIC = "deterministic"
     MODEL = "model"
@@ -99,7 +113,9 @@ _INTENT_CATEGORY: dict[TokyoIntentName, TokyoMvpCategory] = {
     TokyoIntentName.FIND_FAMILY_SUPPORT: TokyoMvpCategory.FAMILY_SUPPORT,
     TokyoIntentName.FIND_MENTAL_HEALTH_SUPPORT: TokyoMvpCategory.MENTAL_HEALTH_SUPPORT,
 }
-_CATEGORY_INTENT = {category: intent for intent, category in _INTENT_CATEGORY.items()}
+_CATEGORY_INTENT: dict[TokyoMvpCategory, TokyoIntentName] = {
+    category: intent for intent, category in _INTENT_CATEGORY.items()
+}
 
 _CATEGORY_TERMS: dict[TokyoMvpCategory, tuple[str, ...]] = {
     TokyoMvpCategory.HEALTHCARE: (
@@ -252,7 +268,14 @@ _ACCESS_TERMS = (
     "轮椅",
     "輪椅",
 )
-_PHONE_TERMS = ("phone number", "telephone", "call them", "電話", "电话号码", "電話號碼")
+_PHONE_TERMS = (
+    "phone number",
+    "telephone",
+    "call them",
+    "電話",
+    "电话号码",
+    "電話號碼",
+)
 _WEBSITE_TERMS = (
     "website",
     "official page",
@@ -316,6 +339,16 @@ class TokyoIntent(BaseModel):
             raise ValueError("unresolved intents cannot select a resource category")
         if self.clarification_reason is None:
             raise ValueError("unresolved intents require a clarification reason")
+        if (
+            self.resolution is IntentResolution.UNSUPPORTED
+            and self.clarification_reason is not ClarificationReason.UNSUPPORTED_SERVICE
+        ):
+            raise ValueError("unsupported intent requires unsupported-service clarification")
+        if (
+            self.resolution is IntentResolution.CLARIFICATION_REQUIRED
+            and self.clarification_reason is ClarificationReason.UNSUPPORTED_SERVICE
+        ):
+            raise ValueError("unsupported-service clarification requires unsupported resolution")
         return self
 
 
@@ -354,10 +387,21 @@ class TokyoModelIntentProposal(BaseModel):
             if self.clarification_reason is not None:
                 raise ValueError("resolved model proposal cannot request clarification")
             return self
+
         if self.intent is not None or self.category is not None:
             raise ValueError("unresolved model proposal cannot select a category")
         if self.clarification_reason is None:
             raise ValueError("unresolved model proposal requires clarification reason")
+        if (
+            self.resolution is IntentResolution.UNSUPPORTED
+            and self.clarification_reason is not ClarificationReason.UNSUPPORTED_SERVICE
+        ):
+            raise ValueError("unsupported model proposal requires unsupported-service reason")
+        if (
+            self.resolution is IntentResolution.CLARIFICATION_REQUIRED
+            and self.clarification_reason is ClarificationReason.UNSUPPORTED_SERVICE
+        ):
+            raise ValueError("unsupported-service reason requires unsupported resolution")
         return self
 
 
@@ -436,7 +480,7 @@ class GroundedExplanation(BaseModel):
 class TokyoAgentResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    status: IntentResolution | str
+    status: AgentStatus
     intent: TokyoIntent
     intent_source: IntentSource
     intent_model_status: ModelStatus
@@ -450,23 +494,23 @@ class TokyoAgentResponse(BaseModel):
         if self.intent.resolution is IntentResolution.RESOLVED:
             if self.search is None:
                 raise ValueError("resolved agent response requires deterministic search output")
-            expected_status = self.search.status
-            if self.status != expected_status:
+            if self.status is not AgentStatus(self.search.status):
                 raise ValueError("agent status must mirror deterministic search status")
             if self.clarification is not None:
                 raise ValueError("resolved agent response cannot include clarification")
-        else:
-            if self.search is not None or self.explanations:
-                raise ValueError("unresolved agent response cannot include search results")
-            if self.clarification is None:
-                raise ValueError("unresolved agent response requires clarification")
-            if self.status != self.intent.resolution:
-                raise ValueError("unresolved agent status must mirror intent resolution")
+            return self
+
+        if self.search is not None or self.explanations:
+            raise ValueError("unresolved agent response cannot include search results")
+        if self.clarification is None:
+            raise ValueError("unresolved agent response requires clarification")
+        if self.status.value != self.intent.resolution.value:
+            raise ValueError("unresolved agent status must mirror intent resolution")
         return self
 
 
 class TokyoGroundedResourceAgent:
-    """Model-assisted language layer that can call only the deterministic CP-203 search."""
+    """Model-assisted language layer that can call only deterministic CP-203 search."""
 
     def __init__(
         self,
@@ -492,18 +536,16 @@ class TokyoGroundedResourceAgent:
                 intent_source = IntentSource.MODEL
 
         if intent.resolution is not IntentResolution.RESOLVED:
+            reason = intent.clarification_reason or ClarificationReason.UNCLEAR_SERVICE
             return TokyoAgentResponse(
-                status=intent.resolution,
+                status=AgentStatus(intent.resolution.value),
                 intent=intent,
                 intent_source=intent_source,
                 intent_model_status=intent_model_status,
                 explanation_model_status=ModelStatus.NOT_NEEDED,
                 clarification=ClarificationMessage(
-                    reason=intent.clarification_reason or ClarificationReason.UNCLEAR_SERVICE,
-                    message=_clarification_text(
-                        payload.interface_language,
-                        intent.clarification_reason or ClarificationReason.UNCLEAR_SERVICE,
-                    ),
+                    reason=reason,
+                    message=_clarification_text(payload.interface_language, reason),
                 ),
             )
 
@@ -518,7 +560,7 @@ class TokyoGroundedResourceAgent:
             )
 
         return TokyoAgentResponse(
-            status=search_response.status,
+            status=AgentStatus(search_response.status),
             intent=intent,
             intent_source=intent_source,
             intent_model_status=intent_model_status,
@@ -590,7 +632,7 @@ class TokyoGroundedResourceAgent:
 
 
 def deterministic_intent(payload: TokyoAgentRequest) -> TokyoIntent:
-    """Resolve frozen CP-202 scenarios without a model and preserve explicit hard constraints."""
+    """Resolve frozen CP-202 scenarios without a model and keep hard constraints."""
 
     text = _normalize_identity(payload.query)
     categories = [
@@ -603,7 +645,7 @@ def deterministic_intent(payload: TokyoAgentRequest) -> TokyoIntent:
         for language, terms in _LANGUAGE_TERMS.items()
         if any(_normalize_identity(term) in text for term in terms)
     ]
-    common = {
+    common: dict[str, Any] = {
         "interface_language": payload.interface_language,
         "location_mode": _location_mode(payload.location),
         "requested_languages": requested_languages,
@@ -760,7 +802,9 @@ def _validate_explanation_selection(
     for resource_id, choice in selected_by_id.items():
         allowed = set(available[resource_id])
         if not set(choice.reason_codes).issubset(allowed):
-            raise ValueError("model explanation selected a reason not backed by deterministic facts")
+            raise ValueError(
+                "model explanation selected a reason not backed by deterministic facts"
+            )
     return [selected_by_id[resource_id] for resource_id in available]
 
 
