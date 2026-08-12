@@ -28,6 +28,8 @@ jobs:
         working-directory: apps/mobile
         run: |
           npx prettier --write src/tokyo/api.test.ts src/navigation.ts src/navigation.test.ts jest.config.cjs
+          npx eslint src/tokyo/api.test.ts src/navigation.ts src/navigation.test.ts --fix
+          npx prettier --write src/tokyo/api.test.ts src/navigation.ts src/navigation.test.ts jest.config.cjs
           npx eslint src/tokyo/api.test.ts src/navigation.ts src/navigation.test.ts --max-warnings=0
           npx tsc --noEmit
       - name: Commit formatter output
