@@ -1,0 +1,327 @@
+{
+  "schema_version": "cp202-v1",
+  "product": {
+    "statement": "CarePath Tokyo turns a natural-language public-health or support need plus a Tokyo location into grounded, actionable public-resource options without requiring a health-data upload or account.",
+    "problem_statement": "Tokyo has authoritative public-health and support resources, but people may not know the formal service name, may face language barriers, or may struggle to judge which nearby resource is relevant. CarePath Tokyo provides a bounded multilingual navigation layer while keeping resource facts traceable to official data.",
+    "demo_target_seconds": 60,
+    "mvp_categories": [
+      "healthcare",
+      "cooling_shelter",
+      "family_support",
+      "mental_health_support"
+    ],
+    "primary_inputs": {
+      "natural_language_request": true,
+      "interface_languages": [
+        "en",
+        "ja",
+        "zh"
+      ],
+      "location_modes": [
+        "browser",
+        "manual"
+      ],
+      "account_required": false,
+      "health_upload_required": false
+    }
+  },
+  "result_card_contract": {
+    "fact_label": "Verified source fact",
+    "generated_label": "Generated explanation",
+    "fields": [
+      {
+        "name": "name",
+        "origin": "verified_data",
+        "required": true,
+        "unknown_behavior": "not_applicable"
+      },
+      {
+        "name": "category",
+        "origin": "verified_data",
+        "required": true,
+        "unknown_behavior": "not_applicable"
+      },
+      {
+        "name": "distance_km",
+        "origin": "deterministic",
+        "required": false,
+        "unknown_behavior": "hide_when_location_unavailable"
+      },
+      {
+        "name": "address",
+        "origin": "verified_data",
+        "required": false,
+        "unknown_behavior": "show_unknown"
+      },
+      {
+        "name": "languages",
+        "origin": "verified_data",
+        "required": false,
+        "unknown_behavior": "show_unknown_never_infer"
+      },
+      {
+        "name": "opening_hours",
+        "origin": "verified_data",
+        "required": false,
+        "unknown_behavior": "show_unknown_never_infer"
+      },
+      {
+        "name": "access_notes",
+        "origin": "verified_data",
+        "required": false,
+        "unknown_behavior": "hide_if_missing"
+      },
+      {
+        "name": "freshness",
+        "origin": "deterministic",
+        "required": true,
+        "unknown_behavior": "show_unknown"
+      },
+      {
+        "name": "source",
+        "origin": "verified_data",
+        "required": true,
+        "unknown_behavior": "not_applicable"
+      },
+      {
+        "name": "why_match",
+        "origin": "generated",
+        "required": true,
+        "unknown_behavior": "omit_when_generator_unavailable"
+      }
+    ],
+    "actions": [
+      {
+        "action": "directions",
+        "requires": "verified_location",
+        "rule": "Show only when a verified address or coordinate is available."
+      },
+      {
+        "action": "call",
+        "requires": "source_phone",
+        "rule": "Show only when a phone number is present in the source data."
+      },
+      {
+        "action": "official_source",
+        "requires": "provenance_url",
+        "rule": "Always expose an official source or catalogue link from provenance."
+      }
+    ]
+  },
+  "primary_scenarios": [
+    {
+      "scenario_id": "tokyo-healthcare-language",
+      "title": "Find nearby healthcare with explicit English support",
+      "kind": "healthcare_language",
+      "category": "healthcare",
+      "interactions": [
+        {
+          "language": "en",
+          "request": "I need a nearby clinic in Tokyo where staff can support me in English."
+        },
+        {
+          "language": "ja",
+          "request": "東京で、英語で対応してもらえる近くの診療所を探したいです。"
+        },
+        {
+          "language": "zh",
+          "request": "我想在东京找一家附近可以用英语沟通的诊所。"
+        }
+      ],
+      "location": {
+        "browser": {
+          "latitude": 35.6938,
+          "longitude": 139.7034
+        },
+        "manual": {
+          "municipality": "新宿区",
+          "labels": {
+            "en": "Shinjuku City",
+            "ja": "新宿区",
+            "zh": "新宿区"
+          }
+        }
+      },
+      "expected": {
+        "intent": "find_healthcare",
+        "requested_languages": [
+          "en"
+        ],
+        "language_constraint": "required",
+        "safety_disposition": "standard_navigation",
+        "filters": {
+          "category": "healthcare",
+          "required_languages": [
+            "en"
+          ],
+          "unknown_language_is_match": false
+        },
+        "ranking": {
+          "hard_constraints": [
+            "category",
+            "required_languages"
+          ],
+          "order": [
+            "distance_km",
+            "stable_id"
+          ],
+          "tie_breaker": "resource_id"
+        },
+        "outcome": "Return nearby healthcare resources only when English support is explicitly reported by the authoritative source. If none match, return a structured no-match result instead of silently dropping the language requirement."
+      },
+      "estimated_demo_seconds": 45,
+      "account_required": false,
+      "health_upload_required": false
+    },
+    {
+      "scenario_id": "tokyo-heat-cooling-shelter",
+      "title": "Find a nearby designated cooling shelter",
+      "kind": "heat_resource",
+      "category": "cooling_shelter",
+      "interactions": [
+        {
+          "language": "en",
+          "request": "It is extremely hot. I need a nearby designated place where I can cool down."
+        },
+        {
+          "language": "ja",
+          "request": "とても暑いので、近くの指定クーリングシェルターを探したいです。"
+        },
+        {
+          "language": "zh",
+          "request": "天气非常热，我想找一个附近的指定避暑场所。"
+        }
+      ],
+      "location": {
+        "browser": {
+          "latitude": 35.6729,
+          "longitude": 139.8174
+        },
+        "manual": {
+          "municipality": "江東区",
+          "labels": {
+            "en": "Koto City",
+            "ja": "江東区",
+            "zh": "江东区"
+          }
+        }
+      },
+      "expected": {
+        "intent": "find_cooling_shelter",
+        "requested_languages": [],
+        "language_constraint": "none",
+        "safety_disposition": "safety_check_then_navigation",
+        "filters": {
+          "category": "cooling_shelter",
+          "required_languages": [],
+          "unknown_language_is_match": false
+        },
+        "ranking": {
+          "hard_constraints": [
+            "category"
+          ],
+          "order": [
+            "distance_km",
+            "stable_id"
+          ],
+          "tie_breaker": "resource_id"
+        },
+        "outcome": "After the safety gate, return nearby designated cooling shelters. Never claim live opening, capacity or availability unless a future authoritative source explicitly provides it."
+      },
+      "estimated_demo_seconds": 40,
+      "account_required": false,
+      "health_upload_required": false
+    },
+    {
+      "scenario_id": "tokyo-family-support-unknown-service",
+      "title": "Navigate to family support without knowing the service name",
+      "kind": "unknown_service_navigation",
+      "category": "family_support",
+      "interactions": [
+        {
+          "language": "en",
+          "request": "I am overwhelmed with childcare and do not know which Tokyo public service I should contact for family support."
+        },
+        {
+          "language": "ja",
+          "request": "育児で困っていますが、どの公的な相談先に連絡すればよいのか分かりません。"
+        },
+        {
+          "language": "zh",
+          "request": "我在育儿方面遇到困难，但不知道应该联系东京的哪种公共支持服务。"
+        }
+      ],
+      "location": {
+        "browser": {
+          "latitude": 35.6729,
+          "longitude": 139.8174
+        },
+        "manual": {
+          "municipality": "江東区",
+          "labels": {
+            "en": "Koto City",
+            "ja": "江東区",
+            "zh": "江东区"
+          }
+        }
+      },
+      "expected": {
+        "intent": "find_family_support",
+        "requested_languages": [],
+        "language_constraint": "none",
+        "safety_disposition": "standard_navigation",
+        "filters": {
+          "category": "family_support",
+          "required_languages": [],
+          "unknown_language_is_match": false
+        },
+        "ranking": {
+          "hard_constraints": [
+            "category"
+          ],
+          "order": [
+            "distance_km",
+            "stable_id"
+          ],
+          "tie_breaker": "resource_id"
+        },
+        "outcome": "Map ordinary natural language to the family_support category without requiring the user to know the formal service name, while keeping every resource fact source-bounded."
+      },
+      "estimated_demo_seconds": 50,
+      "account_required": false,
+      "health_upload_required": false
+    }
+  ],
+  "failure_scenarios": [
+    {
+      "failure_id": "location_permission_denied",
+      "trigger": "Browser geolocation is denied or unavailable.",
+      "expected_behavior": "Preserve the natural-language request and immediately offer a manual Tokyo location fallback. Do not require account creation, profile creation or health-data upload.",
+      "safety_disposition": "standard_navigation"
+    },
+    {
+      "failure_id": "no_matching_resources",
+      "trigger": "No resource satisfies all hard constraints within the bounded search.",
+      "expected_behavior": "Return a structured empty state that names the unmet constraint and offers bounded adjustments. Never invent a resource or silently weaken a required constraint.",
+      "safety_disposition": "standard_navigation"
+    },
+    {
+      "failure_id": "incomplete_resource_data",
+      "trigger": "A matched resource lacks language, opening, access, phone or coordinate data.",
+      "expected_behavior": "Keep unknown fields explicit, hide actions that lack verified inputs, and never turn missing data into positive evidence.",
+      "safety_disposition": "standard_navigation"
+    },
+    {
+      "failure_id": "model_unavailable",
+      "trigger": "The language model or structured-intent provider is unavailable or invalid.",
+      "expected_behavior": "Preserve the request and location, use a bounded deterministic/category fallback when possible, omit unsupported generated explanation, and keep verified resource facts usable.",
+      "safety_disposition": "standard_navigation"
+    },
+    {
+      "failure_id": "urgent_or_unsafe_request",
+      "trigger": "The request contains urgent red flags, for example fainting, confusion or inability to stay awake during severe heat.",
+      "expected_behavior": "Run deterministic safety handling before ordinary navigation, present urgent escalation guidance in the selected interface language, and never let an ordinary resource card substitute for the safety response.",
+      "safety_disposition": "urgent_escalation"
+    }
+  ]
+}
