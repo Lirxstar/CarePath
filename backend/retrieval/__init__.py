@@ -36,12 +36,16 @@ from .vector import (
     external_recall_at_k,
     rebuild_qdrant_local,
 )
+from .bundled import BundledEvidenceCorpus, BundledEvidenceEntry, BundledExternalEvidenceIndex
 
 __all__ = [
     "COLLECTION_SCHEMA",
     "DEFAULT_COLLECTION_NAME",
     "DEFAULT_MULTILINGUAL_EMBEDDING_MODEL",
     "INDEX_VERSION",
+    "BundledEvidenceCorpus",
+    "BundledEvidenceEntry",
+    "BundledExternalEvidenceIndex",
     "DeterministicHashEmbeddingModel",
     "DualRetrievalResult",
     "DualRetriever",
