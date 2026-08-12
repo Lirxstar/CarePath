@@ -23,28 +23,37 @@ const CAREPATH_THEME = {
   },
 };
 
-function browserPathname(): string | null {
-  const target = globalThis as unknown as { location?: { pathname?: string } };
-  return target.location?.pathname ?? null;
+interface BrowserLocation {
+  pathname?: string;
+  assign?: (url: string) => void;
+}
+
+function browserLocation(): BrowserLocation | null {
+  const target = globalThis as unknown as { location?: BrowserLocation };
+  return target.location ?? null;
 }
 
 function initialRouteName(): keyof RootTabParamList {
-  const pathname = browserPathname();
+  const pathname = browserLocation()?.pathname;
   return pathname === "/tokyo" || pathname === "/tokyo/" ? "Tokyo" : "Today";
 }
 
-function syncBrowserPath(routeName: keyof RootTabParamList): void {
-  const target = globalThis as unknown as {
-    location?: { pathname?: string };
-    history?: { pushState: (data: unknown, unused: string, url?: string | null) => void };
-  };
-  if (target.history === undefined || target.location === undefined) {
-    return;
+function switchProductRoute(routeName: keyof RootTabParamList): boolean {
+  const location = browserLocation();
+  if (location?.assign === undefined) {
+    return false;
   }
-  const nextPath = routeName === "Tokyo" ? "/tokyo" : "/";
-  if (target.location.pathname !== nextPath) {
-    target.history.pushState({}, "", nextPath);
+  const pathname = location.pathname ?? "/";
+  const tokyoPath = pathname === "/tokyo" || pathname === "/tokyo/";
+  if (routeName === "Tokyo" && !tokyoPath) {
+    location.assign("/tokyo");
+    return true;
   }
+  if (routeName === "Today" && tokyoPath) {
+    location.assign("/");
+    return true;
+  }
+  return false;
 }
 
 function CarePathTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
@@ -85,7 +94,9 @@ function CarePathTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
             canPreventDefault: true,
           });
           if (!focused && !event.defaultPrevented) {
-            syncBrowserPath(routeName);
+            if (switchProductRoute(routeName)) {
+              return;
+            }
             navigation.navigate(route.name, route.params);
           }
         };
