@@ -187,18 +187,18 @@ def assess_tokyo_safety(
         if heat_emergency and "TOKYO-URG-HEAT-001" not in matched_rule_ids:
             matched_rule_ids.append("TOKYO-URG-HEAT-001")
         violence = _matches_any(normalized, _VIOLENCE_PATTERNS)
-        references = [AMBULANCE_119_REFERENCE]
+        emergency_references = [AMBULANCE_119_REFERENCE]
         if heat_context:
-            references.append(HEAT_SAFETY_REFERENCE)
+            emergency_references.append(HEAT_SAFETY_REFERENCE)
         if violence:
-            references.append(POLICE_110_REFERENCE)
+            emergency_references.append(POLICE_110_REFERENCE)
         return TokyoSafetyDecision(
             disposition=TokyoSafetyDisposition.EMERGENCY_ESCALATION,
             bypass_resource_navigation=True,
             message=_emergency_message(interface_language, violence=violence),
             matched_rule_ids=tuple(matched_rule_ids),
             policy_flags=policy_flags,
-            references=_dedupe_references(references),
+            references=_dedupe_references(emergency_references),
         )
 
     flags = set(core.policy_flags)
@@ -240,16 +240,16 @@ def assess_tokyo_safety(
             ),
         )
 
-    references: tuple[TokyoSafetyReference, ...] = ()
+    routine_references: tuple[TokyoSafetyReference, ...] = ()
     message = _routine_message(interface_language)
     if heat_context and _matches_any(normalized, _HEAT_MILD_PATTERNS):
-        references = (HEAT_SAFETY_REFERENCE, AMBULANCE_119_REFERENCE)
+        routine_references = (HEAT_SAFETY_REFERENCE, AMBULANCE_119_REFERENCE)
         message = _heat_routine_message(interface_language)
     return TokyoSafetyDecision(
         disposition=TokyoSafetyDisposition.ROUTINE_NAVIGATION,
         bypass_resource_navigation=False,
         message=message,
-        references=references,
+        references=routine_references,
     )
 
 
