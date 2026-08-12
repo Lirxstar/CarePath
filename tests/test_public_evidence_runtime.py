@@ -51,6 +51,7 @@ def test_public_bundle_sources_are_redistributable_registry_entries() -> None:
         assert source["full_text_storage_allowed"] is True
         assert entry["organisation"] == source["organisation"]
         assert entry["license"] == source["license"]
+        assert set(entry["topics"]).issubset(source["topics"])
 
 
 def test_empty_qdrant_directory_uses_bundled_fallback(tmp_path: Path) -> None:
