@@ -93,7 +93,16 @@ test("Private mode uses an isolated non-persistent workspace", async ({ page }) 
 
   await page.getByRole("button", { name: "Exit Private mode" }).click();
   await expect(page.getByText(/Private mode is off/)).toBeVisible();
-  await expect(page.getByText("Demo loaded")).toHaveCount(0);
+  await expect(page.getByText("Load demo data to view the raw series.")).toBeVisible();
+
+  // Start another private session to verify the ended workspace cannot be restored.
+  // React Navigation may retain hidden screen nodes, so assert the visible journey state
+  // rather than counting hidden DOM text left by an inactive screen.
+  await page.getByRole("button", { name: "Turn on Private mode" }).click();
+  await expect(page.getByText(/Private mode is on/).first()).toBeVisible();
+  await expect(page.getByText("Load demo data to view the raw series.")).toBeVisible();
+  await page.getByRole("button", { name: "Exit Private mode" }).click();
+  await expect(page.getByText(/Private mode is off/)).toBeVisible();
 });
 
 test("language selection translates the complete web interface", async ({ page }) => {
