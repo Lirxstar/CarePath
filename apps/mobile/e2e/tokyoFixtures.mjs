@@ -1,18 +1,18 @@
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
-const fixtureUrl = new URL('../../../data/tokyo/journeys.json', import.meta.url);
-const REQUIRED_LANGUAGES = new Set(['en', 'ja', 'zh']);
+const fixtureUrl = new URL("../../../data/tokyo/journeys.json", import.meta.url);
+const REQUIRED_LANGUAGES = new Set(["en", "ja", "zh"]);
 const REQUIRED_FAILURES = new Set([
-  'location_permission_denied',
-  'no_matching_resources',
-  'incomplete_resource_data',
-  'model_unavailable',
-  'urgent_or_unsafe_request',
+  "location_permission_denied",
+  "no_matching_resources",
+  "incomplete_resource_data",
+  "model_unavailable",
+  "urgent_or_unsafe_request",
 ]);
 
 export function loadTokyoJourneyFixtures() {
-  const catalog = JSON.parse(readFileSync(fixtureUrl, 'utf8'));
+  const catalog = JSON.parse(readFileSync(fixtureUrl, "utf8"));
   validateCatalog(catalog);
   return catalog;
 }
@@ -31,20 +31,20 @@ export function primaryScenarioVariants(catalog = loadTokyoJourneyFixtures()) {
 }
 
 function validateCatalog(catalog) {
-  if (catalog.schema_version !== 'cp202-v1') {
-    throw new Error('unsupported CP-202 fixture schema');
+  if (catalog.schema_version !== "cp202-v1") {
+    throw new Error("unsupported CP-202 fixture schema");
   }
   if (catalog.product?.demo_target_seconds > 60) {
-    throw new Error('Tokyo primary demo target must be at most 60 seconds');
+    throw new Error("Tokyo primary demo target must be at most 60 seconds");
   }
   if (
     catalog.product?.primary_inputs?.account_required ||
     catalog.product?.primary_inputs?.health_upload_required
   ) {
-    throw new Error('Tokyo primary journey must not require account or health-data upload');
+    throw new Error("Tokyo primary journey must not require account or health-data upload");
   }
   if (!Array.isArray(catalog.primary_scenarios) || catalog.primary_scenarios.length !== 3) {
-    throw new Error('CP-202 must contain exactly three primary scenarios');
+    throw new Error("CP-202 must contain exactly three primary scenarios");
   }
   for (const scenario of catalog.primary_scenarios) {
     const languages = new Set(scenario.interactions.map((item) => item.language));
@@ -61,7 +61,7 @@ function validateCatalog(catalog) {
       throw new Error(`${scenario.scenario_id} exceeds the frozen demo target`);
     }
     if (
-      scenario.expected.language_constraint === 'required' &&
+      scenario.expected.language_constraint === "required" &&
       scenario.expected.filters.unknown_language_is_match
     ) {
       throw new Error(
@@ -74,7 +74,7 @@ function validateCatalog(catalog) {
     failureIds.size !== REQUIRED_FAILURES.size ||
     ![...REQUIRED_FAILURES].every((failureId) => failureIds.has(failureId))
   ) {
-    throw new Error('CP-202 failure contract is incomplete');
+    throw new Error("CP-202 failure contract is incomplete");
   }
 }
 
