@@ -1,4 +1,4 @@
-"""HTTP contracts for deterministic Tokyo public-resource search."""
+"""HTTP contracts for deterministic Tokyo search and bounded CP-204 assistance."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from typing import cast
 
 from fastapi import APIRouter, Request
 
+from backend.tokyo.agent import TokyoAgentRequest, TokyoAgentResponse, TokyoGroundedResourceAgent
 from backend.tokyo.models import TokyoResource
 from backend.tokyo.search import (
     TokyoResourceRepository,
@@ -15,6 +16,7 @@ from backend.tokyo.search import (
 )
 
 from .errors import CarePathError
+from .llm.provider import LLMProvider
 
 router = APIRouter(prefix="/tokyo", tags=["tokyo"])
 
@@ -30,6 +32,17 @@ def get_tokyo_repository(request: Request) -> TokyoResourceRepository:
     return cast(TokyoResourceRepository, repository)
 
 
+def get_model_provider(request: Request) -> LLMProvider:
+    provider = getattr(request.app.state, "provider", None)
+    if provider is None:
+        raise CarePathError(
+            "model_provider_unavailable",
+            "Model provider is not available",
+            status_code=HTTPStatus.SERVICE_UNAVAILABLE,
+        )
+    return cast(LLMProvider, provider)
+
+
 @router.post("/resources/search", response_model=TokyoResourceSearchResponse)
 async def search_tokyo_resources(
     payload: TokyoResourceSearchRequest,
@@ -38,6 +51,20 @@ async def search_tokyo_resources(
     """Apply validated hard filters and deterministic location-aware ranking."""
 
     return get_tokyo_repository(request).search(payload)
+
+
+@router.post("/agent/search", response_model=TokyoAgentResponse)
+async def assist_tokyo_resource_search(
+    payload: TokyoAgentRequest,
+    request: Request,
+) -> TokyoAgentResponse:
+    """Map bounded natural language to CP-203 without making the model a factual authority."""
+
+    agent = TokyoGroundedResourceAgent(
+        repository=get_tokyo_repository(request),
+        provider=get_model_provider(request),
+    )
+    return await agent.assist(payload)
 
 
 @router.get("/resources/{resource_id}", response_model=TokyoResource)
