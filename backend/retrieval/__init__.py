@@ -1,5 +1,6 @@
 """Retrieval package boundaries shared by curated evidence workflows."""
 
+from .bundled import BundledEvidenceCorpus, BundledEvidenceEntry, BundledExternalEvidenceIndex
 from .dual import (
     DualRetrievalResult,
     DualRetriever,
@@ -36,7 +37,6 @@ from .vector import (
     external_recall_at_k,
     rebuild_qdrant_local,
 )
-from .bundled import BundledEvidenceCorpus, BundledEvidenceEntry, BundledExternalEvidenceIndex
 
 __all__ = [
     "COLLECTION_SCHEMA",
