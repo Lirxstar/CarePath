@@ -103,11 +103,11 @@ class ProductDefinition(BaseModel):
 
     @field_validator("mvp_categories")
     @classmethod
-    def frozen_categories(
-        cls, value: list[TokyoResourceCategory]
-    ) -> list[TokyoResourceCategory]:
+    def frozen_categories(cls, value: list[TokyoResourceCategory]) -> list[TokyoResourceCategory]:
         if set(value) != _FROZEN_MVP_CATEGORIES or len(value) != len(_FROZEN_MVP_CATEGORIES):
-            raise ValueError("CP-202 MVP categories must match the frozen four-category Tokyo scope")
+            raise ValueError(
+                "CP-202 MVP categories must match the frozen four-category Tokyo scope"
+            )
         return value
 
 
@@ -193,7 +193,9 @@ class ManualLocation(BaseModel):
     def validate_labels(self) -> Self:
         if set(self.labels) != set(InterfaceLanguage):
             raise ValueError("manual location must have EN/JA/ZH labels")
-        if not self.municipality.strip() or any(not label.strip() for label in self.labels.values()):
+        if not self.municipality.strip() or any(
+            not label.strip() for label in self.labels.values()
+        ):
             raise ValueError("manual location labels must not be empty")
         return self
 
@@ -233,7 +235,9 @@ class RankingExpectation(BaseModel):
         if "category" not in self.hard_constraints:
             raise ValueError("category must always be a hard resource constraint")
         if not self.order or self.tie_breaker != "resource_id":
-            raise ValueError("Tokyo ranking contract requires deterministic resource_id tie-breaking")
+            raise ValueError(
+                "Tokyo ranking contract requires deterministic resource_id tie-breaking"
+            )
         return self
 
 
@@ -278,7 +282,9 @@ class PrimaryTokyoJourney(BaseModel):
     def validate_scenario_contract(self) -> Self:
         languages = [variant.language for variant in self.interactions]
         if set(languages) != set(InterfaceLanguage) or len(languages) != len(InterfaceLanguage):
-            raise ValueError("each primary Tokyo journey must contain exactly EN/JA/ZH interactions")
+            raise ValueError(
+                "each primary Tokyo journey must contain exactly EN/JA/ZH interactions"
+            )
         if self.account_required or self.health_upload_required:
             raise ValueError("primary Tokyo journeys cannot require an account or health upload")
         if self.expected.filters.category is not self.category:
@@ -327,7 +333,9 @@ class TokyoJourneyCatalog(BaseModel):
             raise ValueError("primary Tokyo scenario IDs must be unique")
         categories = {scenario.category for scenario in self.primary_scenarios}
         if categories != _REQUIRED_PRIMARY_CATEGORIES:
-            raise ValueError("primary journeys must cover healthcare, cooling shelter and family support")
+            raise ValueError(
+                "primary journeys must cover healthcare, cooling shelter and family support"
+            )
         if any(
             scenario.estimated_demo_seconds > self.product.demo_target_seconds
             for scenario in self.primary_scenarios
