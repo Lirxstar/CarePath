@@ -105,23 +105,29 @@ jobs:
           npm install --no-save --package-lock=false @playwright/test@1.54.1
           npx playwright install --with-deps chromium
 
-      - name: Wait for public reviewer deployment
+      - name: Wait for exact public reviewer deployment
         run: |
           set -euo pipefail
           public_url="$(tr -d '\r\n' < deployment/public_backend_url.txt)"
           echo "CAREPATH_E2E_BASE_URL=${public_url}" >> "${GITHUB_ENV}"
           for attempt in {1..80}; do
+            echo "Mobile deployment probe ${attempt}/80 for ${GITHUB_SHA}"
             if curl --fail --silent --show-error \
               --header 'Accept: text/html' \
+              --header 'Cache-Control: no-cache' \
               "${public_url}/" \
               --output /tmp/carepath-reviewer.html \
               && grep -qi '<!DOCTYPE html' /tmp/carepath-reviewer.html \
-              && python deployment/verify_backend.py "${public_url}"; then
+              && python deployment/verify_backend.py \
+                "${public_url}" \
+                --expected-commit "${GITHUB_SHA}" \
+                --confirmations 3 \
+                --confirmation-interval 5; then
               exit 0
             fi
             sleep 15
           done
-          echo "Public reviewer deployment did not become ready within the acceptance window." >&2
+          echo "Exact public reviewer deployment did not become stable within the acceptance window." >&2
           exit 1
 
       - name: Run mobile browser journey against public deployment

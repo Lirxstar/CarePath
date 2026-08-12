@@ -34,6 +34,47 @@ def test_liveness_does_not_require_dependencies(monkeypatch: pytest.MonkeyPatch)
     assert response.json() == {"status": "ok"}
 
 
+def test_build_identity_reports_platform_commit_without_caching(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("CAREPATH_BUILD_COMMIT", raising=False)
+    monkeypatch.setenv("RENDER_GIT_COMMIT", "a" * 40)
+    application = create_app(TEST_SETTINGS, MockLLMProvider())
+
+    with TestClient(application) as client:
+        response = client.get("/health/build")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok", "git_commit": "a" * 40}
+    assert response.headers["cache-control"] == "no-store"
+
+
+def test_build_identity_prefers_operator_commit_override(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("RENDER_GIT_COMMIT", "a" * 40)
+    monkeypatch.setenv("CAREPATH_BUILD_COMMIT", "b" * 40)
+    application = create_app(TEST_SETTINGS, MockLLMProvider())
+
+    with TestClient(application) as client:
+        response = client.get("/health/build")
+
+    assert response.json() == {"status": "ok", "git_commit": "b" * 40}
+
+
+def test_build_identity_is_explicitly_unknown_without_deployment_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("CAREPATH_BUILD_COMMIT", raising=False)
+    monkeypatch.delenv("RENDER_GIT_COMMIT", raising=False)
+    application = create_app(TEST_SETTINGS, MockLLMProvider())
+
+    with TestClient(application) as client:
+        response = client.get("/health/build")
+
+    assert response.json() == {"status": "ok", "git_commit": None}
+
+
 def test_readiness_reports_database_and_provider(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(health_module, "database_health_check", lambda: None)
     application = create_app(TEST_SETTINGS, MockLLMProvider())
