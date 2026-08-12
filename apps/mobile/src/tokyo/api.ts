@@ -122,10 +122,12 @@ export function firstSourcePublisher(response: TokyoAgentApiResponse): string | 
 }
 
 export function hardConstraintSummary(response: TokyoAgentApiResponse): string[] {
-  if (response.status === "safety_boundary" || response.search?.no_match === null) {
+  if (response.status === "safety_boundary") {
     return [];
   }
-  return isStringArray(response.search.no_match.hard_constraints)
-    ? response.search.no_match.hard_constraints
-    : [];
+  const noMatch = response.search?.no_match;
+  if (noMatch == null) {
+    return [];
+  }
+  return isStringArray(noMatch.hard_constraints) ? noMatch.hard_constraints : [];
 }
