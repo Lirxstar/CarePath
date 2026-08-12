@@ -1,3 +1,4 @@
+# ruff: noqa: RUF001
 from __future__ import annotations
 
 import logging
@@ -15,7 +16,7 @@ from backend.tokyo.agent import TokyoAgentRequest
 from backend.tokyo.journeys import InterfaceLanguage
 from backend.tokyo.models import Freshness, SourceProvenance, TokyoResource, TokyoResourceCategory
 from backend.tokyo.safety import TokyoSafetyDisposition, assess_tokyo_safety
-from backend.tokyo.search import CoordinateLocation, TokyoResourceRepository
+from backend.tokyo.search import TokyoResourceRepository
 
 
 class FailIfCalledProvider(LLMProvider):
