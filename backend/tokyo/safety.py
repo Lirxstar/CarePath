@@ -77,8 +77,7 @@ AMBULANCE_119_REFERENCE = TokyoSafetyReference(
     title="How to call an ambulance",
     publisher="東京都保健医療局",
     canonical_url=(
-        "https://www.hokeniryo.metro.tokyo.lg.jp/iryo/iryo_hoken/"
-        "medical_info_eng/emergency_call"
+        "https://www.hokeniryo.metro.tokyo.lg.jp/iryo/iryo_hoken/medical_info_eng/emergency_call"
     ),
     retrieved_at=date(2026, 8, 12),
     source_as_of=date(2023, 1, 1),
