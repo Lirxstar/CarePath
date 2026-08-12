@@ -64,9 +64,7 @@ function validateCatalog(catalog) {
       scenario.expected.language_constraint === "required" &&
       scenario.expected.filters.unknown_language_is_match
     ) {
-      throw new Error(
-        `${scenario.scenario_id} cannot treat unknown language support as a match`,
-      );
+      throw new Error(`${scenario.scenario_id} cannot treat unknown language support as a match`);
     }
   }
   const failureIds = new Set(catalog.failure_scenarios.map((item) => item.failure_id));
