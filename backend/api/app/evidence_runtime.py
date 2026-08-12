@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from contextlib import suppress
 from http import HTTPStatus
 from pathlib import Path
 from threading import Lock
@@ -110,10 +111,8 @@ def _load_qdrant_index(settings: Settings) -> QdrantExternalEvidenceIndex | None
         )
     except Exception as exc:
         if client is not None:
-            try:
+            with suppress(Exception):
                 client.close()
-            except Exception:
-                pass
         logger.warning(
             "external_qdrant_unavailable",
             extra={"error_class": type(exc).__name__},
