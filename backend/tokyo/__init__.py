@@ -2,6 +2,7 @@
 
 from backend.tokyo.agent import (
     MAX_NATURAL_LANGUAGE_QUERY_CHARS,
+    AgentStatus,
     ClarificationMessage,
     ClarificationReason,
     GroundedExplanation,
@@ -65,6 +66,7 @@ __all__ = [
     "MAX_SEARCH_RADIUS_KM",
     "MAX_SEARCH_RESULTS",
     "AdapterKind",
+    "AgentStatus",
     "ClarificationMessage",
     "ClarificationReason",
     "CoordinateLocation",
