@@ -65,6 +65,8 @@ select = ["B", "C4", "E", "F", "I", "PIE", "RUF", "SIM", "UP"]
 [tool.ruff.lint.per-file-ignores]
 "backend/api/app/llm/provider.py" = ["B027"]
 "backend/safety/triage.py" = ["E501"]
+"backend/tokyo/agent.py" = ["E501", "RUF001"]
+"tests/test_cp204_tokyo_agent.py" = ["E501", "RUF001"]
 
 [tool.mypy]
 files = ["backend"]
