@@ -65,10 +65,16 @@ jobs:
           from backend.api.app.llm.mock import MockLLMProvider
           from backend.tokyo.agent import TokyoAgentRequest, TokyoGroundedResourceAgent
           from backend.tokyo.journeys import InterfaceLanguage
-          from backend.tokyo.models import TokyoResourceCategory
+          from backend.tokyo.models import TokyoResource, TokyoResourceCategory
           from backend.tokyo.search import CoordinateLocation, TokyoResourceRepository
 
-          repository = TokyoResourceRepository.from_jsonl(Path('/tmp/tokyo-resources.jsonl'))
+          path = Path('/tmp/tokyo-resources.jsonl')
+          resources = [
+              TokyoResource.model_validate_json(line)
+              for line in path.read_text(encoding='utf-8').splitlines()
+              if line.strip()
+          ]
+          repository = TokyoResourceRepository.from_jsonl(path)
           allowed_queries = {
               TokyoResourceCategory.HEALTHCARE: 'Find a nearby clinic.',
               TokyoResourceCategory.COOLING_SHELTER: 'Find a nearby cooling shelter.',
@@ -78,7 +84,7 @@ jobs:
           candidate = next(
               (
                   resource
-                  for resource in repository._resources
+                  for resource in resources
                   if resource.category in allowed_queries
                   and resource.latitude is not None
                   and resource.longitude is not None
