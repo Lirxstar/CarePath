@@ -105,10 +105,7 @@ export function responseHasPartialResourceData(response: TokyoAgentApiResponse):
   });
 }
 
-export function explanationFor(
-  response: TokyoAgentApiResponse,
-  resourceId: string,
-): string | null {
+export function explanationFor(response: TokyoAgentApiResponse, resourceId: string): string | null {
   if (response.status === "safety_boundary") {
     return null;
   }

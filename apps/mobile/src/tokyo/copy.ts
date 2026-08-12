@@ -188,7 +188,8 @@ const JA: TokyoCopy = {
   resultsHeading: "根拠のある東京都のリソース",
   verifiedFacts: "確認済みの出典情報",
   whyMatch: "根拠付き説明",
-  explanationUnavailable: "説明モデルを利用できませんでした。出典に基づく事実はそのまま利用できます。",
+  explanationUnavailable:
+    "説明モデルを利用できませんでした。出典に基づく事実はそのまま利用できます。",
   sourceFreshness: "出典と更新状況",
   sourceReportedLanguages: "出典に記載された対応言語",
   openingHours: "公表された開館・診療情報",
@@ -204,11 +205,13 @@ const JA: TokyoCopy = {
   noMatchHint: "近隣地域に変えるか、必須でない条件を外して再検索してください。",
   clarification: "検索前に1点確認が必要です。",
   unsupported: "このサービスは現在の限定版 Tokyo デモの対象外です。",
-  modelFallback: "モデル支援を利用できなかったため、決定論的フォールバックを使用し、事実を生成していません。",
+  modelFallback:
+    "モデル支援を利用できなかったため、決定論的フォールバックを使用し、事実を生成していません。",
   partialData: "公式データに言語・開館時間・アクセス情報がない場合、推測せず不明のまま表示します。",
   safetyTitle: "安全確認をリソース順位付けより先に行います",
   safetyEmergency: "このリクエストでは通常のリソース検索を停止しました。",
-  privacyNote: "アカウントや健康データのアップロードは不要です。Tokyo ルートは入力文や正確な座標を永続保存しません。",
+  privacyNote:
+    "アカウントや健康データのアップロードは不要です。Tokyo ルートは入力文や正確な座標を永続保存しません。",
   coreLink: "CarePath Core レビュアー",
   freshness: {
     current: "出典ポリシー上は最新",

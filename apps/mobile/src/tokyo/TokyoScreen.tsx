@@ -75,7 +75,15 @@ function languageLabel(language: string): string {
   return language;
 }
 
-function ActionButton({ label, onPress, testID }: { label: string; onPress: () => void; testID: string }) {
+function ActionButton({
+  label,
+  onPress,
+  testID,
+}: {
+  label: string;
+  onPress: () => void;
+  testID: string;
+}) {
   return (
     <Pressable
       accessibilityRole="button"
@@ -203,7 +211,13 @@ function FactRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function SafetyReferenceButton({ reference, label }: { reference: TokyoSafetyReference; label: string }) {
+function SafetyReferenceButton({
+  reference,
+  label,
+}: {
+  reference: TokyoSafetyReference;
+  label: string;
+}) {
   return (
     <ActionButton
       label={`${label}: ${reference.publisher}`}
@@ -421,7 +435,11 @@ export function TokyoScreen() {
             </Text>
           </Pressable>
           {locationNotice !== null ? (
-            <Text accessibilityRole="alert" style={styles.noticeText} testID="tokyo-location-notice">
+            <Text
+              accessibilityRole="alert"
+              style={styles.noticeText}
+              testID="tokyo-location-notice"
+            >
               {locationNotice}
             </Text>
           ) : null}
@@ -475,13 +493,17 @@ export function TokyoScreen() {
             testID="tokyo-search"
           >
             {searching ? <ActivityIndicator color="#FFFFFF" size="small" /> : null}
-            <Text style={styles.searchButtonText}>{searching ? copy.searching : copy.findHelp}</Text>
+            <Text style={styles.searchButtonText}>
+              {searching ? copy.searching : copy.findHelp}
+            </Text>
           </Pressable>
         </View>
 
         {error !== null ? (
           <View accessibilityRole="alert" style={styles.errorPanel} testID="tokyo-api-error">
-            <Text style={styles.panelTitle}>{error.code === "network_error" ? copy.offline : copy.apiError}</Text>
+            <Text style={styles.panelTitle}>
+              {error.code === "network_error" ? copy.offline : copy.apiError}
+            </Text>
             <Text style={styles.bodyText}>{error.message}</Text>
             <Pressable
               accessibilityRole="button"
