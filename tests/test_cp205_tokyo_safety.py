@@ -295,9 +295,7 @@ def test_unknown_resource_facts_never_become_positive_claims() -> None:
     with TestClient(app) as client:
         response = client.post(
             "/tokyo/agent/search",
-            json=_agent_payload(
-                "Find a clinic with English support and published opening hours."
-            ),
+            json=_agent_payload("Find a clinic with English support and published opening hours."),
         )
 
     assert response.status_code == 200
