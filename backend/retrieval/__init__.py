@@ -1,5 +1,6 @@
 """Retrieval package boundaries shared by curated evidence workflows."""
 
+from .bundled import BundledEvidenceCorpus, BundledEvidenceEntry, BundledExternalEvidenceIndex
 from .dual import (
     DualRetrievalResult,
     DualRetriever,
@@ -42,6 +43,9 @@ __all__ = [
     "DEFAULT_COLLECTION_NAME",
     "DEFAULT_MULTILINGUAL_EMBEDDING_MODEL",
     "INDEX_VERSION",
+    "BundledEvidenceCorpus",
+    "BundledEvidenceEntry",
+    "BundledExternalEvidenceIndex",
     "DeterministicHashEmbeddingModel",
     "DualRetrievalResult",
     "DualRetriever",

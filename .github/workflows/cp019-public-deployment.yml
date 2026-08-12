@@ -3,21 +3,35 @@ name: CP-019 public deployment
 on:
   pull_request:
     paths:
+      - Dockerfile
+      - render.yaml
+      - backend/api/app/evidence_runtime.py
+      - backend/api/app/evidence_routes.py
       - backend/api/app/health.py
+      - backend/retrieval/bundled.py
+      - data/guidelines/public_evidence_bundle.json
       - deployment/public_backend_url.txt
       - deployment/verify_backend.py
       - tests/test_deployment_health.py
       - tests/test_deployment_verifier.py
+      - tests/test_public_evidence_runtime.py
       - .github/workflows/cp019-public-deployment.yml
   push:
     branches:
       - main
     paths:
+      - Dockerfile
+      - render.yaml
+      - backend/api/app/evidence_runtime.py
+      - backend/api/app/evidence_routes.py
       - backend/api/app/health.py
+      - backend/retrieval/bundled.py
+      - data/guidelines/public_evidence_bundle.json
       - deployment/public_backend_url.txt
       - deployment/verify_backend.py
       - tests/test_deployment_health.py
       - tests/test_deployment_verifier.py
+      - tests/test_public_evidence_runtime.py
       - .github/workflows/cp019-public-deployment.yml
 
 permissions:
@@ -26,7 +40,7 @@ permissions:
 jobs:
   verify-public-backend:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -45,14 +59,67 @@ jobs:
             )
           fi
 
-          for attempt in {1..20}; do
-            echo "Public deployment verification attempt ${attempt}/20"
+          verified=false
+          for attempt in {1..24}; do
+            echo "Public deployment verification attempt ${attempt}/24"
             if python deployment/verify_backend.py "${public_url}" "${expected_args[@]}"; then
-              exit 0
-            fi
-            if [ "${attempt}" -eq 20 ]; then
-              echo "Public backend did not reach the required deployment state after 20 attempts." >&2
-              exit 1
+              verified=true
+              break
             fi
             sleep 15
           done
+          if [[ "${verified}" != "true" ]]; then
+            echo "Public backend did not reach the required deployment state." >&2
+            exit 1
+          fi
+
+          if [[ "${GITHUB_EVENT_NAME}" == "push" ]]; then
+            PUBLIC_URL="${public_url}" python - <<'PY'
+          import json
+          import os
+          from urllib.parse import urlencode
+          from urllib.request import Request, urlopen
+
+          base_url = os.environ["PUBLIC_URL"].rstrip("/")
+          query = urlencode(
+              {
+                  "query": "walking movement physical activity",
+                  "top_k": 3,
+                  "topics": "physical_activity",
+                  "language": "en",
+              }
+          )
+          request = Request(
+              f"{base_url}/evidence/external/search?{query}",
+              headers={
+                  "Accept": "application/json",
+                  "Cache-Control": "no-cache",
+                  "User-Agent": "carepath-public-evidence-gate/1",
+              },
+          )
+          with urlopen(request, timeout=10) as response:
+              payload = json.load(response)
+          if not isinstance(payload, list) or not payload:
+              raise SystemExit("public external evidence search returned no source-backed hits")
+          first = payload[0]
+          metadata = first.get("metadata") if isinstance(first, dict) else None
+          if not isinstance(metadata, dict):
+              raise SystemExit("public external evidence hit is missing metadata")
+          if not str(metadata.get("source_id", "")).startswith("src-"):
+              raise SystemExit("public external evidence hit is missing canonical source_id")
+          if not str(metadata.get("canonical_url", "")).startswith("https://"):
+              raise SystemExit("public external evidence hit is missing canonical source URL")
+          if not str(first.get("citation", "")).strip():
+              raise SystemExit("public external evidence hit is missing display citation")
+          print(
+              json.dumps(
+                  {
+                      "hit_count": len(payload),
+                      "source_id": metadata["source_id"],
+                      "backend_model": metadata.get("embedding_model"),
+                  },
+                  sort_keys=True,
+              )
+          )
+          PY
+          fi
