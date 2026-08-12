@@ -41,8 +41,8 @@ jobs:
       - name: Install frontend dependencies
         working-directory: apps/mobile
         run: npm ci
-      - name: Render canonical browser fixture formatting
+      - name: Check browser fixture formatting
         working-directory: apps/mobile
-        run: npx prettier e2e/tokyoFixtures.mjs
+        run: npx prettier --check e2e/tokyoFixtures.mjs
       - name: Validate browser fixture consumer
         run: node apps/mobile/e2e/tokyoFixtures.mjs
