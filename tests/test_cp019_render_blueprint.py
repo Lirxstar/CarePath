@@ -13,9 +13,10 @@ def test_render_blueprint_pins_free_instances() -> None:
     assert content.count("plan: free") == 2
 
 
-def test_render_blueprint_keeps_health_and_database_wiring() -> None:
+def test_render_blueprint_uses_cheap_liveness_and_keeps_database_wiring() -> None:
     content = BLUEPRINT.read_text(encoding="utf-8")
 
-    assert "healthCheckPath: /health/ready" in content
+    assert "healthCheckPath: /health/live" in content
+    assert "healthCheckPath: /health/ready" not in content
     assert "key: CAREPATH_DATABASE_URL" in content
     assert "name: carepath-db\n          property: connectionString" in content
