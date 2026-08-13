@@ -2,6 +2,21 @@ import type { ApiResult, ControlledApiError } from "../api/client";
 import type { CarePathApiClient } from "../api/client";
 import type { TokyoAgentApiResponse, TokyoAgentRequest } from "./types";
 
+const NETWORK_RETRY_DELAYS_MS = [2_000, 5_000, 10_000, 15_000] as const;
+
+export type RetryWait = (delayMs: number) => Promise<void>;
+
+function defaultRetryWait(delayMs: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, delayMs);
+  });
+}
+
+function browserReportsOffline(): boolean {
+  const target = globalThis as unknown as { navigator?: { onLine?: boolean } };
+  return target.navigator?.onLine === false;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -68,7 +83,7 @@ function invalidResponseError(): ControlledApiError {
   };
 }
 
-export async function searchTokyoAgent(
+async function postTokyoAgent(
   client: CarePathApiClient,
   request: TokyoAgentRequest,
 ): Promise<ApiResult<TokyoAgentApiResponse>> {
@@ -80,6 +95,29 @@ export async function searchTokyoAgent(
     return { ok: false, error: invalidResponseError() };
   }
   return { ok: true, data: result.data };
+}
+
+export async function searchTokyoAgent(
+  client: CarePathApiClient,
+  request: TokyoAgentRequest,
+  retryDelaysMs: readonly number[] = NETWORK_RETRY_DELAYS_MS,
+  retryWait: RetryWait = defaultRetryWait,
+): Promise<ApiResult<TokyoAgentApiResponse>> {
+  let result = await postTokyoAgent(client, request);
+
+  if (browserReportsOffline()) {
+    return result;
+  }
+
+  for (const delayMs of retryDelaysMs) {
+    if (result.ok || result.error.code !== "network_error") {
+      return result;
+    }
+    await retryWait(delayMs);
+    result = await postTokyoAgent(client, request);
+  }
+
+  return result;
 }
 
 export function responseHasModelFallback(response: TokyoAgentApiResponse): boolean {
