@@ -422,11 +422,14 @@ def _heat_routine_message(
         ),
     }[language]
     if ambulance_119:
-        return base + {
-            InterfaceLanguage.EN: " If severe warning signs develop, use 119.",
-            InterfaceLanguage.JA: " 重い症状が出た場合は119番を利用してください。",
-            InterfaceLanguage.ZH: " 如果出现严重警示症状，请拨打119。",
-        }[language]
+        return (
+            base
+            + {
+                InterfaceLanguage.EN: " If severe warning signs develop, use 119.",
+                InterfaceLanguage.JA: " 重い症状が出た場合は119番を利用してください。",
+                InterfaceLanguage.ZH: " 如果出现严重警示症状，请拨打119。",
+            }[language]
+        )
     return base + _unverified_emergency_contact_suffix(language)
 
 
@@ -462,18 +465,24 @@ def _emergency_message(
     if not violence:
         return base
     if police_110:
-        return base + {
-            InterfaceLanguage.EN: " If there is an immediate crime or violence emergency, call 110.",
-            InterfaceLanguage.JA: " 犯罪や暴力の緊急事態が目前にある場合は110番に電話してください。",
-            InterfaceLanguage.ZH: " 如果存在正在发生的犯罪或暴力紧急情况，请拨打110。",
+        return (
+            base
+            + {
+                InterfaceLanguage.EN: " If there is an immediate crime or violence emergency, call 110.",
+                InterfaceLanguage.JA: " 犯罪や暴力の緊急事態が目前にある場合は110番に電話してください。",
+                InterfaceLanguage.ZH: " 如果存在正在发生的犯罪或暴力紧急情况，请拨打110。",
+            }[language]
+        )
+    return (
+        base
+        + {
+            InterfaceLanguage.EN: (
+                " For an immediate crime or violence emergency, use a current official police emergency source."
+            ),
+            InterfaceLanguage.JA: " 犯罪や暴力の緊急時は、最新の警察公式緊急情報を利用してください。",
+            InterfaceLanguage.ZH: " 如遇正在发生的犯罪或暴力紧急情况，请使用当前官方警务紧急信息。",
         }[language]
-    return base + {
-        InterfaceLanguage.EN: (
-            " For an immediate crime or violence emergency, use a current official police emergency source."
-        ),
-        InterfaceLanguage.JA: " 犯罪や暴力の緊急時は、最新の警察公式緊急情報を利用してください。",
-        InterfaceLanguage.ZH: " 如遇正在发生的犯罪或暴力紧急情况，请使用当前官方警务紧急信息。",
-    }[language]
+    )
 
 
 def _professional_help_message(
