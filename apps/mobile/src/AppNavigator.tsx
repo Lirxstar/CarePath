@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useI18n } from "./i18n/I18nContext";
 import type { RootTabParamList } from "./navigation";
 import { CoachRoute, HealthDataRoute, PlanHistoryRoute, TodayRoute } from "./ResilientRoutes";
+import { TokyoScreen } from "./tokyo/TokyoScreen";
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
 
@@ -22,15 +23,57 @@ const CAREPATH_THEME = {
   },
 };
 
+interface BrowserLocation {
+  pathname?: string;
+  assign?: (url: string) => void;
+}
+
+function browserLocation(): BrowserLocation | null {
+  const target = globalThis as unknown as { location?: BrowserLocation };
+  return target.location ?? null;
+}
+
+function initialRouteName(): keyof RootTabParamList {
+  const pathname = browserLocation()?.pathname;
+  return pathname === "/tokyo" || pathname === "/tokyo/" ? "Tokyo" : "Today";
+}
+
+function switchProductRoute(routeName: keyof RootTabParamList): boolean {
+  const location = browserLocation();
+  if (location?.assign === undefined) {
+    return false;
+  }
+  const pathname = location.pathname ?? "/";
+  const tokyoPath = pathname === "/tokyo" || pathname === "/tokyo/";
+  if (routeName === "Tokyo" && !tokyoPath) {
+    location.assign("/tokyo");
+    return true;
+  }
+  if (routeName === "Today" && tokyoPath) {
+    location.assign("/");
+    return true;
+  }
+  return false;
+}
+
 function CarePathTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const { strings } = useI18n();
   const insets = useSafeAreaInsets();
+  const activeRoute = state.routes[state.index]?.name as keyof RootTabParamList | undefined;
+  const tokyoMode = activeRoute === "Tokyo";
   const tabs: Record<keyof RootTabParamList, { label: string; testId: string }> = {
-    Today: { label: strings.nav.today, testId: "tab-today" },
+    Tokyo: { label: "Tokyo", testId: "tab-tokyo" },
+    Today: {
+      label: tokyoMode ? "Core reviewer" : strings.nav.today,
+      testId: tokyoMode ? "tab-core-reviewer" : "tab-today",
+    },
     Coach: { label: strings.nav.coach, testId: "tab-coach" },
     "Health Data": { label: strings.nav.healthData, testId: "tab-health-data" },
     "Plan & History": { label: strings.nav.planHistory, testId: "tab-plan-history" },
   };
+  const visibleRoutes = tokyoMode
+    ? state.routes.filter((route) => route.name === "Tokyo" || route.name === "Today")
+    : state.routes;
 
   return (
     <View
@@ -38,10 +81,12 @@ function CarePathTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
       style={[styles.tabBar, { paddingBottom: Math.max(insets.bottom, 6) }]}
       testID="primary-tab-bar"
     >
-      {state.routes.map((route, index) => {
+      {visibleRoutes.map((route) => {
+        const index = state.routes.findIndex((candidate) => candidate.key === route.key);
         const focused = state.index === index;
         const options = descriptors[route.key]?.options;
-        const metadata = tabs[route.name as keyof RootTabParamList];
+        const routeName = route.name as keyof RootTabParamList;
+        const metadata = tabs[routeName];
         const onPress = () => {
           const event = navigation.emit({
             type: "tabPress",
@@ -49,6 +94,9 @@ function CarePathTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
             canPreventDefault: true,
           });
           if (!focused && !event.defaultPrevented) {
+            if (switchProductRoute(routeName)) {
+              return;
+            }
             navigation.navigate(route.name, route.params);
           }
         };
@@ -87,10 +135,15 @@ function NavigatorBody() {
   return (
     <NavigationContainer theme={CAREPATH_THEME}>
       <Tab.Navigator
-        initialRouteName="Today"
+        initialRouteName={initialRouteName()}
         screenOptions={{ headerShown: false }}
         tabBar={(props) => <CarePathTabBar {...props} />}
       >
+        <Tab.Screen
+          name="Tokyo"
+          component={TokyoScreen}
+          options={{ tabBarAccessibilityLabel: "CarePath Tokyo" }}
+        />
         <Tab.Screen
           name="Today"
           component={TodayRoute}

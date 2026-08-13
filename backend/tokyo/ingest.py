@@ -283,6 +283,10 @@ def _resource(
     flags: list[str],
 ) -> TokyoResource:
     resource_id = _stable_resource_id(source.category, name, address)
+    if municipality is None:
+        municipality = _municipality_from_tokyo_address(address)
+        if municipality is not None:
+            flags.append("municipality_derived_from_address")
     if not languages:
         flags.append("language_support_unknown")
     if latitude is None:
@@ -317,6 +321,22 @@ def _resource(
         provenance=[provenance],
         data_quality_flags=flags,
     )
+
+
+def _municipality_from_tokyo_address(address: str) -> str | None:
+    """Extract a municipality only from a source-backed Tokyo address string."""
+
+    normalized = " ".join(unicodedata.normalize("NFKC", address).strip().split())
+    normalized = re.sub(r"^〒?\d{3}-?\d{4}\s*", "", normalized)
+    if normalized.startswith("東京都"):
+        normalized = normalized[len("東京都") :]
+    match = re.match(r"([^0-9\s,]+?(?:区|市|町|村))", normalized)
+    if match is None:
+        return None
+    municipality = match.group(1)
+    if "郡" in municipality and municipality.endswith(("町", "村")):
+        municipality = municipality.split("郡", 1)[1]
+    return municipality or None
 
 
 def _first(row: Mapping[str, str], aliases: tuple[str, ...]) -> str | None:

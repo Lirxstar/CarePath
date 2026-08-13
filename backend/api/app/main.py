@@ -65,6 +65,13 @@ def configure_reviewer_web(application: FastAPI, directory: str | None) -> None:
     async def reviewer_root() -> FileResponse:
         return FileResponse(index_path, media_type="text/html")
 
+    @application.get("/tokyo", include_in_schema=False)
+    @application.get("/tokyo/", include_in_schema=False)
+    async def tokyo_reviewer_root() -> FileResponse:
+        """Serve the dedicated CP-206 Tokyo entry while keeping API sub-routes intact."""
+
+        return FileResponse(index_path, media_type="text/html")
+
     for url_prefix, child_name in (("/_expo", "_expo"), ("/assets", "assets")):
         child_dir = reviewer_dir / child_name
         if child_dir.is_dir():

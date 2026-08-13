@@ -7,14 +7,21 @@ import { I18nProvider } from "./src/i18n/I18nContext";
 import { WebLocaleTranslator } from "./src/i18n/WebLocaleTranslator";
 import { JourneyProvider } from "./src/journey/JourneyContext";
 
+function isTokyoEntryPath(): boolean {
+  const target = globalThis as unknown as { location?: { pathname?: string } };
+  const pathname = target.location?.pathname;
+  return pathname === "/tokyo" || pathname === "/tokyo/";
+}
+
 export default function App() {
+  const tokyoEntry = isTokyoEntryPath();
   return (
     <SafeAreaProvider>
       <I18nProvider>
         <AuthProvider>
           <WebLocaleTranslator />
           <JourneyProvider>
-            <AccountPrivacyPanel />
+            {tokyoEntry ? null : <AccountPrivacyPanel />}
             <AppNavigator />
           </JourneyProvider>
         </AuthProvider>

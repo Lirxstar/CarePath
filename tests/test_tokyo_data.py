@@ -101,6 +101,27 @@ def test_unknown_language_and_opening_hours_remain_explicit() -> None:
     assert "opening_hours_unknown" in resource.data_quality_flags
 
 
+def test_missing_municipality_is_derived_only_from_source_backed_tokyo_address() -> None:
+    source = _source()
+    payload = (
+        "名称,住所\nShelter A,東京都江東区2-2\nShelter B,〒100-0005 東京都千代田区丸の内1-1\n"
+    ).encode()
+    resources, _ = ingest_source(source, payload, source.download_url or "")
+    assert [resource.municipality for resource in resources] == ["江東区", "千代田区"]
+    assert all(
+        "municipality_derived_from_address" in resource.data_quality_flags for resource in resources
+    )
+
+
+def test_explicit_municipality_is_preserved_without_derived_flag() -> None:
+    source = _source()
+    payload = "名称,住所,市区町村\nShelter A,東京都江東区2-2,江東区\n".encode()
+    resources, _ = ingest_source(source, payload, source.download_url or "")
+    resource = resources[0]
+    assert resource.municipality == "江東区"
+    assert "municipality_derived_from_address" not in resource.data_quality_flags
+
+
 def test_invalid_or_partial_coordinates_are_not_presented_as_valid() -> None:
     source = _source()
     payload = (
