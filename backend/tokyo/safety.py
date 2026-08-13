@@ -3,16 +3,19 @@
 
 Safety classification runs before resource lookup or model use. Emergency and
 professional-help facts are frozen to authoritative Tokyo sources and rendered
-locally in English, Japanese, or Chinese.
+locally in English, Japanese, or Chinese. Safety-critical source facts are
+re-evaluated on every request so stale or unavailable verification cannot remain
+actionable indefinitely.
 """
 
 from __future__ import annotations
 
 import re
 import unicodedata
-from datetime import date
+from datetime import date, datetime
 from enum import StrEnum
 from typing import Literal
+from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -28,8 +31,37 @@ class TokyoSafetyDisposition(StrEnum):
     EMERGENCY_ESCALATION = "emergency_escalation"
 
 
+class TokyoSafetyAvailabilityState(StrEnum):
+    VERIFIED_AVAILABLE = "verified_available"
+    UNKNOWN = "unknown"
+    VERIFIED_UNAVAILABLE = "verified_unavailable"
+
+
+class TokyoSafetyEligibilityState(StrEnum):
+    VERIFIED_APPLICABLE = "verified_applicable"
+    UNKNOWN = "unknown"
+    VERIFIED_INAPPLICABLE = "verified_inapplicable"
+
+
+class TokyoSafetyVerificationStatus(StrEnum):
+    UNEVALUATED = "unevaluated"
+    VERIFIED_CURRENT = "verified_current"
+    EXPIRED = "expired"
+    AVAILABILITY_UNKNOWN = "availability_unknown"
+    VERIFIED_UNAVAILABLE = "verified_unavailable"
+    ELIGIBILITY_UNKNOWN = "eligibility_unknown"
+    VERIFIED_INAPPLICABLE = "verified_inapplicable"
+    SUPERSEDED = "superseded"
+
+
 class TokyoSafetyReference(BaseModel):
-    """Versioned authoritative reference for one safety-critical fact set."""
+    """Versioned authoritative reference for one safety-critical fact set.
+
+    ``valid_until`` is a CarePath revalidation deadline, not an assertion that the
+    underlying official source expires on that date. ``verification_status`` and
+    ``currently_verified_actionable`` are recalculated at request time and default
+    fail-closed so an unevaluated frozen object cannot be presented as current.
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -39,6 +71,15 @@ class TokyoSafetyReference(BaseModel):
     canonical_url: str
     retrieved_at: date
     source_as_of: date | None = None
+    valid_until: date
+    service_hours: str | None = None
+    eligibility: str | None = None
+    languages: tuple[str, ...] | None = None
+    availability_state: TokyoSafetyAvailabilityState
+    eligibility_state: TokyoSafetyEligibilityState
+    superseded_by_source_id: str | None = None
+    verification_status: TokyoSafetyVerificationStatus = TokyoSafetyVerificationStatus.UNEVALUATED
+    currently_verified_actionable: bool = False
 
 
 class TokyoPrivacyBoundary(BaseModel):
@@ -82,6 +123,9 @@ AMBULANCE_119_REFERENCE = TokyoSafetyReference(
     ),
     retrieved_at=date(2026, 8, 12),
     source_as_of=date(2023, 1, 1),
+    valid_until=date(2027, 8, 12),
+    availability_state=TokyoSafetyAvailabilityState.VERIFIED_AVAILABLE,
+    eligibility_state=TokyoSafetyEligibilityState.VERIFIED_APPLICABLE,
 )
 
 EMERGENCY_CONSULTATION_7119_REFERENCE = TokyoSafetyReference(
@@ -90,6 +134,10 @@ EMERGENCY_CONSULTATION_7119_REFERENCE = TokyoSafetyReference(
     publisher="東京消防庁",
     canonical_url="https://www.tfd.metro.tokyo.lg.jp/lfe/kyuu_adv/soudan-center.html",
     retrieved_at=date(2026, 8, 12),
+    valid_until=date(2026, 11, 10),
+    service_hours="24 hours / 365 days",
+    availability_state=TokyoSafetyAvailabilityState.VERIFIED_AVAILABLE,
+    eligibility_state=TokyoSafetyEligibilityState.VERIFIED_APPLICABLE,
 )
 
 POLICE_110_REFERENCE = TokyoSafetyReference(
@@ -102,6 +150,9 @@ POLICE_110_REFERENCE = TokyoSafetyReference(
     ),
     retrieved_at=date(2026, 8, 12),
     source_as_of=date(2026, 5, 22),
+    valid_until=date(2027, 8, 12),
+    availability_state=TokyoSafetyAvailabilityState.VERIFIED_AVAILABLE,
+    eligibility_state=TokyoSafetyEligibilityState.VERIFIED_APPLICABLE,
 )
 
 HEAT_SAFETY_REFERENCE = TokyoSafetyReference(
@@ -110,6 +161,9 @@ HEAT_SAFETY_REFERENCE = TokyoSafetyReference(
     publisher="東京消防庁",
     canonical_url="https://www.tfd.metro.tokyo.lg.jp/lfe/nichijo/heat/teate.html",
     retrieved_at=date(2026, 8, 12),
+    valid_until=date(2026, 9, 30),
+    availability_state=TokyoSafetyAvailabilityState.VERIFIED_AVAILABLE,
+    eligibility_state=TokyoSafetyEligibilityState.VERIFIED_APPLICABLE,
 )
 
 
@@ -167,13 +221,31 @@ _PROFESSIONAL_HELP_FLAGS = {
     PolicyFlag.ACTIVITY_RESTRICTION,
 }
 _UNCERTAINTY_FLAGS = {PolicyFlag.DATA_QUALITY, PolicyFlag.UNCERTAINTY}
+_TOKYO_TIME_ZONE = ZoneInfo("Asia/Tokyo")
 
 
 def assess_tokyo_safety(
     query: str,
     interface_language: InterfaceLanguage,
+    *,
+    as_of: date | None = None,
 ) -> TokyoSafetyDecision:
-    """Classify a Tokyo request before any model call or resource ranking."""
+    """Classify a Tokyo request before any model call or resource ranking.
+
+    Safety disposition is determined independently from reference freshness. A
+    stale, unknown, unavailable, inapplicable, or superseded preferred reference
+    can remove only the action driven by that fact; it can never downgrade an
+    emergency or urgent disposition into ordinary resource navigation.
+    """
+
+    effective_date = as_of or _tokyo_today()
+    ambulance_119 = _evaluate_reference(AMBULANCE_119_REFERENCE, effective_date)
+    consultation_7119 = _evaluate_reference(
+        EMERGENCY_CONSULTATION_7119_REFERENCE,
+        effective_date,
+    )
+    police_110 = _evaluate_reference(POLICE_110_REFERENCE, effective_date)
+    heat_safety = _evaluate_reference(HEAT_SAFETY_REFERENCE, effective_date)
 
     core = triage_safety(query)
     normalized = _normalize(query)
@@ -187,15 +259,20 @@ def assess_tokyo_safety(
         if heat_emergency and "TOKYO-URG-HEAT-001" not in matched_rule_ids:
             matched_rule_ids.append("TOKYO-URG-HEAT-001")
         violence = _matches_any(normalized, _VIOLENCE_PATTERNS)
-        emergency_references = [AMBULANCE_119_REFERENCE]
+        emergency_references = [ambulance_119]
         if heat_context:
-            emergency_references.append(HEAT_SAFETY_REFERENCE)
+            emergency_references.append(heat_safety)
         if violence:
-            emergency_references.append(POLICE_110_REFERENCE)
+            emergency_references.append(police_110)
         return TokyoSafetyDecision(
             disposition=TokyoSafetyDisposition.EMERGENCY_ESCALATION,
             bypass_resource_navigation=True,
-            message=_emergency_message(interface_language, violence=violence),
+            message=_emergency_message(
+                interface_language,
+                ambulance_119=_reference_is_actionable(ambulance_119),
+                police_110=violence and _reference_is_actionable(police_110),
+                violence=violence,
+            ),
             matched_rule_ids=tuple(matched_rule_ids),
             policy_flags=policy_flags,
             references=_dedupe_references(emergency_references),
@@ -207,49 +284,95 @@ def assess_tokyo_safety(
             return TokyoSafetyDecision(
                 disposition=TokyoSafetyDisposition.INSUFFICIENT_INFORMATION,
                 bypass_resource_navigation=True,
-                message=_insufficient_message(interface_language),
+                message=_insufficient_message(
+                    interface_language,
+                    consultation_7119=_reference_is_actionable(consultation_7119),
+                    ambulance_119=_reference_is_actionable(ambulance_119),
+                ),
                 matched_rule_ids=core.matched_rule_ids,
                 policy_flags=core.policy_flags,
-                references=(
-                    EMERGENCY_CONSULTATION_7119_REFERENCE,
-                    AMBULANCE_119_REFERENCE,
-                ),
+                references=(consultation_7119, ambulance_119),
             )
         if flags & _PROFESSIONAL_HELP_FLAGS:
             return TokyoSafetyDecision(
                 disposition=TokyoSafetyDisposition.URGENT_PROFESSIONAL_HELP,
                 bypass_resource_navigation=True,
-                message=_professional_help_message(interface_language),
+                message=_professional_help_message(
+                    interface_language,
+                    consultation_7119=_reference_is_actionable(consultation_7119),
+                    ambulance_119=_reference_is_actionable(ambulance_119),
+                ),
                 matched_rule_ids=core.matched_rule_ids,
                 policy_flags=core.policy_flags,
-                references=(
-                    EMERGENCY_CONSULTATION_7119_REFERENCE,
-                    AMBULANCE_119_REFERENCE,
-                ),
+                references=(consultation_7119, ambulance_119),
             )
 
     if _matches_any(normalized, _UNCERTAIN_SERIOUS_PATTERNS):
         return TokyoSafetyDecision(
             disposition=TokyoSafetyDisposition.INSUFFICIENT_INFORMATION,
             bypass_resource_navigation=True,
-            message=_insufficient_message(interface_language),
-            matched_rule_ids=("TOKYO-UNC-001",),
-            references=(
-                EMERGENCY_CONSULTATION_7119_REFERENCE,
-                AMBULANCE_119_REFERENCE,
+            message=_insufficient_message(
+                interface_language,
+                consultation_7119=_reference_is_actionable(consultation_7119),
+                ambulance_119=_reference_is_actionable(ambulance_119),
             ),
+            matched_rule_ids=("TOKYO-UNC-001",),
+            references=(consultation_7119, ambulance_119),
         )
 
     routine_references: tuple[TokyoSafetyReference, ...] = ()
     message = _routine_message(interface_language)
     if heat_context and _matches_any(normalized, _HEAT_MILD_PATTERNS):
-        routine_references = (HEAT_SAFETY_REFERENCE, AMBULANCE_119_REFERENCE)
-        message = _heat_routine_message(interface_language)
+        routine_references = (heat_safety, ambulance_119)
+        message = _heat_routine_message(
+            interface_language,
+            heat_guidance=_reference_is_actionable(heat_safety),
+            ambulance_119=_reference_is_actionable(ambulance_119),
+        )
     return TokyoSafetyDecision(
         disposition=TokyoSafetyDisposition.ROUTINE_NAVIGATION,
         bypass_resource_navigation=False,
         message=message,
         references=routine_references,
+    )
+
+
+def _tokyo_today() -> date:
+    return datetime.now(_TOKYO_TIME_ZONE).date()
+
+
+def _evaluate_reference(
+    reference: TokyoSafetyReference,
+    as_of: date,
+) -> TokyoSafetyReference:
+    if reference.superseded_by_source_id is not None:
+        status = TokyoSafetyVerificationStatus.SUPERSEDED
+    elif reference.availability_state is TokyoSafetyAvailabilityState.UNKNOWN:
+        status = TokyoSafetyVerificationStatus.AVAILABILITY_UNKNOWN
+    elif reference.availability_state is TokyoSafetyAvailabilityState.VERIFIED_UNAVAILABLE:
+        status = TokyoSafetyVerificationStatus.VERIFIED_UNAVAILABLE
+    elif reference.eligibility_state is TokyoSafetyEligibilityState.UNKNOWN:
+        status = TokyoSafetyVerificationStatus.ELIGIBILITY_UNKNOWN
+    elif reference.eligibility_state is TokyoSafetyEligibilityState.VERIFIED_INAPPLICABLE:
+        status = TokyoSafetyVerificationStatus.VERIFIED_INAPPLICABLE
+    elif as_of > reference.valid_until:
+        status = TokyoSafetyVerificationStatus.EXPIRED
+    else:
+        status = TokyoSafetyVerificationStatus.VERIFIED_CURRENT
+
+    return reference.model_copy(
+        update={
+            "verification_status": status,
+            "currently_verified_actionable": status
+            is TokyoSafetyVerificationStatus.VERIFIED_CURRENT,
+        }
+    )
+
+
+def _reference_is_actionable(reference: TokyoSafetyReference) -> bool:
+    return (
+        reference.verification_status is TokyoSafetyVerificationStatus.VERIFIED_CURRENT
+        and reference.currently_verified_actionable
     )
 
 
@@ -276,84 +399,221 @@ def _routine_message(language: InterfaceLanguage) -> str:
     }[language]
 
 
-def _heat_routine_message(language: InterfaceLanguage) -> str:
-    return {
+def _heat_routine_message(
+    language: InterfaceLanguage,
+    *,
+    heat_guidance: bool,
+    ambulance_119: bool,
+) -> str:
+    if not heat_guidance:
+        return _routine_message(language)
+
+    base = {
         InterfaceLanguage.EN: (
             "Resource navigation may continue. For heat-related discomfort, move to a cooler place, "
-            "cool the body, and take fluids if you can. If severe warning signs develop, use 119."
+            "cool the body, and take fluids if you can."
         ),
         InterfaceLanguage.JA: (
             "リソース案内を続行できます。暑さによる体調不良では、涼しい場所へ移動し、体を冷やし、"
-            "可能であれば水分を取ってください。重い症状が出た場合は119を利用してください。"
+            "可能であれば水分を取ってください。"
         ),
         InterfaceLanguage.ZH: (
             "可以继续资源导航。若因炎热出现不适，请先移到凉爽处、给身体降温，并在能够饮水时补充水分。"
-            "如果出现严重警示症状，请拨打119。"
         ),
     }[language]
+    if ambulance_119:
+        return (
+            base
+            + {
+                InterfaceLanguage.EN: " If severe warning signs develop, use 119.",
+                InterfaceLanguage.JA: " 重い症状が出た場合は119番を利用してください。",
+                InterfaceLanguage.ZH: " 如果出现严重警示症状，请拨打119。",
+            }[language]
+        )
+    return base + _unverified_emergency_contact_suffix(language)
 
 
-def _emergency_message(language: InterfaceLanguage, *, violence: bool) -> str:
+def _emergency_message(
+    language: InterfaceLanguage,
+    *,
+    ambulance_119: bool,
+    police_110: bool,
+    violence: bool,
+) -> str:
     base = {
         InterfaceLanguage.EN: (
             "This request contains signs that may require immediate emergency help. CarePath Tokyo "
-            "will not diagnose the situation or rank ordinary resources. For a medical emergency "
-            "in Tokyo, call 119 now."
+            "will not diagnose the situation or rank ordinary resources."
         ),
         InterfaceLanguage.JA: (
             "直ちに緊急対応が必要な可能性のある内容が含まれています。CarePath Tokyo は診断や通常の"
-            "リソース順位付けを行いません。東京都内の医療上の緊急時は、今すぐ119番に電話してください。"
+            "リソース順位付けを行いません。"
         ),
         InterfaceLanguage.ZH: (
             "该请求包含可能需要立即紧急处理的情况。CarePath Tokyo 不会进行诊断，也不会继续普通资源排名。"
-            "在东京遇到医疗紧急情况时，请立即拨打119。"
         ),
     }[language]
+    if ambulance_119:
+        base += {
+            InterfaceLanguage.EN: " For a medical emergency in Tokyo, call 119 now.",
+            InterfaceLanguage.JA: " 東京都内の医療上の緊急時は、今すぐ119番に電話してください。",
+            InterfaceLanguage.ZH: " 在东京遇到医疗紧急情况时，请立即拨打119。",
+        }[language]
+    else:
+        base += _unverified_emergency_contact_suffix(language)
+
     if not violence:
         return base
-    suffix = {
-        InterfaceLanguage.EN: " If there is an immediate crime or violence emergency, call 110.",
-        InterfaceLanguage.JA: " 犯罪や暴力の緊急事態が目前にある場合は110番に電話してください。",
-        InterfaceLanguage.ZH: " 如果存在正在发生的犯罪或暴力紧急情况，请拨打110。",
-    }[language]
-    return base + suffix
+    if police_110:
+        return (
+            base
+            + {
+                InterfaceLanguage.EN: " If there is an immediate crime or violence emergency, call 110.",
+                InterfaceLanguage.JA: " 犯罪や暴力の緊急事態が目前にある場合は110番に電話してください。",
+                InterfaceLanguage.ZH: " 如果存在正在发生的犯罪或暴力紧急情况，请拨打110。",
+            }[language]
+        )
+    return (
+        base
+        + {
+            InterfaceLanguage.EN: (
+                " For an immediate crime or violence emergency, use a current official police emergency source."
+            ),
+            InterfaceLanguage.JA: " 犯罪や暴力の緊急時は、最新の警察公式緊急情報を利用してください。",
+            InterfaceLanguage.ZH: " 如遇正在发生的犯罪或暴力紧急情况，请使用当前官方警务紧急信息。",
+        }[language]
+    )
 
 
-def _professional_help_message(language: InterfaceLanguage) -> str:
-    return {
+def _professional_help_message(
+    language: InterfaceLanguage,
+    *,
+    consultation_7119: bool,
+    ambulance_119: bool,
+) -> str:
+    base = {
         InterfaceLanguage.EN: (
             "CarePath Tokyo cannot diagnose a condition or tell you to start, stop, or change "
-            "medication. This request should pause ordinary resource ranking and use professional "
-            "assessment. If you are unsure whether you need a hospital or ambulance in Tokyo, call "
-            "#7119, which operates 24 hours a day. If the situation becomes severe, call 119."
+            "medication. This request should pause ordinary resource ranking and use professional assessment."
         ),
         InterfaceLanguage.JA: (
             "CarePath Tokyo は診断や、薬の開始・中止・変更の指示を行いません。通常のリソース順位付けを"
-            "中断し、専門家による評価を優先してください。病院へ行くべきか救急車を呼ぶべきか迷う場合は、"
-            "24時間対応の#7119に相談してください。重い状態になった場合は119番に電話してください。"
+            "中断し、専門家による評価を優先してください。"
         ),
         InterfaceLanguage.ZH: (
             "CarePath Tokyo 不会诊断疾病，也不会指示开始、停止或更改药物。此类请求应暂停普通资源排名，"
-            "优先由专业人员评估。如果不确定在东京应去医院还是叫救护车，可拨打24小时服务的#7119；"
-            "若情况变得严重，请拨打119。"
+            "优先由专业人员评估。"
+        ),
+    }[language]
+    return base + _professional_contact_suffix(
+        language,
+        consultation_7119=consultation_7119,
+        ambulance_119=ambulance_119,
+    )
+
+
+def _insufficient_message(
+    language: InterfaceLanguage,
+    *,
+    consultation_7119: bool,
+    ambulance_119: bool,
+) -> str:
+    base = {
+        InterfaceLanguage.EN: (
+            "There is not enough information to safely rank an ordinary service. CarePath Tokyo "
+            "will preserve that uncertainty rather than reassure or diagnose."
+        ),
+        InterfaceLanguage.JA: (
+            "通常のサービスを安全に順位付けするには情報が不足しています。CarePath Tokyo は安心させる"
+            "断定や診断をせず、不確実性を明示します。"
+        ),
+        InterfaceLanguage.ZH: (
+            "目前信息不足以安全地进行普通服务排名。CarePath Tokyo 会保留这种不确定性，而不会给出安慰性"
+            "断言或诊断。"
+        ),
+    }[language]
+    return base + _professional_contact_suffix(
+        language,
+        consultation_7119=consultation_7119,
+        ambulance_119=ambulance_119,
+    )
+
+
+def _professional_contact_suffix(
+    language: InterfaceLanguage,
+    *,
+    consultation_7119: bool,
+    ambulance_119: bool,
+) -> str:
+    if consultation_7119 and ambulance_119:
+        return {
+            InterfaceLanguage.EN: (
+                " If you are unsure whether you need a hospital or ambulance in Tokyo, call #7119, "
+                "which operates 24 hours a day. If the situation becomes severe, call 119."
+            ),
+            InterfaceLanguage.JA: (
+                " 病院へ行くべきか救急車を呼ぶべきか迷う場合は、24時間対応の#7119に相談してください。"
+                "重い状態になった場合は119番に電話してください。"
+            ),
+            InterfaceLanguage.ZH: (
+                " 如果不确定在东京应去医院还是叫救护车，可拨打24小时服务的#7119；若情况变得严重，请拨打119。"
+            ),
+        }[language]
+    if consultation_7119:
+        return {
+            InterfaceLanguage.EN: (
+                " If you are unsure whether you need a hospital or ambulance in Tokyo, call #7119, "
+                "which operates 24 hours a day. The stored 119 contact fact is not currently verified."
+            ),
+            InterfaceLanguage.JA: (
+                " 病院へ行くべきか救急車を呼ぶべきか迷う場合は、24時間対応の#7119に相談してください。"
+                "保存されている119の連絡先情報は現在の検証期限内ではありません。"
+            ),
+            InterfaceLanguage.ZH: (
+                " 如果不确定在东京应去医院还是叫救护车，可拨打24小时服务的#7119。保存的119联系方式目前未通过有效期验证。"
+            ),
+        }[language]
+    if ambulance_119:
+        return {
+            InterfaceLanguage.EN: (
+                " The preferred consultation route is not currently verified, so it is not presented "
+                "as actionable. If the situation is severe, call 119."
+            ),
+            InterfaceLanguage.JA: (
+                " 優先する相談窓口は現在の検証期限内ではないため、利用可能とは表示しません。"
+                "重い状態であれば119番に電話してください。"
+            ),
+            InterfaceLanguage.ZH: (
+                " 首选咨询渠道目前未通过有效性验证，因此不会作为可执行渠道展示。若情况严重，请拨打119。"
+            ),
+        }[language]
+    return {
+        InterfaceLanguage.EN: (
+            " Stored Tokyo emergency contact facts are not currently verified. Keep the higher safety "
+            "disposition and use a current official emergency source rather than ordinary resource ranking."
+        ),
+        InterfaceLanguage.JA: (
+            " 保存されている東京の緊急連絡先情報は現在の検証期限内ではありません。安全上の判定は維持し、"
+            "通常のリソース順位付けではなく最新の公式緊急情報を利用してください。"
+        ),
+        InterfaceLanguage.ZH: (
+            " 保存的东京紧急联系方式目前未通过有效性验证。应维持更高的安全处置，并使用当前官方紧急信息，"
+            "而不是恢复普通资源排名。"
         ),
     }[language]
 
 
-def _insufficient_message(language: InterfaceLanguage) -> str:
+def _unverified_emergency_contact_suffix(language: InterfaceLanguage) -> str:
     return {
         InterfaceLanguage.EN: (
-            "There is not enough information to safely rank an ordinary service. CarePath Tokyo "
-            "will preserve that uncertainty rather than reassure or diagnose. If you are unsure "
-            "whether this is an emergency in Tokyo, call #7119; if the situation is severe, call 119."
+            " Seek immediate emergency help using a current official source; CarePath Tokyo's stored "
+            "medical emergency contact fact is not currently verified."
         ),
         InterfaceLanguage.JA: (
-            "通常のサービスを安全に順位付けするには情報が不足しています。CarePath Tokyo は安心させる"
-            "断定や診断をせず、不確実性を明示します。緊急かどうか迷う場合は#7119に相談し、重い状態なら"
-            "119番に電話してください。"
+            " 最新の公式情報を使って直ちに緊急援助を求めてください。CarePath Tokyo に保存された医療緊急"
+            "連絡先情報は現在の検証期限内ではありません。"
         ),
         InterfaceLanguage.ZH: (
-            "目前信息不足以安全地进行普通服务排名。CarePath Tokyo 会保留这种不确定性，而不会给出安慰性"
-            "断言或诊断。如果不确定是否属于紧急情况，可在东京拨打#7119；若情况严重，请拨打119。"
+            " 请通过当前官方信息立即寻求紧急帮助；CarePath Tokyo 保存的医疗紧急联系方式目前未通过有效性验证。"
         ),
     }[language]
