@@ -140,9 +140,7 @@ class TokyoEvaluationReport(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     schema_version: Literal["cp207-report-v1"] = "cp207-report-v1"
-    evaluation_kind: Literal["software_engineering_acceptance"] = (
-        "software_engineering_acceptance"
-    )
+    evaluation_kind: Literal["software_engineering_acceptance"] = "software_engineering_acceptance"
     clinical_effectiveness_claimed: Literal[False] = False
     scenario_sha256: str
     provider_mode: Literal["forced_unavailable"] = "forced_unavailable"
@@ -280,7 +278,9 @@ def _evaluate_case(
         repository,
         search,
     )
-    ranking_ok = expected.ordered_resource_ids is None or returned_ids == expected.ordered_resource_ids
+    ranking_ok = (
+        expected.ordered_resource_ids is None or returned_ids == expected.ordered_resource_ids
+    )
     if not ranking_ok:
         failures.append(f"resource order {returned_ids!r} != {expected.ordered_resource_ids!r}")
 
@@ -382,9 +382,7 @@ def _audit_special_source_state(
                 unsupported += 1
                 failures.append(f"missing field {field_name!r} became a positive claim")
 
-    payload_by_id = {
-        item["resource"]["resource_id"]: item["resource"] for item in results
-    }
+    payload_by_id = {item["resource"]["resource_id"]: item["resource"] for item in results}
     for resource_id, freshness in expected.freshness.items():
         if payload_by_id.get(resource_id, {}).get("freshness") != freshness.value:
             unsupported += 1
@@ -487,7 +485,9 @@ def _calculate_metrics(results: Sequence[TokyoEvaluationCaseResult]) -> TokyoEva
     intent = _tagged(results, "intent")
     ranking = _tagged(results, "ranking")
     safety = _tagged(results, "safety")
-    language = [result for result in results if "language" in result.tags or "primary" in result.tags]
+    language = [
+        result for result in results if "language" in result.tags or "primary" in result.tags
+    ]
     factual = [result for result in results if result.returned_resource_ids]
     unsupported = sum(result.unsupported_factual_resource_claims for result in results)
     return TokyoEvaluationMetrics(
