@@ -80,10 +80,13 @@ def test_tokyo_readiness_fails_when_source_backed_resource_corpus_is_missing() -
     assert payload["deterministic_search_available"] is False
 
 
-def test_render_health_check_uses_tokyo_readiness() -> None:
+def test_render_uses_liveness_while_cp208_verifier_requires_tokyo_readiness() -> None:
     render = Path("render.yaml").read_text(encoding="utf-8")
+    verifier = Path("deployment/verify_tokyo_public.py").read_text(encoding="utf-8")
 
-    assert "healthCheckPath: /health/tokyo" in render
+    assert "healthCheckPath: /health/live" in render
+    assert 'fetch_json(base_url, "/health/tokyo")' in verifier
+    assert 'tokyo.get("status") != "ready"' in verifier
 
 
 def test_public_tokyo_playwright_contract_covers_deployment_requirements() -> None:
