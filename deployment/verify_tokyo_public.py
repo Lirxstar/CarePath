@@ -157,7 +157,8 @@ def verify(base_url: str, *, expected_commit: str | None = None) -> dict[str, An
             raise RuntimeError("build identity probe did not report a git commit")
         if deployed_commit != expected_commit:
             raise RuntimeError(
-                f"deployed commit {deployed_commit} does not match expected commit {expected_commit}"
+                f"deployed commit {deployed_commit} does not match expected commit "
+                f"{expected_commit}"
             )
         report["build"] = build
 

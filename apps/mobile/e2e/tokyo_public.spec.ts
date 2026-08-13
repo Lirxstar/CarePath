@@ -44,76 +44,78 @@ async function captureExternalOpen(page: Page, testIdPrefix: string) {
   );
 }
 
-test("public Tokyo route survives hard refresh and completes EN JA ZH source-backed journeys", async ({
-  page,
-}) => {
-  await page.goto("/tokyo");
-  await expect(page.getByTestId("tokyo-screen")).toBeVisible({
-    timeout: 60_000,
-  });
-  await expect(page.getByTestId("account-privacy-panel")).toHaveCount(0);
-  await expect(page).toHaveURL(/\/tokyo\/?$/);
+test(
+  "public Tokyo route survives hard refresh and completes EN JA ZH source-backed journeys",
+  async ({ page }) => {
+    await page.goto("/tokyo");
+    await expect(page.getByTestId("tokyo-screen")).toBeVisible({
+      timeout: 60_000,
+    });
+    await expect(page.getByTestId("account-privacy-panel")).toHaveCount(0);
+    await expect(page).toHaveURL(/\/tokyo\/?$/);
 
-  await page.reload();
-  await expect(page.getByTestId("tokyo-screen")).toBeVisible({
-    timeout: 60_000,
-  });
-  await expect(page).toHaveURL(/\/tokyo\/?$/);
+    await page.reload();
+    await expect(page.getByTestId("tokyo-screen")).toBeVisible({
+      timeout: 60_000,
+    });
+    await expect(page).toHaveURL(/\/tokyo\/?$/);
 
-  await page.getByTestId("tokyo-language-en").click();
-  await search(
-    page,
-    "I need a nearby clinic in Tokyo where staff can support me in English.",
-    "新宿区",
-  );
-  await expect(page.getByText("Verified source facts").first()).toBeVisible();
+    await page.getByTestId("tokyo-language-en").click();
+    await search(
+      page,
+      "I need a nearby clinic in Tokyo where staff can support me in English.",
+      "新宿区",
+    );
+    await expect(page.getByText("Verified source facts").first()).toBeVisible();
 
-  await page.getByTestId("tokyo-language-ja").click();
-  await search(
-    page,
-    "とても暑いので、近くの指定クーリングシェルターを探したいです。",
-    "江東区",
-  );
-  await expect(page.getByText("確認済みの出典情報").first()).toBeVisible();
+    await page.getByTestId("tokyo-language-ja").click();
+    await search(
+      page,
+      "とても暑いので、近くの指定クーリングシェルターを探したいです。",
+      "江東区",
+    );
+    await expect(page.getByText("確認済みの出典情報").first()).toBeVisible();
 
-  await page.getByTestId("tokyo-language-zh").click();
-  await search(
-    page,
-    "我在育儿方面遇到困难，但不知道应该联系东京的哪种公共支持服务。",
-    "江東区",
-  );
-  await expect(page.getByText("经来源验证的事实").first()).toBeVisible();
-});
+    await page.getByTestId("tokyo-language-zh").click();
+    await search(
+      page,
+      "我在育儿方面遇到困难，但不知道应该联系东京的哪种公共支持服务。",
+      "江東区",
+    );
+    await expect(page.getByText("经来源验证的事实").first()).toBeVisible();
+  },
+);
 
-test("public deterministic cooling demo exposes only valid action-link schemes", async ({
-  page,
-}) => {
-  await page.goto("/tokyo");
-  await expect(page.getByTestId("tokyo-screen")).toBeVisible({
-    timeout: 60_000,
-  });
-  await page.getByTestId("tokyo-example-cooling").click();
-  await expect(page.getByTestId("tokyo-selected-location")).toContainText(
-    "Koto City",
-  );
-  await page.getByTestId("tokyo-search").click();
-  await expect(page.getByTestId("tokyo-results")).toBeVisible({
-    timeout: 60_000,
-  });
+test(
+  "public deterministic cooling demo exposes only valid action-link schemes",
+  async ({ page }) => {
+    await page.goto("/tokyo");
+    await expect(page.getByTestId("tokyo-screen")).toBeVisible({
+      timeout: 60_000,
+    });
+    await page.getByTestId("tokyo-example-cooling").click();
+    await expect(page.getByTestId("tokyo-selected-location")).toContainText(
+      "Koto City",
+    );
+    await page.getByTestId("tokyo-search").click();
+    await expect(page.getByTestId("tokyo-results")).toBeVisible({
+      timeout: 60_000,
+    });
 
-  const sourceUrl = await captureExternalOpen(page, "tokyo-source-");
-  expect(sourceUrl).toMatch(/^https:\/\//);
+    const sourceUrl = await captureExternalOpen(page, "tokyo-source-");
+    expect(sourceUrl).toMatch(/^https:\/\//);
 
-  const directionsUrl = await captureExternalOpen(page, "tokyo-directions-");
-  expect(directionsUrl).toMatch(/^https:\/\/www\.google\.com\/maps\/search/);
+    const directionsUrl = await captureExternalOpen(page, "tokyo-directions-");
+    expect(directionsUrl).toMatch(/^https:\/\/www\.google\.com\/maps\/search/);
 
-  const websiteUrl = await captureExternalOpen(page, "tokyo-website-");
-  if (websiteUrl !== null) {
-    expect(websiteUrl).toMatch(/^https:\/\//);
-  }
+    const websiteUrl = await captureExternalOpen(page, "tokyo-website-");
+    if (websiteUrl !== null) {
+      expect(websiteUrl).toMatch(/^https:\/\//);
+    }
 
-  const phoneUrl = await captureExternalOpen(page, "tokyo-call-");
-  if (phoneUrl !== null) {
-    expect(phoneUrl).toMatch(/^tel:/);
-  }
-});
+    const phoneUrl = await captureExternalOpen(page, "tokyo-call-");
+    if (phoneUrl !== null) {
+      expect(phoneUrl).toMatch(/^tel:/);
+    }
+  },
+);
