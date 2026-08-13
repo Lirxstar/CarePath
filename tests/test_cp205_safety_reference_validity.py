@@ -5,9 +5,9 @@ from datetime import date
 import pytest
 from fastapi.testclient import TestClient
 
+import backend.tokyo.safety as tokyo_safety
 from backend.api.app.config import Settings
 from backend.api.app.main import create_app
-from backend.tokyo import safety as tokyo_safety
 from backend.tokyo.journeys import InterfaceLanguage
 from backend.tokyo.safety import (
     TokyoSafetyAvailabilityState,
