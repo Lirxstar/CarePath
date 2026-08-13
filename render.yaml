@@ -11,7 +11,7 @@ services:
     plan: free
     dockerfilePath: ./Dockerfile
     dockerContext: .
-    healthCheckPath: /health/live
+    healthCheckPath: /health/tokyo
     envVars:
       - key: CAREPATH_ENVIRONMENT
         value: production
