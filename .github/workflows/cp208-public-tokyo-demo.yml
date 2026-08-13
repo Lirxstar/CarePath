@@ -1,0 +1,210 @@
+name: CP-208 public Tokyo demo
+
+on:
+  pull_request:
+    paths:
+      - "backend/api/app/health.py"
+      - "backend/api/app/main.py"
+      - "backend/tokyo/**"
+      - "deployment/**"
+      - "render.yaml"
+      - "apps/mobile/src/tokyo/**"
+      - "apps/mobile/e2e/tokyo_public.spec.ts"
+      - "apps/mobile/e2e/playwright.cp208.config.ts"
+      - "tests/test_cp208_public_tokyo_demo.py"
+      - "docs/cp208_public_tokyo_demo.md"
+      - ".github/workflows/cp208-public-tokyo-demo.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/api/app/health.py"
+      - "backend/api/app/main.py"
+      - "backend/tokyo/**"
+      - "deployment/**"
+      - "render.yaml"
+      - "apps/mobile/src/tokyo/**"
+      - "apps/mobile/e2e/tokyo_public.spec.ts"
+      - "apps/mobile/e2e/playwright.cp208.config.ts"
+      - "tests/test_cp208_public_tokyo_demo.py"
+      - "docs/cp208_public_tokyo_demo.md"
+      - ".github/workflows/cp208-public-tokyo-demo.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  integrated:
+    name: Integrated public-demo contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: .python-version
+          cache: pip
+          cache-dependency-path: |
+            pyproject.toml
+            requirements-dev.lock
+
+      - name: Install backend dependencies
+        run: python -m pip install -c requirements-dev.lock -e '.[dev]'
+
+      - name: Check CP-208 Python quality
+        run: |
+          python -m ruff format --check backend/api/app/health.py deployment/verify_tokyo_public.py tests/test_cp208_public_tokyo_demo.py
+          python -m ruff check backend/api/app/health.py deployment/verify_tokyo_public.py tests/test_cp208_public_tokyo_demo.py
+          python -m mypy backend/api/app/health.py deployment/verify_tokyo_public.py
+
+      - name: Run CP-207 and CP-208 regressions
+        run: >-
+          python -m pytest
+          tests/test_cp207_tokyo_evaluation.py
+          tests/test_cp208_public_tokyo_demo.py
+          --no-cov
+
+      - name: Build and start production-style deployment
+        run: >-
+          docker compose --env-file deployment/.env.compose.example
+          up -d --build --wait --wait-timeout 180
+
+      - name: Verify integrated Tokyo readiness and grounded demo
+        run: >-
+          python deployment/verify_tokyo_public.py
+          http://127.0.0.1:8000
+          --output /tmp/cp208/integrated-verification.json
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: apps/mobile/.nvmrc
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+
+      - name: Install Playwright runtime
+        working-directory: apps/mobile
+        run: |
+          npm ci
+          npm install --no-save --package-lock=false @playwright/test@1.54.1
+          npx playwright install --with-deps chromium
+
+      - name: Run integrated CP-208 Tokyo browser acceptance
+        working-directory: apps/mobile
+        env:
+          CAREPATH_E2E_BASE_URL: http://127.0.0.1:8000
+        run: npx playwright test --config=e2e/playwright.cp208.config.ts
+
+      - name: Capture deployment logs
+        if: always()
+        run: |
+          mkdir -p /tmp/cp208
+          docker compose --env-file deployment/.env.compose.example logs --no-color > /tmp/cp208/integrated-compose.log 2>&1 || true
+
+      - name: Upload integrated CP-208 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cp208-integrated-${{ github.run_attempt }}
+          path: |
+            /tmp/cp208/**
+            apps/mobile/test-results/cp208/**
+          if-no-files-found: warn
+
+      - name: Tear down deployment stack
+        if: always()
+        run: docker compose --env-file deployment/.env.compose.example down -v --remove-orphans
+
+  public:
+    name: Exact public Render Tokyo acceptance
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: integrated
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: .python-version
+
+      - name: Resolve public origin
+        id: origin
+        shell: bash
+        run: |
+          origin="$(tr -d '[:space:]' < deployment/public_backend_url.txt)"
+          if [[ ! "$origin" =~ ^https:// ]]; then
+            echo "Public backend origin must use HTTPS" >&2
+            exit 1
+          fi
+          echo "url=$origin" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for exact Render build and stable full-service readiness
+        env:
+          PUBLIC_ORIGIN: ${{ steps.origin.outputs.url }}
+          EXPECTED_COMMIT: ${{ github.sha }}
+        shell: bash
+        run: |
+          success=0
+          for attempt in $(seq 1 42); do
+            echo "Exact deployment probe $attempt/42"
+            if python deployment/verify_backend.py \
+              "$PUBLIC_ORIGIN" \
+              --expected-commit "$EXPECTED_COMMIT" \
+              --confirmations 3 \
+              --confirmation-interval 2; then
+              success=1
+              break
+            fi
+            sleep 10
+          done
+          if [[ "$success" != "1" ]]; then
+            echo "Exact Render deployment did not become stable" >&2
+            exit 1
+          fi
+
+      - name: Verify public Tokyo readiness and grounded demo
+        env:
+          PUBLIC_ORIGIN: ${{ steps.origin.outputs.url }}
+          EXPECTED_COMMIT: ${{ github.sha }}
+        run: >-
+          python deployment/verify_tokyo_public.py
+          "$PUBLIC_ORIGIN"
+          --expected-commit "$EXPECTED_COMMIT"
+          --output /tmp/cp208/public-verification.json
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: apps/mobile/.nvmrc
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+
+      - name: Install Playwright runtime
+        working-directory: apps/mobile
+        run: |
+          npm ci
+          npm install --no-save --package-lock=false @playwright/test@1.54.1
+          npx playwright install --with-deps chromium
+
+      - name: Run public CP-208 Tokyo browser acceptance
+        working-directory: apps/mobile
+        env:
+          CAREPATH_E2E_BASE_URL: ${{ steps.origin.outputs.url }}
+        run: npx playwright test --config=e2e/playwright.cp208.config.ts
+
+      - name: Upload public CP-208 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cp208-public-${{ github.run_attempt }}
+          path: |
+            /tmp/cp208/**
+            apps/mobile/test-results/cp208/**
+          if-no-files-found: warn

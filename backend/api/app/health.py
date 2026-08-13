@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from backend.storage.database import engine as storage_engine
+from backend.tokyo.search import TokyoResourceRepository
 
 from .llm.provider import LLMProvider
 
@@ -49,7 +50,7 @@ async def build_identity(response: Response) -> dict[str, str | None]:
 
 @router.get("/health/ready", response_model=None)
 async def readiness(request: Request) -> JSONResponse:
-    """Dependency-aware readiness probe for orchestrators and cloud platforms."""
+    """Dependency-aware readiness probe for the complete CarePath Core service."""
 
     checks: dict[str, str] = {}
 
@@ -74,5 +75,45 @@ async def readiness(request: Request) -> JSONResponse:
         content={
             "status": "ready" if ready else "not_ready",
             "checks": checks,
+        },
+    )
+
+
+@router.get("/health/tokyo", response_model=None)
+async def tokyo_readiness(request: Request) -> JSONResponse:
+    """Report whether the public Tokyo navigator can serve grounded resource searches.
+
+    Tokyo factual selection depends on the local resource corpus, not on model availability.
+    A provider outage is therefore exposed as ``fallback`` while the endpoint remains ready
+    when deterministic source-backed search can still operate. Missing resource data is
+    blocking and returns 503.
+    """
+
+    repository = cast(
+        TokyoResourceRepository | None,
+        getattr(request.app.state, "tokyo_resource_repository", None),
+    )
+    resource_count = len(repository) if repository is not None else 0
+    resource_ready = resource_count > 0
+
+    active_provider = cast(LLMProvider, request.app.state.provider)
+    try:
+        provider_health = await active_provider.health_check()
+        provider_ready = provider_health.get("status") == "ok"
+    except Exception:
+        provider_ready = False
+
+    checks = {
+        "resource_data": "ok" if resource_ready else "error",
+        "provider": "ok" if provider_ready else "fallback",
+    }
+    return JSONResponse(
+        status_code=HTTPStatus.OK if resource_ready else HTTPStatus.SERVICE_UNAVAILABLE,
+        content={
+            "status": "ready" if resource_ready else "not_ready",
+            "checks": checks,
+            "resource_count": resource_count,
+            "deterministic_search_available": resource_ready,
+            "model_assistance_available": provider_ready,
         },
     )
