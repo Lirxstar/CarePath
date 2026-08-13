@@ -16,7 +16,7 @@ The endpoint returns HTTP 200 only when the canonical Tokyo resource corpus is l
 - `provider=fallback`: the provider is unavailable, but deterministic source-backed search remains usable;
 - missing/empty resource data: HTTP 503 because the product cannot safely fabricate replacement resources.
 
-Render uses `/health/tokyo` as its service health check. The existing `/health/ready` remains the stricter full CarePath Core readiness probe.
+Render keeps the lightweight `/health/live` platform probe. CP-208's dedicated public acceptance requires `/health/tokyo` readiness before the Tokyo demo is considered deployable. The existing `/health/ready` remains the stricter full CarePath Core readiness probe.
 
 ## Privacy and location
 

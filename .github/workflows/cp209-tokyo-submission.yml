@@ -1,0 +1,86 @@
+name: CP-209 Tokyo submission package
+
+on:
+  pull_request:
+    paths:
+      - "submission/tokyo/**"
+      - "docs/cp208_public_tokyo_demo.md"
+      - "data/tokyo/sources.json"
+      - "deployment/public_backend_url.txt"
+      - "render.yaml"
+      - "apps/mobile/e2e/cp209_submission_capture.spec.ts"
+      - "apps/mobile/e2e/playwright.cp209.config.ts"
+      - ".github/workflows/cp209-tokyo-submission.yml"
+  push:
+    branches: [main]
+    paths:
+      - "submission/tokyo/**"
+      - "docs/cp208_public_tokyo_demo.md"
+      - "data/tokyo/sources.json"
+      - "deployment/public_backend_url.txt"
+      - "render.yaml"
+      - "apps/mobile/e2e/cp209_submission_capture.spec.ts"
+      - "apps/mobile/e2e/playwright.cp209.config.ts"
+      - ".github/workflows/cp209-tokyo-submission.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  submission-contract:
+    name: Submission consistency and public screenshots
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: .python-version
+
+      - name: Verify CP-209 source/claim consistency
+        run: python submission/tokyo/verify_submission.py
+
+      - name: Verify public Tokyo deployment contract
+        run: >-
+          python deployment/verify_tokyo_public.py
+          "$(tr -d '[:space:]' < deployment/public_backend_url.txt)"
+          --output /tmp/cp209-public-verification.json
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: apps/mobile/.nvmrc
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+
+      - name: Install Playwright runtime
+        working-directory: apps/mobile
+        run: |
+          npm ci
+          npm install --no-save --package-lock=false @playwright/test@1.54.1
+          npx playwright install --with-deps chromium
+
+      - name: Capture three public submission screenshots
+        working-directory: apps/mobile
+        env:
+          CAREPATH_E2E_BASE_URL: https://carepath-api-8edq.onrender.com
+        run: npx playwright test --config=e2e/playwright.cp209.config.ts
+
+      - name: Enforce screenshot count
+        run: |
+          count="$(find submission/tokyo/screenshots -maxdepth 1 -type f -name '*.png' | wc -l | tr -d ' ')"
+          test "$count" = "3"
+
+      - name: Upload CP-209 submission evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: cp209-submission-${{ github.run_attempt }}
+          path: |
+            /tmp/cp209-public-verification.json
+            submission/tokyo/screenshots/*.png
+            apps/mobile/test-results/cp209/**
+          if-no-files-found: error
