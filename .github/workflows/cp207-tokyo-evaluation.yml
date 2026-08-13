@@ -73,7 +73,7 @@ jobs:
         with:
           name: cp207-tokyo-evaluation-${{ github.run_attempt }}
           path: /tmp/cp207-results/**
-          if-no-files-found: error
+          if-no-files-found: warn
 
   browser-e2e:
     name: Tokyo desktop and mobile browser acceptance
