@@ -1,0 +1,30 @@
+name: CP-208 Prettier diagnostic
+
+on:
+  push:
+    branches:
+      - agent/cp208-public-tokyo-demo
+
+permissions:
+  contents: read
+
+jobs:
+  prettier-diff:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: apps/mobile/.nvmrc
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+      - name: Install frontend dependencies
+        working-directory: apps/mobile
+        run: npm ci
+      - name: Print canonical Prettier diff
+        working-directory: apps/mobile
+        run: |
+          npx prettier --write e2e/tokyo_public.spec.ts
+          git diff -- e2e/tokyo_public.spec.ts
