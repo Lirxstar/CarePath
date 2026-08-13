@@ -57,8 +57,7 @@ def test_expired_preferred_reference_is_not_actionable_and_119_remains_fallback(
         TokyoSafetyVerificationStatus.EXPIRED
     )
     assert (
-        references["tokyo-fire-emergency-consultation-7119"].currently_verified_actionable
-        is False
+        references["tokyo-fire-emergency-consultation-7119"].currently_verified_actionable is False
     )
     assert references["tokyo-health-ambulance-119"].verification_status is (
         TokyoSafetyVerificationStatus.VERIFIED_CURRENT
