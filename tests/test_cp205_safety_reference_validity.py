@@ -19,7 +19,6 @@ from backend.tokyo.safety import (
     assess_tokyo_safety,
 )
 
-
 _AS_OF = date(2026, 8, 13)
 
 
