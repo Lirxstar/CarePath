@@ -45,7 +45,7 @@ def fetch_html(base_url: str, path: str) -> str:
     try:
         with urlopen(request, timeout=20) as response:
             content_type = response.headers.get("Content-Type", "")
-            body = response.read().decode("utf-8")
+            body: str = response.read().decode("utf-8")
     except (HTTPError, URLError, TimeoutError, UnicodeDecodeError) as exc:
         raise RuntimeError(f"Tokyo public route check failed for {path}") from exc
     if "text/html" not in content_type.lower() or "<html" not in body.lower():
