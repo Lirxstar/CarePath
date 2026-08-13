@@ -342,7 +342,11 @@ def _intent_tool_ok(
         return False
     if search is None:
         return False
-    return search.get("applied_filters", {}).get("category") == expected.category
+    applied_filters = search.get("applied_filters")
+    if not isinstance(applied_filters, dict):
+        return False
+    category = applied_filters.get("category")
+    return isinstance(category, str) and category == expected.category
 
 
 def _audit_resources(
