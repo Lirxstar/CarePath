@@ -127,7 +127,7 @@ def test_inapplicable_preferred_route_is_suppressed_without_lowering_safety(
 
 def test_unknown_language_support_is_not_inferred_from_interface_language() -> None:
     decision = assess_tokyo_safety(
-        "我不确定这是不是紧急情况。",
+        "天气很热，我头晕。",
         InterfaceLanguage.ZH,
         as_of=_AS_OF,
     )
