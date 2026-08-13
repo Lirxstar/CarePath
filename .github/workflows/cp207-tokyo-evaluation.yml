@@ -1,0 +1,129 @@
+name: CP-207 Tokyo evaluation
+
+on:
+  pull_request:
+    paths:
+      - "backend/evaluation/tokyo.py"
+      - "backend/evaluation/tokyo_cli.py"
+      - "backend/tokyo/**"
+      - "backend/api/app/tokyo_routes.py"
+      - "data/tokyo/**"
+      - "evaluation/tokyo/**"
+      - "tests/test_cp20*_tokyo_*.py"
+      - "apps/mobile/src/tokyo/**"
+      - "apps/mobile/e2e/tokyo_web.spec.ts"
+      - "apps/mobile/e2e/playwright.v08.config.ts"
+      - "docs/cp207_tokyo_evaluation.md"
+      - ".github/workflows/cp207-tokyo-evaluation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  evaluation:
+    name: Fixed Tokyo evaluation and metrics
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: .python-version
+          cache: pip
+          cache-dependency-path: |
+            pyproject.toml
+            requirements-dev.lock
+
+      - name: Install backend dependencies
+        run: python -m pip install -c requirements-dev.lock -e '.[dev]'
+
+      - name: Check CP-207 formatting and lint
+        run: |
+          python -m ruff format --check backend/evaluation/tokyo.py backend/evaluation/tokyo_cli.py tests/test_cp207_tokyo_evaluation.py
+          python -m ruff check backend/evaluation/tokyo.py backend/evaluation/tokyo_cli.py tests/test_cp207_tokyo_evaluation.py
+
+      - name: Strict type-check CP-207 evaluation code
+        run: python -m mypy backend/evaluation/tokyo.py backend/evaluation/tokyo_cli.py
+
+      - name: Run Tokyo regression and CP-207 acceptance tests
+        run: |
+          python -m pytest \
+            tests/test_cp202_tokyo_journeys.py \
+            tests/test_cp203_tokyo_search.py \
+            tests/test_cp204_tokyo_agent.py \
+            tests/test_cp205_tokyo_safety.py \
+            tests/test_cp205_safety_reference_validity.py \
+            tests/test_cp206_tokyo_web.py \
+            tests/test_cp207_tokyo_evaluation.py \
+            --no-cov
+
+      - name: Produce machine-readable CP-207 results
+        run: >-
+          python -m backend.evaluation.tokyo_cli
+          --scenarios evaluation/tokyo/scenarios.json
+          --output-dir /tmp/cp207-results
+
+      - name: Upload complete CP-207 results including failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cp207-tokyo-evaluation-${{ github.run_attempt }}
+          path: /tmp/cp207-results/**
+          if-no-files-found: error
+
+  browser-e2e:
+    name: Tokyo desktop and mobile browser acceptance
+    needs: evaluation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Build and start deployment stack
+        run: >-
+          docker compose --env-file deployment/.env.compose.example
+          up -d --build --wait --wait-timeout 180
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: apps/mobile/.nvmrc
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+
+      - name: Install Playwright runtime
+        working-directory: apps/mobile
+        run: |
+          npm ci
+          npm install --no-save --package-lock=false @playwright/test@1.54.1
+          npx playwright install --with-deps chromium
+
+      - name: Run Tokyo desktop, denied-location mobile, and safety journeys
+        working-directory: apps/mobile
+        env:
+          CAREPATH_E2E_BASE_URL: http://127.0.0.1:8000
+        run: >-
+          npx playwright test e2e/tokyo_web.spec.ts
+          --config=e2e/playwright.v08.config.ts
+
+      - name: Show deployment logs on failure
+        if: failure()
+        run: docker compose --env-file deployment/.env.compose.example logs --no-color || true
+
+      - name: Upload CP-207 browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cp207-tokyo-browser-${{ github.run_attempt }}
+          path: docs/evidence/v08/**
+          include-hidden-files: true
+          if-no-files-found: warn
+
+      - name: Tear down deployment stack
+        if: always()
+        run: docker compose --env-file deployment/.env.compose.example down -v --remove-orphans
