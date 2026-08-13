@@ -1,11 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 
-const EN_QUERY =
-  "I need a nearby clinic in Tokyo where staff can support me in English.";
-const JA_QUERY =
-  "とても暑いので、近くの指定クーリングシェルターを探したいです。";
-const ZH_QUERY =
-  "我在育儿方面遇到困难，但不知道应该联系东京的哪种公共支持服务。";
+const EN_QUERY = "I need a nearby clinic in Tokyo where staff can support me in English.";
+const JA_QUERY = "とても暑いので、近くの指定クーリングシェルターを探したいです。";
+const ZH_QUERY = "我在育儿方面遇到困难，但不知道应该联系东京的哪种公共支持服务。";
 
 async function chooseManualLocation(page: Page, municipality: string) {
   await page.getByTestId("tokyo-manual-location").fill(municipality);
@@ -37,10 +34,7 @@ async function captureExternalOpen(page: Page, testIdPrefix: string) {
   await page.evaluate(() => {
     window.sessionStorage.removeItem("carepath-cp208-open-url");
     window.open = ((url?: string | URL) => {
-      window.sessionStorage.setItem(
-        "carepath-cp208-open-url",
-        String(url ?? ""),
-      );
+      window.sessionStorage.setItem("carepath-cp208-open-url", String(url ?? ""));
       return null;
     }) as typeof window.open;
   });
