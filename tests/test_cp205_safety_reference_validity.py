@@ -5,11 +5,12 @@ from datetime import date
 import pytest
 from fastapi.testclient import TestClient
 
-import backend.tokyo.safety as tokyo_safety
 from backend.api.app.config import Settings
 from backend.api.app.main import create_app
 from backend.tokyo.journeys import InterfaceLanguage
 from backend.tokyo.safety import (
+    AMBULANCE_119_REFERENCE,
+    EMERGENCY_CONSULTATION_7119_REFERENCE,
     TokyoSafetyAvailabilityState,
     TokyoSafetyDisposition,
     TokyoSafetyEligibilityState,
@@ -35,12 +36,11 @@ def test_expired_preferred_reference_is_not_actionable_and_119_remains_fallback(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     expired_7119 = _replace_reference(
-        tokyo_safety.EMERGENCY_CONSULTATION_7119_REFERENCE,
+        EMERGENCY_CONSULTATION_7119_REFERENCE,
         valid_until=date(2026, 8, 12),
     )
     monkeypatch.setattr(
-        tokyo_safety,
-        "EMERGENCY_CONSULTATION_7119_REFERENCE",
+        "backend.tokyo.safety.EMERGENCY_CONSULTATION_7119_REFERENCE",
         expired_7119,
     )
 
@@ -70,10 +70,13 @@ def test_unknown_emergency_reference_never_downgrades_emergency_disposition(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     unknown_119 = _replace_reference(
-        tokyo_safety.AMBULANCE_119_REFERENCE,
+        AMBULANCE_119_REFERENCE,
         availability_state=TokyoSafetyAvailabilityState.UNKNOWN,
     )
-    monkeypatch.setattr(tokyo_safety, "AMBULANCE_119_REFERENCE", unknown_119)
+    monkeypatch.setattr(
+        "backend.tokyo.safety.AMBULANCE_119_REFERENCE",
+        unknown_119,
+    )
 
     decision = assess_tokyo_safety(
         "I can't breathe. Find me a nearby clinic.",
@@ -98,13 +101,12 @@ def test_inapplicable_preferred_route_is_suppressed_without_lowering_safety(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     inapplicable_7119 = _replace_reference(
-        tokyo_safety.EMERGENCY_CONSULTATION_7119_REFERENCE,
+        EMERGENCY_CONSULTATION_7119_REFERENCE,
         eligibility="fixture-ineligible",
         eligibility_state=TokyoSafetyEligibilityState.VERIFIED_INAPPLICABLE,
     )
     monkeypatch.setattr(
-        tokyo_safety,
-        "EMERGENCY_CONSULTATION_7119_REFERENCE",
+        "backend.tokyo.safety.EMERGENCY_CONSULTATION_7119_REFERENCE",
         inapplicable_7119,
     )
 
@@ -139,12 +141,11 @@ def test_superseded_reference_is_quarantined_and_escalation_is_preserved(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     superseded_7119 = _replace_reference(
-        tokyo_safety.EMERGENCY_CONSULTATION_7119_REFERENCE,
+        EMERGENCY_CONSULTATION_7119_REFERENCE,
         superseded_by_source_id="tokyo-fire-newer-consultation-reference",
     )
     monkeypatch.setattr(
-        tokyo_safety,
-        "EMERGENCY_CONSULTATION_7119_REFERENCE",
+        "backend.tokyo.safety.EMERGENCY_CONSULTATION_7119_REFERENCE",
         superseded_7119,
     )
 
@@ -167,12 +168,11 @@ def test_unknown_eligibility_fails_closed_for_action_driving_reference(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     unknown_eligibility = _replace_reference(
-        tokyo_safety.EMERGENCY_CONSULTATION_7119_REFERENCE,
+        EMERGENCY_CONSULTATION_7119_REFERENCE,
         eligibility_state=TokyoSafetyEligibilityState.UNKNOWN,
     )
     monkeypatch.setattr(
-        tokyo_safety,
-        "EMERGENCY_CONSULTATION_7119_REFERENCE",
+        "backend.tokyo.safety.EMERGENCY_CONSULTATION_7119_REFERENCE",
         unknown_eligibility,
     )
 
