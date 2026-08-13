@@ -669,7 +669,10 @@ def _render_summary(report: TokyoEvaluationReport) -> str:
     lines = [
         "# CP-207 Tokyo engineering evaluation",
         "",
-        "This report measures reproducible software behaviour only. It does not claim clinical effectiveness.",
+        (
+            "This report measures reproducible software behaviour only. "
+            "It does not claim clinical effectiveness."
+        ),
         "",
         f"- Threshold status: **{'PASS' if report.threshold_pass else 'FAIL'}**",
         f"- Cases passed: {metrics.passed_cases}/{metrics.total_cases}",
